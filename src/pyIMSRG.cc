@@ -964,6 +964,8 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("Mscheme_Test_comm122ss", &UnitTest::Mscheme_Test_comm122ss)
           .def("Mscheme_Test_comm222_pp_hhss", &UnitTest::Mscheme_Test_comm222_pp_hhss)
           .def("Mscheme_Test_comm222_phss", &UnitTest::Mscheme_Test_comm222_phss)
+
+          .def("Mscheme_Test_comm122st", &UnitTest::Mscheme_Test_comm122st)
           //
           //      .def("Mscheme_Test_comm222_pp_hh_221ss", &UnitTest::Mscheme_Test_comm222_pp_hh_221ss)
           ///
