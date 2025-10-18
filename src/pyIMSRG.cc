@@ -77,6 +77,12 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def_readwrite("parity", &TwoBodyChannel::parity)
           .def_readwrite("Tz", &TwoBodyChannel::Tz);
 
+      py::class_<TwoBodyChannel_CC>(m, "TwoBodyChannel_CC")
+          .def(py::init<>())
+          .def_readwrite("J", &TwoBodyChannel::J)
+          .def_readwrite("parity", &TwoBodyChannel::parity)
+          .def_readwrite("Tz", &TwoBodyChannel::Tz);
+
       py::class_<ThreeBodyChannel>(m, "ThreeBodyChannel")
           .def(py::init<>())
           .def("GetNumber3bKets", &ThreeBodyChannel::GetNumber3bKets)
@@ -132,6 +138,7 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("GetNumberOrbits", &ModelSpace::GetNumberOrbits)
           .def("GetNumberKets", &ModelSpace::GetNumberKets)
           .def("GetNumberTwoBodyChannels", &ModelSpace::GetNumberTwoBodyChannels)
+          .def("GetNumberTwoBodyChannels_CC", &ModelSpace::GetNumberTwoBodyChannels_CC)
           .def("GetNumberThreeBodyChannels", &ModelSpace::GetNumberThreeBodyChannels)
           .def("GetEmax",  &ModelSpace::GetEmax)
           .def("GetE2max", &ModelSpace::GetE2max)
@@ -183,6 +190,7 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("SetScalar3bFirstPass", &ModelSpace::SetScalar3bFirstPass)
           .def("ClearVectors", &ModelSpace::ClearVectors)
           .def("Print", &ModelSpace::Print)
+          .def("Print_CC", &ModelSpace::Print_CC)
           .def_readwrite("holes", &ModelSpace::holes)
           .def_readwrite("particles", &ModelSpace::particles)
           .def_readwrite("core", &ModelSpace::core)
@@ -711,6 +719,8 @@ PYBIND11_MODULE(pyIMSRG, m)
        Commutator.def("SetVerbose", &Commutator::SetVerbose, py::arg("tf"));
        Commutator.def("SetSingleThread", &Commutator::SetSingleThread, py::arg("tf"));
        Commutator.def("PrintSettings", &Commutator::PrintSettings );
+
+       Commutator.def("DoPandyaTransformation_SingleChannel", &Commutator::DoPandyaTransformation_SingleChannel, py::arg("OpIn"), py::arg("M_CC"), py::arg("ch_cc"), py::arg("orientation"));
 
        // IMSRG(2) commutators
        Commutator.def("comm110ss", &Commutator::comm110ss);
