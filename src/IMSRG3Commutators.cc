@@ -9,6 +9,7 @@ namespace Commutator
 {
 
   bool imsrg3_no_qqq = false;
+  bool imsrg3_only_vvv = false;
   bool imsrg3_valence_2b = false;
   bool discard_0b_from_3b = false;
   bool discard_1b_from_3b = false;
@@ -5038,6 +5039,8 @@ namespace Commutator
         continue;
       if (imsrg3_no_qqq and (oi.cvq + oj.cvq + ok.cvq) > 5)
         continue; // Need at least one core or valence particle
+      if (imsrg3_only_vvv and ((oi.cvq!=1) or (oj.cvq!=1) or (ok.cvq!=1) ))
+        continue; // everything should be valence
 
       int J1 = bra.Jpq;
 
@@ -5072,6 +5075,8 @@ namespace Commutator
         if (perturbative_triples and (std::abs(occ_ijk*unocc_lmn - unocc_ijk*occ_lmn)<1e-8) )
           continue;
         if (imsrg3_no_qqq and (ol.cvq + om.cvq + on.cvq) > 5)
+          continue;
+        if (imsrg3_only_vvv and ((ol.cvq!=1) or (om.cvq!=1) or (on.cvq!=1) ))
           continue;
         int J2 = ket.Jpq;
 

@@ -257,6 +257,7 @@ PYBIND11_MODULE(pyIMSRG, m)
                { self.PrintTwoBody(ch); })
           .def("PrintTwoBody_chch", [](Operator &self, int ch_bra, int ch_ket)
                { self.PrintTwoBody(ch_bra, ch_ket); })
+          .def("PrintThreeBody", &Operator::PrintThreeBody )
           //      .def("PrintTwoBody_ch", &Operator::PrintTwoBody)
           .def("MakeReduced", &Operator::MakeReduced)
           .def("MakeNotReduced", &Operator::MakeNotReduced)
@@ -755,6 +756,7 @@ PYBIND11_MODULE(pyIMSRG, m)
        Commutator.def("comm222_pp_hh_221st", &Commutator::comm222_pp_hh_221st);
        Commutator.def("comm222_phst", &Commutator::comm222_phst);
        Commutator.def("SetIMSRG3Noqqq", &Commutator::SetIMSRG3Noqqq);
+       Commutator.def("SetIMSRG3Onlyvvv", &Commutator::SetIMSRG3Onlyvvv);
        Commutator.def("SetIMSRG3valence2b", &Commutator::SetIMSRG3valence2b);
        Commutator.def("Discard0bFrom3b", &Commutator::Discard0bFrom3b);
        Commutator.def("Discard1bFrom3b", &Commutator::Discard1bFrom3b);
