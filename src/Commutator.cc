@@ -688,14 +688,11 @@ namespace Commutator
     int pX = X.GetParity();
     int pY = Y.GetParity();
     int pZ = (pX + pY) % 2; // Added to make z.parity correct when calling only UnitTest and not through the CommutatorScalarScalar
-    if (X.GetParticleRank() < 2 or Y.GetParticleRank() < 2)
-      return;
-    if (Z.IsAntiHermitian())
+    if (    X.GetParticleRank() < 2 or Y.GetParticleRank() < 2 
+         or Z.IsAntiHermitian()
+         or  Z.GetJRank() > 0 or Z.GetTRank() > 0 or pZ != 0)
     {
-      return;
-    }
-    if (Z.GetJRank() > 0 or Z.GetTRank() > 0 or pZ != 0)
-    {
+      Z.profiler.timer[__func__] += omp_get_wtime() - t_start;
       return;
     }
 
