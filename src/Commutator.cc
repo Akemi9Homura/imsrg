@@ -704,6 +704,7 @@ namespace Commutator
       ch_ket_list.push_back(iter.first[1]);
     }
     int nch = ch_bra_list.size();
+#pragma omp parallel for schedule(dynamic) reduction(+:z0)
     for (int ich = 0; ich < nch; ++ich)
     {
       size_t ch_bra = ch_bra_list[ich];
