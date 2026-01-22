@@ -752,9 +752,6 @@ bool UnitTest::TestCommutators_Tensor(Operator& X, Operator& Y)
 
 
 
-
-
-
   if (all_good)
   {
     std::cout << " Done with " << __func__ << " and all is well" << std::endl;
