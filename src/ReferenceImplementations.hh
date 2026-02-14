@@ -104,6 +104,10 @@ namespace ReferenceImplementations
   void comm223_232(const Operator &Eta, const Operator &Gamma, Operator &Z);
 
   double TriplesGuess(const Operator &Omega, const Operator &H);
+  void comm223_231_fI(const Operator &Eta, const Operator &Gamma, Operator &Z);
+  void comm223_231_fII(const Operator &Eta, const Operator &Gamma, Operator &Z);
+  void comm223_231_fIIIa(const Operator &Eta, const Operator &Gamma, Operator &Z);
+  void comm223_231_fIIIb(const Operator &Eta, const Operator &Gamma, Operator &Z);
 
 } // namespace ReferenceImplementations
 
