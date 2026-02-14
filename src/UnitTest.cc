@@ -611,12 +611,12 @@ bool UnitTest::TestNormalOrdering(Operator& Op)
 
 
 
-bool UnitTest::TestCommutators()
+bool UnitTest::TestCommutators(Operator& X, Operator& Y)
 {
   double t_start = omp_get_wtime();
   arma::arma_rng::set_seed(random_seed);
-  Operator X = RandomOp(*modelspace, 0, 0, 0, 3, -1);
-  Operator Y = RandomOp(*modelspace, 0, 0, 0, 3, +1);
+//  Operator X = RandomOp(*modelspace, 0, 0, 0, 3, -1);
+//  Operator Y = RandomOp(*modelspace, 0, 0, 0, 3, +1);
   modelspace->PreCalculateSixJ();
 
   bool all_good = true;
@@ -640,7 +640,7 @@ bool UnitTest::TestCommutators()
   if (Commutator::comm_term_on["comm222_phss"])
     all_good &= Test_comm222_phss(X, Y);
   //  if ( Commutator::comm_term_on["comm222_pp_hh_221ss"] )   all_good &= Test_comm222_pp_hh_221ss( X, Y );
-  if (Commutator::comm_term_on["comm222_pp_hh"] and Commutator::comm_term_on["comm221ss"])
+  if (Commutator::comm_term_on["comm222_pp_hhss"] and Commutator::comm_term_on["comm221ss"])
     all_good &= Test_comm222_pp_hh_221ss(X, Y);
 
   if (Commutator::comm_term_on["comm330ss"])
@@ -2148,18 +2148,18 @@ bool UnitTest::Mscheme_Test_comm221ss(const Operator &X, const Operator &Y)
   Operator Xcpy(X);
   Operator Ycpy(Y);
   Ycpy.MakeReduced();
-  Commutator::comm222_pp_hh_221st(Xcpy, Ycpy, Z_J);
-  Z_J.MakeNotReduced();
+//  Commutator::comm222_pp_hh_221st(Xcpy, Ycpy, Z_J);
+//  Z_J.MakeNotReduced();
   //  Commutator::comm222_pp_hh_221ss( X, Y, Z_J ) ;
-  //  Commutator::comm221ss( X, Y, Z_J);
+    Commutator::comm221ss( X, Y, Z_J);
   //  Commutator::comm222_pp_hh_221st( X, Y, Z_J);
-  Z_J.EraseTwoBody();
+//  Z_J.EraseTwoBody();
   //  ReferenceImplementations::comm221ss( X, Y, Z_J);
 
-  if (Z_J.IsHermitian())
-    Z_J.Symmetrize();
-  else if (Z_J.IsAntiHermitian())
-    Z_J.AntiSymmetrize();
+//  if (Z_J.IsHermitian())
+//    Z_J.Symmetrize();
+//  else if (Z_J.IsAntiHermitian())
+//    Z_J.AntiSymmetrize();
 
   double summed_error = 0;
   double sum_m = 0;
@@ -2191,10 +2191,10 @@ bool UnitTest::Mscheme_Test_comm221ss(const Operator &X, const Operator &Y)
               double nc = oc.occ;
               if (std::abs(na * nb * (1 - nc) + (1 - na) * (1 - nb) * nc) < 1e-6)
                 continue;
-              if ((oi.l + oc.l + oa.l + ob.l) % 2 > 0)
-                continue;
-              if ((oi.tz2 + oc.tz2) != (oa.tz2 + ob.tz2))
-                continue;
+//              if ((oi.l + oc.l + oa.l + ob.l) % 2 > 0)
+//                continue;
+//              if ((oi.tz2 + oc.tz2) != (oa.tz2 + ob.tz2))
+//                continue;
 
               for (int ma = -oa.j2; ma <= oa.j2; ma += 2)
               {
@@ -5989,22 +5989,36 @@ bool UnitTest::TestRPAEffectiveCharge(const Operator &H, const Operator &OpIn, s
   return passed;
 }
 
-bool UnitTest::TestFactorizedDoubleCommutators()
+//bool UnitTest::TestFactorizedDoubleCommutators()
+bool UnitTest::TestFactorizedDoubleCommutators( Operator& eta, Operator& H )
 {
   bool passed = true;
 
-  int jrank = 0;
-  int tz = 0;
-  int parity = 0;
-  int particle_rank = 2;
+//  int jrank = 0;
+//  int tz = 0;
+//  int parity = 0;
+//  int particle_rank = 2;
 
-  Operator eta = RandomOp(*modelspace, jrank, tz, parity, particle_rank, -1);
-  Operator H = RandomOp(*modelspace, jrank, tz, parity, particle_rank, +1);
+  int jrank = eta.GetJRank() + H.GetJRank();
+  int tz = eta.GetTRank() + H.GetTRank();
+  int parity = (eta.GetParity() + H.GetParity())%2 ;
+  int particle_rank = 2;
+  
+
+//  Operator eta = RandomOp(*modelspace, jrank, tz, parity, particle_rank, -1);
+//  Operator H = RandomOp(*modelspace, jrank, tz, parity, particle_rank, +1);
   Operator OpOut_direct(*modelspace, jrank, tz, parity, 3);
   Operator OpOut_factorized(*modelspace, jrank, tz, parity, 2);
   OpOut_direct.ThreeBody.SetMode("pn");
+  OpOut_direct.MakeNotReduced();
+  OpOut_factorized.MakeNotReduced();
 
-
+  if ( eta.IsReduced() or H.IsReduced() or OpOut_direct.IsReduced() or OpOut_factorized.IsReduced())
+  {
+     std::cout << "Uh oh. eta,H,Odirect,Ofactorized  Is Reduced? "
+               << eta.IsReduced() << " " << H.IsReduced() << " " << OpOut_direct.IsReduced() << " " << OpOut_factorized.IsReduced() 
+               << std::endl;
+  }
   Commutator::comm223ss(eta, H, OpOut_direct);
   Commutator::comm231ss(eta, OpOut_direct, OpOut_direct);
   Commutator::comm232ss(eta, OpOut_direct, OpOut_direct);
@@ -6015,9 +6029,22 @@ bool UnitTest::TestFactorizedDoubleCommutators()
 
   Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates(true);
   Commutator::FactorizedDoubleCommutator::SetUse_2b_Intermediates(true);
+  Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates(false);
+//  Commutator::FactorizedDoubleCommutator::SetUse_2b_Intermediates(false);
 
-  Commutator::FactorizedDoubleCommutator::comm223_231(eta, H, OpOut_factorized);
+//  Commutator::FactorizedDoubleCommutator::comm223_231(eta, H, OpOut_factorized);
+  Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates(true);
   Commutator::FactorizedDoubleCommutator::comm223_232(eta, H, OpOut_factorized);
+
+  ReferenceImplementations::comm223_231_BruteForce(eta, H, OpOut_factorized);
+//  ReferenceImplementations::comm223_232_BruteForce(eta, H, OpOut_factorized);
+//  OpOut_factorized.EraseOneBody();
+//  ReferenceImplementations::comm223_231_fI(eta, H, OpOut_factorized);
+//  ReferenceImplementations::comm223_231_fII(eta, H, OpOut_factorized);
+  ReferenceImplementations::comm223_231_fIIIa(eta, H, OpOut_factorized);
+  ReferenceImplementations::comm223_231_fIIIb(eta, H, OpOut_factorized);
+//  ReferenceImplementations::comm223_231(eta, H, OpOut_factorized);
+//  ReferenceImplementations::comm223_232(eta, H, OpOut_factorized);
 
   std::cout << "Norm of OpOut_direct:     " << OpOut_direct.Norm()     << "  1b : " << OpOut_direct.OneBodyNorm()     << "  2b : " << OpOut_direct.TwoBodyNorm() << std::endl;
   std::cout << "Norm of OpOut_factorized: " << OpOut_factorized.Norm() << "  1b : " << OpOut_factorized.OneBodyNorm() << "  2b : " << OpOut_factorized.TwoBodyNorm() << std::endl;

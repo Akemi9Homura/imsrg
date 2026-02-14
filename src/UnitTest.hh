@@ -43,7 +43,7 @@ class UnitTest
   // using the J-coupled expression, and in m-scheme (where the formula is simpler)
   // and make sure that they give the same answer
 //  void TestCommutators();
-  bool TestCommutators();
+  bool TestCommutators(Operator& X, Operator& Y);
   bool TestCommutators_Tensor(Operator& X, Operator& Y);
 //  bool TestCommutators_Tensor();
   bool TestCommutators_IsospinChanging();
@@ -166,7 +166,8 @@ class UnitTest
   bool TestRPAEffectiveCharge( const Operator& H, const Operator& OpIn, size_t k, size_t l);
 
 //  bool TestFactorizedDoubleCommutators(ModelSpace& ms);
-  bool TestFactorizedDoubleCommutators();
+//  bool TestFactorizedDoubleCommutators();
+  bool TestFactorizedDoubleCommutators(Operator& eta, Operator& H);
 
   bool TestPerturbativeTriples();
 
