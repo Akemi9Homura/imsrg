@@ -6029,20 +6029,20 @@ bool UnitTest::TestFactorizedDoubleCommutators( Operator& eta, Operator& H )
 
   Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates(true);
   Commutator::FactorizedDoubleCommutator::SetUse_2b_Intermediates(true);
-  Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates(false);
+//  Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates(false);
 //  Commutator::FactorizedDoubleCommutator::SetUse_2b_Intermediates(false);
 
-//  Commutator::FactorizedDoubleCommutator::comm223_231(eta, H, OpOut_factorized);
-  Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates(true);
+  Commutator::FactorizedDoubleCommutator::comm223_231(eta, H, OpOut_factorized);
+//  Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates(true);
   Commutator::FactorizedDoubleCommutator::comm223_232(eta, H, OpOut_factorized);
 
-  ReferenceImplementations::comm223_231_BruteForce(eta, H, OpOut_factorized);
+//  ReferenceImplementations::comm223_231_BruteForce(eta, H, OpOut_factorized);
 //  ReferenceImplementations::comm223_232_BruteForce(eta, H, OpOut_factorized);
 //  OpOut_factorized.EraseOneBody();
 //  ReferenceImplementations::comm223_231_fI(eta, H, OpOut_factorized);
 //  ReferenceImplementations::comm223_231_fII(eta, H, OpOut_factorized);
-  ReferenceImplementations::comm223_231_fIIIa(eta, H, OpOut_factorized);
-  ReferenceImplementations::comm223_231_fIIIb(eta, H, OpOut_factorized);
+//  ReferenceImplementations::comm223_231_fIIIa(eta, H, OpOut_factorized);
+//  ReferenceImplementations::comm223_231_fIIIb(eta, H, OpOut_factorized);
 //  ReferenceImplementations::comm223_231(eta, H, OpOut_factorized);
 //  ReferenceImplementations::comm223_232(eta, H, OpOut_factorized);
 
