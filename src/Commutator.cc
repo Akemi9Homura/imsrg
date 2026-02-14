@@ -905,8 +905,11 @@ namespace Commutator
     int hZ = Z.IsHermitian() ? 1 : -1;
 
 
-    TwoBodyME Mpp(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
-    TwoBodyME Mhh(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
+//    TwoBodyME Mpp(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
+//    TwoBodyME Mhh(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
+    TwoBodyME Mpp = 0*Z.TwoBody;
+    TwoBodyME Mhh = Mpp;
+
     ConstructScalarMpp_Mhh(X, Y, Z, Mpp, Mhh);
 
     int norbits = Z.modelspace->all_orbits.size();
