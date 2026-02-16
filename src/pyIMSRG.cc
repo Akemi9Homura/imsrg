@@ -77,6 +77,12 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def_readwrite("parity", &TwoBodyChannel::parity)
           .def_readwrite("Tz", &TwoBodyChannel::Tz);
 
+      py::class_<TwoBodyChannel_CC>(m, "TwoBodyChannel_CC")
+          .def(py::init<>())
+          .def_readwrite("J", &TwoBodyChannel::J)
+          .def_readwrite("parity", &TwoBodyChannel::parity)
+          .def_readwrite("Tz", &TwoBodyChannel::Tz);
+
       py::class_<ThreeBodyChannel>(m, "ThreeBodyChannel")
           .def(py::init<>())
           .def("GetNumber3bKets", &ThreeBodyChannel::GetNumber3bKets)
@@ -132,6 +138,7 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("GetNumberOrbits", &ModelSpace::GetNumberOrbits)
           .def("GetNumberKets", &ModelSpace::GetNumberKets)
           .def("GetNumberTwoBodyChannels", &ModelSpace::GetNumberTwoBodyChannels)
+          .def("GetNumberTwoBodyChannels_CC", &ModelSpace::GetNumberTwoBodyChannels_CC)
           .def("GetNumberThreeBodyChannels", &ModelSpace::GetNumberThreeBodyChannels)
           .def("GetEmax",  &ModelSpace::GetEmax)
           .def("GetE2max", &ModelSpace::GetE2max)
@@ -183,6 +190,7 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("SetScalar3bFirstPass", &ModelSpace::SetScalar3bFirstPass)
           .def("ClearVectors", &ModelSpace::ClearVectors)
           .def("Print", &ModelSpace::Print)
+//          .def("Print_CC", &ModelSpace::Print_CC)
           .def_readwrite("holes", &ModelSpace::holes)
           .def_readwrite("particles", &ModelSpace::particles)
           .def_readwrite("core", &ModelSpace::core)
@@ -714,6 +722,8 @@ PYBIND11_MODULE(pyIMSRG, m)
        Commutator.def("SetSingleThread", &Commutator::SetSingleThread, py::arg("tf"));
        Commutator.def("PrintSettings", &Commutator::PrintSettings );
 
+       Commutator.def("DoPandyaTransformation_SingleChannel", &Commutator::DoPandyaTransformation_SingleChannel, py::arg("OpIn"), py::arg("M_CC"), py::arg("ch_cc"), py::arg("orientation"));
+
        // IMSRG(2) commutators
        Commutator.def("comm110ss", &Commutator::comm110ss);
        Commutator.def("comm220ss", &Commutator::comm220ss);
@@ -873,6 +883,7 @@ PYBIND11_MODULE(pyIMSRG, m)
        ReferenceImplementations.def("comm233_phst", &ReferenceImplementations::comm233_phst);  
        ReferenceImplementations.def("comm333_ppp_hhhst", &ReferenceImplementations::comm333_ppp_hhhst);  
        ReferenceImplementations.def("comm333_pph_hhpst", &ReferenceImplementations::comm333_pph_hhpst); 
+       ReferenceImplementations.def("TriplesGuess", &ReferenceImplementations::TriplesGuess);
 
 
       py::class_<RPA>(m, "RPA")
@@ -955,6 +966,8 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("Mscheme_Test_comm122ss", &UnitTest::Mscheme_Test_comm122ss)
           .def("Mscheme_Test_comm222_pp_hhss", &UnitTest::Mscheme_Test_comm222_pp_hhss)
           .def("Mscheme_Test_comm222_phss", &UnitTest::Mscheme_Test_comm222_phss)
+
+//          .def("Mscheme_Test_comm122st", &UnitTest::Mscheme_Test_comm122st)
           //
           //      .def("Mscheme_Test_comm222_pp_hh_221ss", &UnitTest::Mscheme_Test_comm222_pp_hh_221ss)
           ///
