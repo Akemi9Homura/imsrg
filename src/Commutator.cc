@@ -905,9 +905,12 @@ namespace Commutator
     int hZ = Z.IsHermitian() ? 1 : -1;
 
 
-    TwoBodyME Mpp(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
-    TwoBodyME Mhh(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
+    TwoBodyME Mpp = Z.TwoBody;
+    TwoBodyME Mhh = Z.TwoBody;
+    Mpp.Erase();
+    Mhh.Erase();
     ConstructScalarMpp_Mhh(X, Y, Z, Mpp, Mhh);
+
 
     int norbits = Z.modelspace->all_orbits.size();
     std::vector<index_t> allorb_vec(Z.modelspace->all_orbits.begin(), Z.modelspace->all_orbits.end());
@@ -957,6 +960,7 @@ namespace Commutator
         }
       } // for j
     }
+
     // Z.PrintOneBody();
     // std::cout<<"=========================="<<std::endl;
     X.profiler.timer[__func__] += omp_get_wtime() - t_start;
@@ -1437,6 +1441,7 @@ namespace Commutator
           Z.OneBody(j, i) += hZ * zij / (oi.j2 + 1.0);
       } // for j
     } // for i
+    std::cout << __FILE__ << " " << __func__ << std::endl << Z.OneBody << std::endl;
 
     if (Commutator::verbose)
     {
