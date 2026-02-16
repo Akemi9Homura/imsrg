@@ -165,15 +165,20 @@ namespace ReferenceImplementations
       {
         Orbit &oj = Z.modelspace->GetOrbit(j);
 
+            for (size_t c : Z.modelspace->all_orbits)
+            {
+              Orbit &oc = Z.modelspace->GetOrbit(c);
+
+
         for (size_t a : Z.modelspace->all_orbits)
         {
           Orbit &oa = Z.modelspace->GetOrbit(a);
           for (size_t b : Z.modelspace->all_orbits)
           {
             Orbit &ob = Z.modelspace->GetOrbit(b);
-            for (size_t c : Z.modelspace->all_orbits)
-            {
-              Orbit &oc = Z.modelspace->GetOrbit(c);
+//            for (size_t c : Z.modelspace->all_orbits)
+//            {
+//              Orbit &oc = Z.modelspace->GetOrbit(c);
 
               //               if ( (oi.l+oc.l + oa.l+ob.l)%2>0) continue;
               //               if ( (oi.tz2+oc.tz2) != (oa.tz2+ob.tz2) ) continue;
@@ -195,6 +200,7 @@ namespace ReferenceImplementations
       } // j
     } // i
 
+//    Z.PrintOneBody();
     Z.profiler.timer[ "ReferenceImplementations::" + std::string(__func__)] += omp_get_wtime() - t_start;
   }
 

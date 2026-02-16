@@ -1499,6 +1499,8 @@ bool UnitTest::Test_against_ref_impl(const Operator &X, const Operator &Y, commu
 
   if (Z.IsReduced() and z_Jrank==0)
     Z.MakeNotReduced();
+  if (Zref.IsReduced() and z_Jrank==0)
+    Zref.MakeNotReduced();
 
   if ((X.IsHermitian() and Y.IsHermitian()) or (X.IsAntiHermitian() and Y.IsAntiHermitian()))
   {
@@ -1517,22 +1519,20 @@ bool UnitTest::Test_against_ref_impl(const Operator &X, const Operator &Y, commu
     Zref.SetNonHermitian();
   }
 
-  if (Zref.IsReduced() and z_Jrank==0)
-    Zref.MakeNotReduced();
 
 
   ComOpt(*Xnred, *Ynred, Z);
-  if ( not Z.IsReduced() and ((Z.GetParity() != 0) or (Z.GetTRank() != 0) and z_Jrank==0) )
-  {  
-    Z.MakeReduced(); // If Z changes parity or Tz, we by default store it as reduced. So make it as expected. Is that a good idea? Not sure....
-  }
+//  if ( not Z.IsReduced() and ((Z.GetParity() != 0) or (Z.GetTRank() != 0) and z_Jrank==0) )
+//  {  
+//    Z.MakeReduced(); // If Z changes parity or Tz, we by default store it as reduced. So make it as expected. Is that a good idea? Not sure....
+//  }
 
 //  double tstart = omp_get_wtime();
   ComRef(*Xnred, *Ynred, Zref);
-  if ( not Zref.IsReduced() and ((Zref.GetParity() != 0) or (Zref.GetTRank() != 0) and z_Jrank==0) )
-  {
-    Zref.MakeReduced(); // If Z changes parity or Tz, we by default store it as reduced. So make it as expected. Is that a good idea? Not sure....
-  }
+//  if ( not Zref.IsReduced() and ((Zref.GetParity() != 0) or (Zref.GetTRank() != 0) and z_Jrank==0) )
+//  {
+//    Zref.MakeReduced(); // If Z changes parity or Tz, we by default store it as reduced. So make it as expected. Is that a good idea? Not sure....
+//  }
 //  Z.profiler.timer["_ref_" + output_tag] += omp_get_wtime() - tstart;
   // std::cout<<Z.Norm()<<" "<<Z.ZeroBody<<std::endl;
   // std::cout << Zref.Norm() << " " << Zref.ZeroBody << std::endl;
@@ -2142,24 +2142,38 @@ bool UnitTest::Mscheme_Test_comm121st(const Operator &X, const Operator &Y)
 bool UnitTest::Mscheme_Test_comm221ss(const Operator &X, const Operator &Y)
 {
 
-  Operator Z_J(Y);
-  Z_J.Erase();
+  int z_Jrank = X.GetJRank() + Y.GetJRank(); // I sure hope this is zero.
+  int z_Trank = X.GetTRank() + Y.GetTRank();
+  int z_parity = (X.GetParity() + Y.GetParity()) % 2;
+  int z_particlerank = Commutator::use_imsrg3 ? 3: 2;
+  int hx = X.IsHermitian() ? +1 : -1;
+  int hy = Y.IsHermitian() ? +1 : -1;
+  int hz = -hx*hy;
+
+  ModelSpace &ms = *(Y.GetModelSpace());
+  Operator Z_J(ms, z_Jrank, z_Trank, z_parity, z_particlerank);
+  Z_J.MakeNotReduced();
+  if (hz < 0)
+  Z_J.SetAntiHermitian();
 
   Operator Xcpy(X);
   Operator Ycpy(Y);
-  Ycpy.MakeReduced();
+  Xcpy.MakeNotReduced();
+  Ycpy.MakeNotReduced();
+//  Ycpy.MakeReduced();
 //  Commutator::comm222_pp_hh_221st(Xcpy, Ycpy, Z_J);
 //  Z_J.MakeNotReduced();
-  //  Commutator::comm222_pp_hh_221ss( X, Y, Z_J ) ;
-    Commutator::comm221ss( X, Y, Z_J);
-  //  Commutator::comm222_pp_hh_221st( X, Y, Z_J);
+//    Commutator::comm222_pp_hh_221ss( X, Y, Z_J ) ;
+    Commutator::comm221ss( Xcpy, Ycpy, Z_J);
+//   Commutator::comm222_pp_hh_221ss( Xcpy, Ycpy, Z_J);
 //  Z_J.EraseTwoBody();
-  //  ReferenceImplementations::comm221ss( X, Y, Z_J);
+//    ReferenceImplementations::comm221ss( Xcpy, Ycpy, Z_J);
 
 //  if (Z_J.IsHermitian())
 //    Z_J.Symmetrize();
 //  else if (Z_J.IsAntiHermitian())
 //    Z_J.AntiSymmetrize();
+
 
   double summed_error = 0;
   double sum_m = 0;
@@ -2174,7 +2188,8 @@ bool UnitTest::Mscheme_Test_comm221ss(const Operator &X, const Operator &Y)
       Orbit &oj = X.modelspace->GetOrbit(j);
       int mj = oj.j2;
       double Zm_ij = 0;
-      if ((oi.j2 == oj.j2) and (oi.l == oj.l) and (oi.tz2 == oj.tz2))
+//      if ((oi.j2 == oj.j2) and (oi.l == oj.l) and (oi.tz2 == oj.tz2))
+      if ((oi.j2 == oj.j2) and true)
       {
         for (auto a : X.modelspace->all_orbits)
         {

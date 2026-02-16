@@ -190,7 +190,7 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("SetScalar3bFirstPass", &ModelSpace::SetScalar3bFirstPass)
           .def("ClearVectors", &ModelSpace::ClearVectors)
           .def("Print", &ModelSpace::Print)
-          .def("Print_CC", &ModelSpace::Print_CC)
+//          .def("Print_CC", &ModelSpace::Print_CC)
           .def_readwrite("holes", &ModelSpace::holes)
           .def_readwrite("particles", &ModelSpace::particles)
           .def_readwrite("core", &ModelSpace::core)
@@ -883,6 +883,7 @@ PYBIND11_MODULE(pyIMSRG, m)
        ReferenceImplementations.def("comm233_phst", &ReferenceImplementations::comm233_phst);  
        ReferenceImplementations.def("comm333_ppp_hhhst", &ReferenceImplementations::comm333_ppp_hhhst);  
        ReferenceImplementations.def("comm333_pph_hhpst", &ReferenceImplementations::comm333_pph_hhpst); 
+       ReferenceImplementations.def("TriplesGuess", &ReferenceImplementations::TriplesGuess);
 
 
       py::class_<RPA>(m, "RPA")
@@ -966,7 +967,7 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("Mscheme_Test_comm222_pp_hhss", &UnitTest::Mscheme_Test_comm222_pp_hhss)
           .def("Mscheme_Test_comm222_phss", &UnitTest::Mscheme_Test_comm222_phss)
 
-          .def("Mscheme_Test_comm122st", &UnitTest::Mscheme_Test_comm122st)
+//          .def("Mscheme_Test_comm122st", &UnitTest::Mscheme_Test_comm122st)
           //
           //      .def("Mscheme_Test_comm222_pp_hh_221ss", &UnitTest::Mscheme_Test_comm222_pp_hh_221ss)
           ///
