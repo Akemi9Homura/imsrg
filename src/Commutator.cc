@@ -1443,7 +1443,6 @@ namespace Commutator
           Z.OneBody(j, i) += hZ * zij / (oi.j2 + 1.0);
       } // for j
     } // for i
-    std::cout << __FILE__ << " " << __func__ << std::endl << Z.OneBody << std::endl;
 
 //    Z.PrintOneBody();
     if (Commutator::verbose)
