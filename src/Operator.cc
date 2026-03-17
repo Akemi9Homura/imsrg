@@ -423,6 +423,38 @@ Operator Operator::UndoNormalOrderingCore() const
     return DoNormalOrdering2(-1, modelspace->core);
 }
 
+Operator Operator::ReNormalOrderCore() const
+{
+  //  std::cout << " IN " << __func__ << "   legs = " << legs << std::endl;
+  auto orbit_set = modelspace->holes;
+  for (auto orb : orbit_set )
+  {
+    std::cout << orb << " ";
+  }
+  std::cout << std::endl;
+  for (auto c : modelspace->core)
+  {
+     std::cout << "Checking " << c << std::endl;
+     auto it = orbit_set.find(c);
+     if (it != orbit_set.end() )
+     {
+        orbit_set.erase(it);
+     }
+  }
+  std::cout << "After purging core orbits:" << std::endl;
+  for (auto orb : orbit_set )
+  {
+    std::cout << orb << " ";
+  }
+  
+  if (not this->IsNumberConserving())
+    return DoNormalOrderingDagger(-1, orbit_set );
+  if (this->GetParticleRank() >= 3)
+    return DoNormalOrdering3(-1, orbit_set);
+  else
+    return DoNormalOrdering2(-1, orbit_set);
+}
+
 // Operator Operator::UndoNormalOrdering2() const
 //{
 //    return this->DoNormalOrdering2(-1, modelspace->holes);
