@@ -2,8 +2,8 @@
 
 import pyIMSRG
 
-emax= 2
-ms = pyIMSRG.ModelSpace(emax,'He8','He8')
+emax=  1
+ms = pyIMSRG.ModelSpace(emax,'He6','He6')
 ut = pyIMSRG.UnitTest(ms)
 passed = True
 

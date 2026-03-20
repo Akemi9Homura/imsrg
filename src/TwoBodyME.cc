@@ -2,6 +2,7 @@
 #include "TwoBodyME.hh"
 #include "AngMom.hh"
 #include "PhysicalConstants.hh" // for SQRT2
+#include <iomanip> // for std::setw
 //#ifndef SQRT2
 //  #define SQRT2 1.4142135623730950488
 //#endif
@@ -838,9 +839,9 @@ void TwoBodyME::PrintAllMatrices() const
     
     arma::uvec subscript = itmat.second.is_empty()  ?  arma::uvec({0,0}) 
                            :   arma::ind2sub( arma::size(itmat.second),  arma::abs(itmat.second).index_max() ) ; // get row,column of maximum entry
-    std::cout << "ch_bra, ch_ket : " << itmat.first[0] << " " << itmat.first[1] << "     norm = " << arma::norm( itmat.second, "fro")
+    std::cout << "ch_bra, ch_ket : " << itmat.first[0] << " " << itmat.first[1] << "     norm = " << std::setw(8) << std::scientific<< arma::norm( itmat.second, "fro")
               << "  max entry at ( " << subscript(0) << " , " << subscript(1) << " ) ";
-    if ( not itmat.second.is_empty() )  std::cout << "     " << itmat.second(subscript(0),subscript(1));
+    if ( not itmat.second.is_empty() )  std::cout << "     " << std::setw(8) << std::scientific << itmat.second(subscript(0),subscript(1));
     std::cout << std::endl  << itmat.second << std::endl << std::endl;
 
   }

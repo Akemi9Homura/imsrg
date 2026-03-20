@@ -196,6 +196,12 @@ namespace Commutator
     imsrg3_valence_2b = tf;
   }
 
+  void SetPertTripNovvv(bool tf)
+  {
+    pert_trip_novvv = tf;
+  }
+
+
   void SetSingleThread(bool tf)
   {
     single_thread = tf;
@@ -927,14 +933,19 @@ namespace Commutator
     int hZ = Z.IsHermitian() ? 1 : -1;
 
 
-    TwoBodyME Mpp(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
-    TwoBodyME Mhh(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
+
+//    TwoBodyME Mpp(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
+//    TwoBodyME Mhh(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
+    TwoBodyME Mpp = 0*Z.TwoBody;
+    TwoBodyME Mhh = Mpp;
+
     ConstructScalarMpp_Mhh(X, Y, Z, Mpp, Mhh);
+
 
     int norbits = Z.modelspace->all_orbits.size();
     std::vector<index_t> allorb_vec(Z.modelspace->all_orbits.begin(), Z.modelspace->all_orbits.end());
-    //#pragma omp parallel for schedule(dynamic, 1)
     //   for (int i=0;i<norbits;++i)
+    #pragma omp parallel for schedule(dynamic, 1)
     for (int indexi = 0; indexi < norbits; ++indexi)
     {
       //      auto i = Z.modelspace->all_orbits[indexi];
@@ -955,8 +966,8 @@ namespace Commutator
           double nbarc = 1.0 - nc;
           int Jmin = std::max(std::abs(oc.j2 - oi.j2), std::abs(oc.j2 - oj.j2)) / 2;
           int Jmax = (oc.j2 + std::min(oi.j2, oj.j2)) / 2;
-          int parity_phase = hZ == 1 ? 1 : Z.modelspace->phase(oc.l);
-          // int parity_phase = 1;
+          //int parity_phase = hZ == 1 ? 1 : Z.modelspace->phase(oc.l);
+          int parity_phase = 1;
           if (std::abs(nc) > 1e-9)
           {
             for (int J = Jmin; J <= Jmax; J++)
@@ -979,6 +990,7 @@ namespace Commutator
         }
       } // for j
     }
+
     // Z.PrintOneBody();
     // std::cout<<"=========================="<<std::endl;
     X.profiler.timer[__func__] += omp_get_wtime() - t_start;
@@ -1460,6 +1472,7 @@ namespace Commutator
       } // for j
     } // for i
 
+//    Z.PrintOneBody();
     if (Commutator::verbose)
     {
        X.profiler.timer["_pphh One Body bit"] += omp_get_wtime() - t_internal;
