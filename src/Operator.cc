@@ -423,28 +423,19 @@ Operator Operator::UndoNormalOrderingCore() const
     return DoNormalOrdering2(-1, modelspace->core);
 }
 
+// Re-normal order with respect to the core in one step
+// This amounts to running the normal ordering routing
+// with a negative occupation on all hole orbits that aren't in the core.
 Operator Operator::ReNormalOrderCore() const
 {
-  //  std::cout << " IN " << __func__ << "   legs = " << legs << std::endl;
   auto orbit_set = modelspace->holes;
-  for (auto orb : orbit_set )
-  {
-    std::cout << orb << " ";
-  }
-  std::cout << std::endl;
   for (auto c : modelspace->core)
   {
-     std::cout << "Checking " << c << std::endl;
      auto it = orbit_set.find(c);
      if (it != orbit_set.end() )
      {
         orbit_set.erase(it);
      }
-  }
-  std::cout << "After purging core orbits:" << std::endl;
-  for (auto orb : orbit_set )
-  {
-    std::cout << orb << " ";
   }
   
   if (not this->IsNumberConserving())
