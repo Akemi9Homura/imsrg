@@ -1,7 +1,7 @@
 
 #include "imsrg_util.hh"
 #include "AngMom.hh"
-#include "Commutator.hh"
+//#include "Commutator.hh"
 #include "GaussLaguerre.hh"
 #include "DarkMatterNREFT.hh"
 #include "M0nu.hh"
@@ -631,6 +631,8 @@ namespace imsrg_util
     return occupation;
  }
 
+/*
+///SRS DELETED BECAUSE IT CAUSES A CIRCULAR DEPENDENCY WITH IMSRGSolver
  // Do the full IMSRG transformation
  std::vector<double> GetOccupations(HartreeFock& hf, IMSRGSolver& imsrgsolver)
  {
@@ -651,6 +653,7 @@ namespace imsrg_util
     }
     return occupation;
  }
+*/
 
  std::vector<double> GetDensity( std::vector<double>& occupation, std::vector<double>& R, std::vector<int>& orbits, ModelSpace& modelspace )
  {
@@ -5355,78 +5358,78 @@ Operator FourierBesselCoeff(ModelSpace& modelspace, int nu, double R, std::set<i
 
 
 
-  void CommutatorTest(Operator& X, Operator& Y)
-  {
-    Operator Zscalar(X);
-    if ( (X.IsHermitian() and Y.IsHermitian()) or (X.IsAntiHermitian() and Y.IsAntiHermitian()) ) Zscalar.SetAntiHermitian();
-    if ( (X.IsHermitian() and Y.IsAntiHermitian()) or (X.IsAntiHermitian() and Y.IsHermitian()) ) Zscalar.SetHermitian();
-    Zscalar.Erase();
-    Operator Ztensor(Zscalar);
-    Operator Yred = Y;
-    Reduce(Yred);
-
-    std::cout << "operator norms: " << X.Norm() << "  " << Y.Norm() << std::endl;
-//    X.comm111ss(Y,Zscalar);
-//    X.comm111st(Yred,Ztensor);
-    Commutator::comm111ss(X,Y,Zscalar);
-    Commutator::comm111st(X,Yred,Ztensor);
-    Zscalar.Symmetrize();
-    Ztensor.Symmetrize();
-    UnReduce(Ztensor);
-    std::cout << "comm111 norm = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << ",   " << Ztensor.OneBodyNorm() << " " << Ztensor.TwoBodyNorm() << std::endl;
-    Zscalar -= Ztensor;
-    std::cout << "comm111 diff = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << std::endl;
-
-    Zscalar.Erase();
-    Ztensor.Erase();
-    std::cout << "121ss" << std::endl;
-    Commutator::comm121ss(X,Y,Zscalar);
-    std::cout << "121st" << std::endl;
-    Commutator::comm121st(X,Yred,Ztensor);
-    Zscalar.Symmetrize();
-    Ztensor.Symmetrize();
-    UnReduce(Ztensor);
-    std::cout << "comm121 norm = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << ",   " << Ztensor.OneBodyNorm() << " " << Ztensor.TwoBodyNorm() << std::endl;
-    Zscalar -= Ztensor;
-    std::cout << "comm121 diff = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << std::endl;
-
-    Zscalar.Erase();
-    Ztensor.Erase();
-    Commutator::comm122ss(X,Y,Zscalar);
-    Commutator::comm122st(X,Yred,Ztensor);
-    Zscalar.Symmetrize();
-    Ztensor.Symmetrize();
-    UnReduce(Ztensor);
-    std::cout << "comm122 norm = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << ",   " << Ztensor.OneBodyNorm() << " " << Ztensor.TwoBodyNorm() << std::endl;
-    Zscalar -= Ztensor;
-    std::cout << "comm122 diff = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << std::endl;
-
-    Zscalar.Erase();
-    Ztensor.Erase();
-    Commutator::comm222_pp_hh_221ss(X,Y,Zscalar);
-    Commutator::comm222_pp_hh_221st(X,Yred,Ztensor);
-    Zscalar.Symmetrize();
-    Ztensor.Symmetrize();
-    UnReduce(Ztensor);
-    std::cout << "comm222_pp_hh_221 norm = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << ",   " << Ztensor.OneBodyNorm() << " " << Ztensor.TwoBodyNorm() << std::endl;
-    Zscalar -= Ztensor;
-    std::cout << "comm222_pp_hh_221 diff = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << std::endl;
-
-    Zscalar.Erase();
-    Ztensor.Erase();
-    Commutator::comm222_phss(Y,Zscalar,X);
-//    Reduce(Y); // Not sure why I can't use Yred...
-    Commutator::comm222_phss(X,Y,Zscalar);
-    Commutator::comm222_phst(X,Yred,Ztensor);
-    Zscalar.Symmetrize();
-    Ztensor.Symmetrize();
-    UnReduce(Ztensor);
-    std::cout << "comm222_ph norm = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << ",   " << Ztensor.OneBodyNorm() << " " << Ztensor.TwoBodyNorm() << std::endl;
-    Zscalar -= Ztensor;
-    std::cout << "comm222_ph diff = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << std::endl;
-
-
-  }
+//  void CommutatorTest(Operator& X, Operator& Y)
+//  {
+//    Operator Zscalar(X);
+//    if ( (X.IsHermitian() and Y.IsHermitian()) or (X.IsAntiHermitian() and Y.IsAntiHermitian()) ) Zscalar.SetAntiHermitian();
+//    if ( (X.IsHermitian() and Y.IsAntiHermitian()) or (X.IsAntiHermitian() and Y.IsHermitian()) ) Zscalar.SetHermitian();
+//    Zscalar.Erase();
+//    Operator Ztensor(Zscalar);
+//    Operator Yred = Y;
+//    Reduce(Yred);
+//
+//    std::cout << "operator norms: " << X.Norm() << "  " << Y.Norm() << std::endl;
+////    X.comm111ss(Y,Zscalar);
+////    X.comm111st(Yred,Ztensor);
+//    Commutator::comm111ss(X,Y,Zscalar);
+//    Commutator::comm111st(X,Yred,Ztensor);
+//    Zscalar.Symmetrize();
+//    Ztensor.Symmetrize();
+//    UnReduce(Ztensor);
+//    std::cout << "comm111 norm = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << ",   " << Ztensor.OneBodyNorm() << " " << Ztensor.TwoBodyNorm() << std::endl;
+//    Zscalar -= Ztensor;
+//    std::cout << "comm111 diff = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << std::endl;
+//
+//    Zscalar.Erase();
+//    Ztensor.Erase();
+//    std::cout << "121ss" << std::endl;
+//    Commutator::comm121ss(X,Y,Zscalar);
+//    std::cout << "121st" << std::endl;
+//    Commutator::comm121st(X,Yred,Ztensor);
+//    Zscalar.Symmetrize();
+//    Ztensor.Symmetrize();
+//    UnReduce(Ztensor);
+//    std::cout << "comm121 norm = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << ",   " << Ztensor.OneBodyNorm() << " " << Ztensor.TwoBodyNorm() << std::endl;
+//    Zscalar -= Ztensor;
+//    std::cout << "comm121 diff = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << std::endl;
+//
+//    Zscalar.Erase();
+//    Ztensor.Erase();
+//    Commutator::comm122ss(X,Y,Zscalar);
+//    Commutator::comm122st(X,Yred,Ztensor);
+//    Zscalar.Symmetrize();
+//    Ztensor.Symmetrize();
+//    UnReduce(Ztensor);
+//    std::cout << "comm122 norm = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << ",   " << Ztensor.OneBodyNorm() << " " << Ztensor.TwoBodyNorm() << std::endl;
+//    Zscalar -= Ztensor;
+//    std::cout << "comm122 diff = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << std::endl;
+//
+//    Zscalar.Erase();
+//    Ztensor.Erase();
+//    Commutator::comm222_pp_hh_221ss(X,Y,Zscalar);
+//    Commutator::comm222_pp_hh_221st(X,Yred,Ztensor);
+//    Zscalar.Symmetrize();
+//    Ztensor.Symmetrize();
+//    UnReduce(Ztensor);
+//    std::cout << "comm222_pp_hh_221 norm = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << ",   " << Ztensor.OneBodyNorm() << " " << Ztensor.TwoBodyNorm() << std::endl;
+//    Zscalar -= Ztensor;
+//    std::cout << "comm222_pp_hh_221 diff = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << std::endl;
+//
+//    Zscalar.Erase();
+//    Ztensor.Erase();
+//    Commutator::comm222_phss(Y,Zscalar,X);
+////    Reduce(Y); // Not sure why I can't use Yred...
+//    Commutator::comm222_phss(X,Y,Zscalar);
+//    Commutator::comm222_phst(X,Yred,Ztensor);
+//    Zscalar.Symmetrize();
+//    Ztensor.Symmetrize();
+//    UnReduce(Ztensor);
+//    std::cout << "comm222_ph norm = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << ",   " << Ztensor.OneBodyNorm() << " " << Ztensor.TwoBodyNorm() << std::endl;
+//    Zscalar -= Ztensor;
+//    std::cout << "comm222_ph diff = " << Zscalar.OneBodyNorm() << " " << Zscalar.TwoBodyNorm() << std::endl;
+//
+//
+//  }
 
 
 
