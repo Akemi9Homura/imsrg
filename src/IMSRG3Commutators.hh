@@ -38,7 +38,6 @@ namespace Commutator
     extern bool discard_0b_from_3b;
     extern bool discard_1b_from_3b;
     extern bool discard_2b_from_3b;
-//    extern bool imsrg3_verbose; // Switch to print out more info for debugging/profiling.
     extern double threebody_threshold;
     extern double imsrg3_dE6max;
 
@@ -49,7 +48,6 @@ namespace Commutator
     void SetIMSRG3Noqqq(bool tf);
     void SetIMSRG3Onlyvvv(bool tf);
     void SetIMSRG3valence2b(bool tf);
-//    void SetIMSRG3Verbose(bool tf);
     void SetSingleThread(bool tf); 
   
   
