@@ -196,6 +196,12 @@ namespace Commutator
     imsrg3_valence_2b = tf;
   }
 
+  void SetPertTripNovvv(bool tf)
+  {
+    pert_trip_novvv = tf;
+  }
+
+
   void SetSingleThread(bool tf)
   {
     single_thread = tf;
@@ -905,12 +911,14 @@ namespace Commutator
     int hZ = Z.IsHermitian() ? 1 : -1;
 
 
+
 //    TwoBodyME Mpp(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
 //    TwoBodyME Mhh(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
     TwoBodyME Mpp = 0*Z.TwoBody;
     TwoBodyME Mhh = Mpp;
 
     ConstructScalarMpp_Mhh(X, Y, Z, Mpp, Mhh);
+
 
     int norbits = Z.modelspace->all_orbits.size();
     std::vector<index_t> allorb_vec(Z.modelspace->all_orbits.begin(), Z.modelspace->all_orbits.end());
@@ -960,6 +968,7 @@ namespace Commutator
         }
       } // for j
     }
+
     // Z.PrintOneBody();
     // std::cout<<"=========================="<<std::endl;
     X.profiler.timer[__func__] += omp_get_wtime() - t_start;

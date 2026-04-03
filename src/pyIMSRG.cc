@@ -236,6 +236,7 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("DoNormalOrderingFilledValence", &Operator::DoNormalOrderingFilledValence)
           .def("UndoNormalOrdering", &Operator::UndoNormalOrdering)
           .def("UndoNormalOrderingCore", &Operator::UndoNormalOrderingCore)
+          .def("ReNormalOrderCore", &Operator::ReNormalOrderCore)
           .def("DoNormalOrdering", &Operator::UndoNormalOrdering)
           .def("SetModelSpace", &Operator::SetModelSpace)
           .def("Truncate", &Operator::Truncate)
@@ -582,6 +583,11 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("TransformHFToNATBasis", &HFMBPT::TransformHFToNATBasis)
           .def("GetNormalOrderedHNAT", &HFMBPT::GetNormalOrderedHNAT)
           .def("PrintSPEandWF", &HFMBPT::PrintSPEandWF)
+          .def("GetMP2_Energy", &HFMBPT::GetMP2_Energy)
+          .def("GetMP3_Energy", &HFMBPT::GetMP3_Energy)
+          .def("GetMP3_pp", &HFMBPT::GetMP3_pp)
+          .def("GetMP3_hh", &HFMBPT::GetMP3_hh)
+          .def("GetMP3_ph", &HFMBPT::GetMP3_ph)
           .def_readwrite("C_HO2NAT", &HFMBPT::C_HO2NAT) // Unitary transformation
           .def_readwrite("C_HF2NAT", &HFMBPT::C_HF2NAT) // Unitary transformation
           ;
@@ -760,6 +766,7 @@ PYBIND11_MODULE(pyIMSRG, m)
        Commutator.def("SetIMSRG3Noqqq", &Commutator::SetIMSRG3Noqqq);
        Commutator.def("SetIMSRG3Onlyvvv", &Commutator::SetIMSRG3Onlyvvv);
        Commutator.def("SetIMSRG3valence2b", &Commutator::SetIMSRG3valence2b);
+       Commutator.def("SetPertTripNovvv", &Commutator::SetPertTripNovvv);
        Commutator.def("Discard0bFrom3b", &Commutator::Discard0bFrom3b);
        Commutator.def("Discard1bFrom3b", &Commutator::Discard1bFrom3b);
        Commutator.def("Discard2bFrom3b", &Commutator::Discard2bFrom3b);
