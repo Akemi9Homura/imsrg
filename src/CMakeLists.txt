@@ -46,11 +46,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(IMSRGPLUSPLUS_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-#if(IMSRG_BUILD_PYTHON_BINDINGS)
-#    # We only need this for the Python bindings.
-#    # In principle, everything should be faster if we could avoid this.
-#    set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-#endif()
+if(IMSRG_BUILD_PYTHON_BINDINGS)
+    # We only need this for the Python bindings.
+    # In principle, everything should be faster if we could avoid this.
+    set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+endif()
 
 add_subdirectory(extern/armadillo)
 add_subdirectory(extern/half)
