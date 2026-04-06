@@ -912,7 +912,9 @@ PYBIND11_MODULE(pyIMSRG, m)
                { std::cout << self.A << std::endl; })
           .def("PrintB", [](RPA &self)
                { std::cout << self.B << std::endl; })
-          .def("GetEgs", &RPA::GetEgs);
+          .def("GetEgs", &RPA::GetEgs)
+          .def("StraightforwardCPEffectiveCharge", &RPA::StraightforwardCPEffectiveCharge, py::arg("OpIn"), py::arg("i"), py::arg("j"));
+          ;
 
       py::class_<UnitTest>(m, "UnitTest")
           //      .def(py::init<>())
