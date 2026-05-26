@@ -3,8 +3,6 @@ set(INSTDIR $ENV{HOME})
 set(BLA_VENDOR OpenBLAS)
 # set(CMAKE_SKIP_INSTALL_RPATH ON)
 # set(CMAKE_SYSTEM_PREFIX_PATH $ENV{EBROOTGENTOO})
-set(CMAKE_CURRENT_BINARY_DIR "../build")
-
 option(IMSRG_BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
 
 # Place to put any settings for quirks of your specific environment
