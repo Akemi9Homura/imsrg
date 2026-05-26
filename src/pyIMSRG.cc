@@ -1015,6 +1015,11 @@ PYBIND11_MODULE(pyIMSRG, m)
       m.def("MagneticMultipoleOp", imsrg_util::MagneticMultipoleOp);
       m.def("SchiffOp",imsrg_util::SchiffOp);
       m.def("Sigma_Op", imsrg_util::Sigma_Op);
+      m.def("Sigma_Op_pn", imsrg_util::Sigma_Op_pn);
+      m.def("SigmaTau3_Op", imsrg_util::SigmaTau3_Op);
+      m.def("Orbital_Op", imsrg_util::Orbital_Op);
+      m.def("Orbital_Op_pn", imsrg_util::Orbital_Op_pn);
+      m.def("OrbitalTau3_Op", imsrg_util::OrbitalTau3_Op);
       m.def("Isospin2_Op", imsrg_util::Isospin2_Op);
       m.def("LdotS_Op", imsrg_util::LdotS_Op);
       m.def("HO_density", imsrg_util::HO_density);

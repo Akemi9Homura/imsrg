@@ -25,4 +25,5 @@ src/.*.swp
 *.sifs
 #Work folders should only contain the examples scripts
 work/
+result/
 __pycache__

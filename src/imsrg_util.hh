@@ -86,6 +86,10 @@ namespace imsrg_util
  Operator AllowedGamowTeller_Op(ModelSpace& modelspace);
  Operator Sigma_Op(ModelSpace& modelspace);
  Operator Sigma_Op_pn(ModelSpace& modelspace, std::string pn);
+ Operator SigmaTau3_Op(ModelSpace& modelspace);
+ Operator Orbital_Op(ModelSpace& modelspace);
+ Operator Orbital_Op_pn(ModelSpace& modelspace, std::string pn);
+ Operator OrbitalTau3_Op(ModelSpace& modelspace);
  Operator RadialOverlap(ModelSpace& modelspace);
  Operator LdotS_Op(ModelSpace& modelspace);
  Operator L2rel_Op(ModelSpace& modelspace);

@@ -112,6 +112,12 @@ namespace imsrg_util
       else if (opname == "Sigma")         theop =  Sigma_Op(modelspace);
       else if (opname == "Sigma_p")       theop =  Sigma_Op_pn(modelspace,"proton");
       else if (opname == "Sigma_n")       theop =  Sigma_Op_pn(modelspace,"neutron");
+      else if (opname == "SigmaTau3")     theop =  SigmaTau3_Op(modelspace);
+      else if (opname == "Orbital")       theop =  Orbital_Op(modelspace);
+      else if (opname == "Orbital_p")     theop =  Orbital_Op_pn(modelspace,"proton");
+      else if (opname == "Orbital_n")     theop =  Orbital_Op_pn(modelspace,"neutron");
+      else if (opname == "OrbitalTau3")   theop =  OrbitalTau3_Op(modelspace);
+      else if (opname == "Ltau3")         theop =  OrbitalTau3_Op(modelspace);
       else if (opname == "L2rel")         theop =  L2rel_Op(modelspace); // Untested...
       else if (opname == "QdotQ")         theop =  QdotQ_Op(modelspace); // Untested...
       else if (opname == "VQQ")           theop =  VQQ_Op(modelspace); 
@@ -2483,8 +2489,8 @@ Operator FourierBesselCoeff(ModelSpace& modelspace, int nu, double R, std::set<i
  }
 
  /// Pauli spin operator \f[ \langle f \| \sigma \| i \rangle \f]
- Operator Sigma_Op_pn(ModelSpace& modelspace, std::string pn)
- {
+  Operator Sigma_Op_pn(ModelSpace& modelspace, std::string pn)
+  {
    Operator Sig(modelspace,1,0,0,2);
    Sig.SetHermitian();
    size_t norbits = modelspace.GetNumberOrbits();
@@ -2503,7 +2509,50 @@ Operator FourierBesselCoeff(ModelSpace& modelspace, int nu, double R, std::set<i
       }
    } 
    return Sig;
- }
+  }
+
+  /// Isovector Pauli spin operator with particle-physics convention tau3(p)=+1, tau3(n)=-1.
+  Operator SigmaTau3_Op(ModelSpace& modelspace)
+  {
+    return Sigma_Op_pn(modelspace,"proton") - Sigma_Op_pn(modelspace,"neutron");
+  }
+
+  /// Orbital angular momentum operator \f[ \langle f \| l \| i \rangle \f].
+  Operator Orbital_Op(ModelSpace& modelspace)
+  {
+    return Orbital_Op_pn(modelspace,"both");
+  }
+
+  /// Orbital angular momentum operator restricted to protons, neutrons, or both.
+  Operator Orbital_Op_pn(ModelSpace& modelspace, std::string pn)
+  {
+    Operator L(modelspace,1,0,0,2);
+    L.SetHermitian();
+    size_t norbits = modelspace.GetNumberOrbits();
+    for (size_t i=0; i<norbits; ++i)
+    {
+      Orbit& oi = modelspace.GetOrbit(i);
+      if (pn=="proton" and oi.tz2>0) continue;
+      if (pn=="neutron" and oi.tz2<0) continue;
+      for (auto j : L.OneBodyChannels[{oi.l,oi.j2,oi.tz2}] )
+      {
+        Orbit& oj = modelspace.GetOrbit(j);
+        if ((oi.n!=oj.n) or (oi.l != oj.l) or (oi.tz2!=oj.tz2)) continue;
+        double M_l = modelspace.phase(oi.l + (oj.j2+3)/2)
+                   * sqrt((oi.j2+1)*(oj.j2+1))
+                   * sqrt(oi.l*(oi.l+1.)*(2*oi.l+1.))
+                   * modelspace.GetSixJ(oi.l, oi.l, 1.0, oj.j2/2., oi.j2/2., 0.5);
+        L.OneBody(i,j) = M_l;
+      }
+    }
+    return L;
+  }
+
+  /// Isovector orbital angular momentum with particle-physics convention tau3(p)=+1, tau3(n)=-1.
+  Operator OrbitalTau3_Op(ModelSpace& modelspace)
+  {
+    return Orbital_Op_pn(modelspace,"proton") - Orbital_Op_pn(modelspace,"neutron");
+  }
 
   void Reduce(Operator& X)
   {
