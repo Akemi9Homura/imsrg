@@ -40,14 +40,7 @@ if(IMSRG_BUILD_PYTHON_BINDINGS)
 endif()
 
 add_subdirectory(src)
-add_subdirectory(extern)
 if(IMSRG_BUILD_PYTHON_BINDINGS)
-    pybind11_add_module(pyIMSRG src/pyIMSRG.cc)
-    target_link_libraries(
-        pyIMSRG
-        PRIVATE
-        IMSRG
-    )
     #ADD tests to be run directly in the build process
     enable_testing()
     add_test (
@@ -82,4 +75,3 @@ if(IMSRG_BUILD_PYTHON_BINDINGS)
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     )
 endif()
-
