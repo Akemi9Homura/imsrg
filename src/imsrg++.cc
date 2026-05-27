@@ -172,6 +172,23 @@ int main(int argc, char** argv)
   std::vector<Operator> ops;
   std::vector<std::string> spwf = parameters.v("SPWF");
 
+  if (fmt2 == "no2bpack")
+  {
+    if (nucleon_mass_correction)
+    {
+      std::cout << "Ignoring nucleon_mass_correction=true for fmt2=no2bpack. "
+                << "Mass corrections should be applied while generating the no2bpack Hamiltonian." << std::endl;
+      nucleon_mass_correction = false;
+    }
+
+    if (input3bme != "none")
+    {
+      std::cerr << "fmt2=no2bpack already contains the normal-ordered three-body contribution; "
+                << "set 3bme=none instead of " << input3bme << "." << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
+  }
+
   using PhysConst::PROTON_RCH2;
   using PhysConst::NEUTRON_RCH2;
   using PhysConst::DARWIN_FOLDY;

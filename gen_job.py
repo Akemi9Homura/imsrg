@@ -27,6 +27,13 @@ params["3bme"] = dir_3n + "ThBME_NO2B_EM1.8_2.0_hw16_emax14_e2max28_e3max18.me3j
 params["emax"] = 4
 params["e3max"] = 4
 
+# For a packed normal-ordered Hamiltonian produced by the normal-order program:
+#   params["fmt2"] = "no2bpack"
+#   params["2bme"] = "<normal-order output .bin>"
+#   params["3bme"] = "none"
+# The packed file already contains the normal-ordered 0B/1B/2B pieces, including
+# the 3N contribution from the generation step. Keep params["emax"] and
+# params["e3max"] consistent with the truncations used to generate the pack.
 
 
 params["reference"] = "O18"

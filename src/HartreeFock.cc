@@ -183,7 +183,7 @@ void HartreeFock::CalcEHF()
          e3hf += rho(i,j) * jfactor * (1./6)*V3ij(i,j);
       }
    }
-   EHF = e1hf + e2hf + e3hf;
+   EHF = Hbare.ZeroBody + e1hf + e2hf + e3hf;
 }
 
 //**************************************************************************************
@@ -1718,5 +1718,4 @@ double HartreeFock::GetTransformed3bme( Operator& OpIn, int Jab, int Jde, int J2
   } // for alpha
   return V_hf;
 }
-
 
