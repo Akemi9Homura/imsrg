@@ -6,26 +6,29 @@ from pathlib import Path
 _RE_HW = re.compile(r'hw(\d+)')
 _RE_E2MAX = re.compile(r'_emax(\d+)_e2max(\d+)\.')
 _RE_E3MAX = re.compile(r'_emax(\d+)_e2max(\d+)_e3max(\d+)\.')
+_RE_NO2BPACK = re.compile(r'_hw(\d+)_emax(\d+)_e3max(\d+)\.')
 
 REPO_ROOT = Path(__file__).resolve().parent
 
-partition = "c128m1024"
-cpus = 128
+# wm2 Slurm partitions:
+#   C064M1024G: 64 CPU cores, about 1 TB memory per node
+#   C064M0256G: 64 CPU cores, about 256 GB memory per node
+partition = "C064M1024G"
+qos = "low"
+cpus = 64
 
-exe = str(REPO_ROOT / "src" / "imsrg++")
+exe = str(REPO_ROOT / "build" / "imsrg++")
 params = {}
 
 flag = "EM1.8_2.0"
-params["fmt2"] = "me2j"
-dir_nn = "/tns/public/Forces/EM1.8_2.0/2BME/"
-params["2bme"] = dir_nn + "TwBME_N3LO_EM500_srg1.8_hw16_emax14_e2max28.me2j.gz"
+params["fmt2"] = "no2bpack"
+params["2bme"] = "/lustre/home/2401110128/Forces/no2b/EM1.8_2.0/Li8/no2b_Li8_EM1.8_2.0_hw16_emax12_e3max16.bin"
 params["fmt3"] = ""
 params["3bme_type"] = "no2b"
 params["no2b_precision"] = "single"
-dir_3n = "/tns/public/Forces/EM1.8_2.0/3BME/"
-params["3bme"] = dir_3n + "ThBME_NO2B_EM1.8_2.0_hw16_emax14_e2max28_e3max18.me3j.gz"
-params["emax"] = 4
-params["e3max"] = 4
+params["3bme"] = "none"
+params["emax"] = 12
+params["e3max"] = 16
 
 # For a packed normal-ordered Hamiltonian produced by the normal-order program:
 #   params["fmt2"] = "no2bpack"
@@ -36,9 +39,9 @@ params["e3max"] = 4
 # params["e3max"] consistent with the truncations used to generate the pack.
 
 
-params["reference"] = "O18"
-params["valence_space"] = "sd-shell"
-params["Operators"] = ""
+params["reference"] = "Li8"
+params["valence_space"] = "p-shell"
+params["Operators"] = "Sigma,SigmaTau3,Ltau3"
 
 core = params["valence_space"].split(",")[0]
 
@@ -76,6 +79,15 @@ def extract_emax_e2max_e3max(file3: str):
         exit(-1)
 
 
+def extract_no2bpack_hw_emax_e3max(file: str):
+    match = re.search(_RE_NO2BPACK, file)
+    if match:
+        return tuple(map(int, match.groups()))
+    else:
+        print("not match no2bpack hw emax e3max")
+        exit(-1)
+
+
 def extract_hw(file, file3):
     match1 = re.search(_RE_HW, file)
     hw1 = int(match1.group(1))
@@ -92,11 +104,12 @@ def extract_hw(file, file3):
             exit(-1)
 
 
-def add_header(output, partition=partition, cpus=cpus):
-    lib_dir = REPO_ROOT / "src"
+def add_header(output, partition=partition, qos=qos, cpus=cpus):
+    lib_dir = REPO_ROOT / "build"
     header_list = [
         "#!/bin/bash -l",
         f"#SBATCH --partition={partition}",
+        f"#SBATCH --qos={qos}",
         "#SBATCH -J IMSRG",
         "#SBATCH --nodes=1",
         "#SBATCH --ntasks-per-node=1",
@@ -115,20 +128,23 @@ def add_header(output, partition=partition, cpus=cpus):
 def generate_slurm(params: dict):
     file = params["2bme"]
     file3 = params["3bme"]
-    hw = extract_hw(file, file3)
-    params["hw"] = hw
     A = int(re.findall(r'(\d+)', params["reference"])[0])
     params["A"] = A
 
-    emax_nn, e2max_nn = extract_emax_e2max(file)
-    emax_3n, e2max3_3n, e3max_3n = extract_emax_e2max_e3max(file3)
+    if params["fmt2"] == "no2bpack":
+        hw, emax_nn, e3max_nn = extract_no2bpack_hw_emax_e3max(file)
+    else:
+        hw = extract_hw(file, file3)
+        emax_nn, e2max_nn = extract_emax_e2max(file)
+        emax_3n, e2max3_3n, e3max_3n = extract_emax_e2max_e3max(file3)
 
-    params["file2e1max"] = emax_nn
-    params["file2e2max"] = e2max_nn
+        params["file2e1max"] = emax_nn
+        params["file2e2max"] = e2max_nn
+        params["file3e1max"] = emax_3n
+        params["file3e2max"] = e2max3_3n
+        params["file3e3max"] = e3max_3n
 
-    params["file3e1max"] = emax_3n
-    params["file3e2max"] = e2max3_3n
-    params["file3e3max"] = e3max_3n
+    params["hw"] = hw
 
     reference = params["reference"]
     emax = params["emax"]
@@ -148,7 +164,7 @@ def generate_slurm(params: dict):
     params_str = " ".join(f"{key}={val}" for key, val in params.items())
 
     with open(script_file, 'w') as f:
-        f.write(add_header(result_dir / f"log_{prefix}_%j_%N.txt"))
+        f.write(add_header(result_dir / f"log_{prefix}_%j.txt"))
         f.write('\n')
         f.write(f"{exe} {params_str}\n")
     return script_file
