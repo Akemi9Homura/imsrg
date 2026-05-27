@@ -446,6 +446,8 @@ int main(int argc, char** argv)
       rw.ReadBareTBME_Navratil(inputtbme, Hbare);
     else if (fmt2 == "oslo" )
       rw.ReadTBME_Oslo(inputtbme, Hbare);
+    else if (fmt2 == "no2bpack" )
+      rw.Read_no2bpack(inputtbme, Hbare);
     else if (fmt2.find("oakridge") != std::string::npos )
     { // input format should be: singleparticle.dat,vnn.dat
       size_t comma_pos = inputtbme.find_first_of(",");
@@ -513,7 +515,7 @@ int main(int argc, char** argv)
     Hbare /= PhysConst::HARTREE; // Convert to Hartree
   }
 
-  if (fmt2 != "nushellx" and physical_system != "atomic" and hw_trap < 0)  // Don't need to add kinetic energy if we read a shell model interaction
+  if (fmt2 != "nushellx" and fmt2 != "no2bpack" and physical_system != "atomic" and hw_trap < 0)  // Don't need to add kinetic energy if it is already in the input interaction
   {
     Hbare += imsrg_util::Trel_Op(modelspace);
     if (Hbare.OneBody.has_nan())
@@ -1712,4 +1714,3 @@ int main(int argc, char** argv)
 
   return 0;
 }
-

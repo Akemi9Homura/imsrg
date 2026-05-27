@@ -225,6 +225,161 @@ void ReadWrite::ReadTBME_OakRidge( std::string spname, std::string tbmename, Ope
 }
 
 
+/// Read the no2bpack binary format written by normal-order's Write_minipack().
+void ReadWrite::Read_no2bpack( std::string filename, Operator& Hbare )
+{
+  std::ifstream infile(filename, std::ios::binary);
+  if ( !infile.good() )
+  {
+     std::cerr << "************************************" << std::endl
+          << "**    Trouble reading file  !!!   **" << filename << " line " << __LINE__ << std::endl
+          << "************************************" << std::endl;
+     goodstate = false;
+     return;
+  }
+
+  auto read_or_fail = [&](auto& x, const char* what)
+  {
+    infile.read(reinterpret_cast<char*>(&x), sizeof(x));
+    if ( !infile.good() )
+    {
+      std::cerr << "Read_no2bpack: failed while reading " << what << " from " << filename << std::endl;
+      goodstate = false;
+    }
+  };
+
+  ModelSpace* modelspace = Hbare.GetModelSpace();
+  File2N = filename;
+  Aref = modelspace->GetAref();
+  Zref = modelspace->GetZref();
+
+  double hw_file = 0;
+  int emax_file = 0;
+  int num_orbits = 0;
+  int num_obme = 0;
+  int num_tbme = 0;
+
+  read_or_fail(hw_file, "hw");
+  read_or_fail(emax_file, "emax");
+  read_or_fail(num_orbits, "number of orbits");
+  read_or_fail(num_obme, "number of one-body matrix elements");
+  read_or_fail(num_tbme, "number of two-body matrix elements");
+  if ( !goodstate ) return;
+
+  if (num_orbits < 0 or num_obme < 0 or num_tbme < 0)
+  {
+    std::cerr << "Read_no2bpack: negative count in header of " << filename << std::endl;
+    goodstate = false;
+    return;
+  }
+
+  std::vector<std::array<int,4>> file_orbits(num_orbits);
+  std::vector<size_t> orbit_remap(num_orbits, ModelSpace::NOT_AN_ORBIT);
+  for (int i=0; i<num_orbits; ++i)
+  {
+    int n=0, l=0, j2=0, tz2=0;
+    read_or_fail(n, "orbit n");
+    read_or_fail(l, "orbit l");
+    read_or_fail(j2, "orbit 2j");
+    read_or_fail(tz2, "orbit 2tz");
+    if ( !goodstate ) return;
+    file_orbits[i] = {n,l,j2,tz2};
+    orbit_remap[i] = modelspace->GetOrbitIndex(n,l,j2,tz2);
+  }
+
+  read_or_fail(Hbare.ZeroBody, "zero-body matrix element");
+  if ( !goodstate ) return;
+
+  const int expected_obme = num_orbits * (num_orbits + 1) / 2;
+  if ( num_obme != expected_obme )
+  {
+    std::cerr << "Read_no2bpack: header says num_obme = " << num_obme
+              << ", but num_orbits implies " << expected_obme << std::endl;
+    goodstate = false;
+    return;
+  }
+
+  const size_t norbits = modelspace->GetNumberOrbits();
+  for (int a_file=0; a_file<num_orbits; ++a_file)
+  {
+    for (int b_file=a_file; b_file<num_orbits; ++b_file)
+    {
+      float obme = 0;
+      read_or_fail(obme, "one-body matrix element");
+      if ( !goodstate ) return;
+
+      size_t a = orbit_remap[a_file];
+      size_t b = orbit_remap[b_file];
+      if (a >= norbits or b >= norbits) continue;
+
+      Hbare.OneBody(a,b) = obme;
+      if (a != b) Hbare.OneBody(b,a) = obme;
+    }
+  }
+
+  int n_tbme_used = 0;
+  for (int i=0; i<num_tbme; ++i)
+  {
+    int a_file=0, b_file=0, c_file=0, d_file=0, J=0;
+    float tbme = 0;
+    read_or_fail(a_file, "two-body orbit a");
+    read_or_fail(b_file, "two-body orbit b");
+    read_or_fail(c_file, "two-body orbit c");
+    read_or_fail(d_file, "two-body orbit d");
+    read_or_fail(J, "two-body J");
+    read_or_fail(tbme, "two-body matrix element");
+    if ( !goodstate ) return;
+
+    const bool valid_file_orbits = (a_file >= 0 and a_file < num_orbits
+                                and b_file >= 0 and b_file < num_orbits
+                                and c_file >= 0 and c_file < num_orbits
+                                and d_file >= 0 and d_file < num_orbits);
+    if (not valid_file_orbits)
+    {
+      std::cerr << "Read_no2bpack: invalid orbit index in TBME record " << i
+                << " of " << filename << std::endl;
+      goodstate = false;
+      return;
+    }
+
+    bool hcm_is_zero = true;
+    const auto& oa = file_orbits[a_file];
+    const auto& ob = file_orbits[b_file];
+    const auto& oc = file_orbits[c_file];
+    const auto& od = file_orbits[d_file];
+    const int fab = 2 * oa[0] + oa[1] + 2 * ob[0] + ob[1];
+    const int fcd = 2 * oc[0] + oc[1] + 2 * od[0] + od[1];
+    const int delta_f = std::abs(fab - fcd);
+    hcm_is_zero = not (delta_f == 0 or delta_f == 2);
+
+    {
+      size_t a = orbit_remap[a_file];
+      size_t b = orbit_remap[b_file];
+      size_t c = orbit_remap[c_file];
+      size_t d = orbit_remap[d_file];
+      if (a < norbits and b < norbits and c < norbits and d < norbits)
+      {
+        Hbare.TwoBody.SetTBME_J(J, a, b, c, d, tbme);
+        ++n_tbme_used;
+      }
+    }
+
+    if ( !hcm_is_zero )
+    {
+      float hcm_tbme = 0;
+      read_or_fail(hcm_tbme, "center-of-mass two-body matrix element");
+      if ( !goodstate ) return;
+    }
+  }
+
+  std::cout << "Read no2bpack file " << filename
+            << "  hw=" << hw_file
+            << "  emax=" << emax_file
+            << "  used " << n_tbme_used << " / " << num_tbme
+            << " TBMEs" << std::endl;
+}
+
+
 
 /// Read two-body matrix elements from an Oslo-formatted file
 void ReadWrite::WriteTwoBody_Oslo( std::string filename, Operator& Op)
@@ -6309,8 +6464,6 @@ void ReadWrite::CopyFile(std::string filename1, std::string filename2)
 //    f2 << f1.rdbuf ();
 //  } 
 }
-
-
 
 
 
