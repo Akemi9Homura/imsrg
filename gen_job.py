@@ -21,14 +21,18 @@ exe = str(REPO_ROOT / "build" / "imsrg++")
 params = {}
 
 flag = "EM1.8_2.0"
-params["fmt2"] = "no2bpack"
-params["2bme"] = "/lustre/home/2401110128/Forces/no2b/EM1.8_2.0/Li8/no2b_Li8_EM1.8_2.0_hw16_emax12_e3max16.bin"
+params["fmt2"] = "me2j"
+params["2bme"] = "/lustre/home/2401110128/Forces/EM1.8_2.0/2BME/TwBME_N3LO_EM500_srg1.8_hw16_emax14_e2max28.me2j.gz"
 params["fmt3"] = ""
 params["3bme_type"] = "no2b"
 params["no2b_precision"] = "single"
-params["3bme"] = "none"
+params["3bme"] = "/lustre/home/2401110128/Forces/EM1.8_2.0/3BME/ThBME_NO2B_EM1.8_2.0_hw16_emax14_e2max28_e3max18.me3j.gz"
 params["emax"] = 12
 params["e3max"] = 16
+params["BetaCM"] = 3.0
+params["denominator_delta"] = 10.0
+params["denominator_delta_orbit"] = "all"
+params["nucleon_mass_correction"] = "true"
 
 # For a packed normal-ordered Hamiltonian produced by the normal-order program:
 #   params["fmt2"] = "no2bpack"
@@ -39,11 +43,21 @@ params["e3max"] = 16
 # params["e3max"] consistent with the truncations used to generate the pack.
 
 
-params["reference"] = "Li8"
-params["valence_space"] = "p-shell"
+params["reference"] = "O15"
+
+# Model-space naming convention:
+# - params["valence_space"] is the short name used in paths and output prefixes.
+#   If it is a built-in IMSRG space such as "p-shell", it is also parsed by imsrg++.
+# - params["custom_valence_space"], when set, is the physical model-space
+#   definition parsed by imsrg++. Its format is "<core>,<orbit>,...", for example
+#   "He4,p0p3,n0p3,p0p1,n0p1,p0d5,n0d5,p1s1,n1s1".
+# - Do not hand-write a short name and custom definition that describe different
+#   spaces; verify the intended orbit content before generating/submitting.
+params["valence_space"] = "pd5s1-shell"
+params["custom_valence_space"] = "He4,p0p3,n0p3,p0p1,n0p1,p0d5,n0d5,p1s1,n1s1"
 params["Operators"] = "Sigma,SigmaTau3,Ltau3"
 
-core = params["valence_space"].split(",")[0]
+space_tag = params["valence_space"]
 
 params["basis"] = "HF"
 params["method"] = "magnus"
@@ -104,6 +118,10 @@ def extract_hw(file, file3):
             exit(-1)
 
 
+def path_token(value):
+    return f"{value:g}"
+
+
 def add_header(output, partition=partition, qos=qos, cpus=cpus):
     lib_dir = REPO_ROOT / "build"
     header_list = [
@@ -145,13 +163,17 @@ def generate_slurm(params: dict):
         params["file3e3max"] = e3max_3n
 
     params["hw"] = hw
+    params["hwBetaCM"] = hw
 
     reference = params["reference"]
     emax = params["emax"]
     e3max = params["e3max"]
-    prefix = f"{flag}_{core.lower()}_{reference.lower()}_hw{hw}_emax{emax}_e3max{e3max}"
+    lawson_tag = f"beta{path_token(params['BetaCM'])}"
+    delta_tag = f"delta{path_token(params['denominator_delta'])}"
+    run_tag = f"{lawson_tag}_{delta_tag}"
+    prefix = f"{flag}_{space_tag.lower()}_{reference.lower()}_hw{hw}_emax{emax}_e3max{e3max}_{run_tag}"
 
-    result_dir = REPO_ROOT / "result" / flag / f"{core.lower()}_{reference.lower()}_hw{hw}_emax{emax}_e3max{e3max}"
+    result_dir = REPO_ROOT / "result" / flag / f"{space_tag.lower()}_{reference.lower()}_hw{hw}_emax{emax}_e3max{e3max}_{run_tag}"
     script_file = result_dir / f"run_{prefix}.sh"
     scratch_dir = result_dir / "scratch"
 
@@ -208,24 +230,28 @@ if __name__ == "__main__":
         exit(0)
 
     if args.submit:
-        subprocess.run(
+        result = subprocess.run(
             ["sbatch", str(script_file)],
             capture_output=True,
             text=True,
             check=True,
         )
         print(f"sbatch {script_file}")
+        if result.stdout.strip():
+            print(result.stdout.strip())
         exit(0)
 
     run_mode = input("submit job: y/n\n")
     if run_mode.lower()[0] == "y":
-        subprocess.run(
+        result = subprocess.run(
             ["sbatch", str(script_file)],
             capture_output=True,
             text=True,
             check=True,
         )
         print(f"sbatch {script_file}")
+        if result.stdout.strip():
+            print(result.stdout.strip())
     else:
         subprocess.run(
             ["bash", str(script_file)],
