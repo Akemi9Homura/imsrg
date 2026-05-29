@@ -10,27 +10,35 @@ _RE_NO2BPACK = re.compile(r'_hw(\d+)_emax(\d+)_e3max(\d+)\.')
 
 REPO_ROOT = Path(__file__).resolve().parent
 
-# wm2 Slurm partitions:
-#   C064M1024G: 64 CPU cores, about 1 TB memory per node
-#   C064M0256G: 64 CPU cores, about 256 GB memory per node
-partition = "C064M1024G"
+# point7 Slurm partitions:
+#   c128m1024: 128 CPU cores, about 1 TB memory per node (default)
+#   c128m512 : 128 CPU cores, about 512 GB memory per node
+#   compute_C: 96 CPU cores per node
+#   compute_A: 28 CPU cores per node
+# point7 has no accounting/QOS configured (accounting_storage/none), so any
+# --qos is silently ignored there; keep qos=low so the wm2 setting is unchanged.
+partition = "c128m512"
 qos = "low"
 cpus = 64
+# Optionally pin to a specific node, e.g. "node2", to keep this job off a busy
+# node and on its own node (point7 does not track memory, so co-located jobs
+# share RAM with no protection). Set to None / "" to let Slurm choose.
+nodelist = "node3"
 
 exe = str(REPO_ROOT / "build" / "imsrg++")
 params = {}
 
 flag = "EM1.8_2.0"
 params["fmt2"] = "me2j"
-params["2bme"] = "/lustre/home/2401110128/Forces/EM1.8_2.0/2BME/TwBME_N3LO_EM500_srg1.8_hw16_emax14_e2max28.me2j.gz"
+params["2bme"] = "/tns/public/Forces/EM1.8_2.0/2BME/TwBME_N3LO_EM500_srg1.8_hw12_emax14_e2max28.me2j.gz"
 params["fmt3"] = ""
 params["3bme_type"] = "no2b"
 params["no2b_precision"] = "single"
-params["3bme"] = "/lustre/home/2401110128/Forces/EM1.8_2.0/3BME/ThBME_NO2B_EM1.8_2.0_hw16_emax14_e2max28_e3max18.me3j.gz"
-params["emax"] = 12
-params["e3max"] = 16
-params["BetaCM"] = 3.0
-params["denominator_delta"] = 10.0
+params["3bme"] = "/tns/public/Forces/EM1.8_2.0/3BME/ThBME_NO2B_EM1.8_2.0_hw12_emax14_e2max28_e3max24.me3j.gz"
+params["emax"] = 14
+params["e3max"] = 24
+params["BetaCM"] = 0.0
+params["denominator_delta"] = 0.0
 params["denominator_delta_orbit"] = "all"
 params["nucleon_mass_correction"] = "true"
 
@@ -43,7 +51,7 @@ params["nucleon_mass_correction"] = "true"
 # params["e3max"] consistent with the truncations used to generate the pack.
 
 
-params["reference"] = "O15"
+params["reference"] = "Fe57"
 
 # Model-space naming convention:
 # - params["valence_space"] is the short name used in paths and output prefixes.
@@ -53,8 +61,11 @@ params["reference"] = "O15"
 #   "He4,p0p3,n0p3,p0p1,n0p1,p0d5,n0d5,p1s1,n1s1".
 # - Do not hand-write a short name and custom definition that describe different
 #   spaces; verify the intended orbit content before generating/submitting.
-params["valence_space"] = "pd5s1-shell"
-params["custom_valence_space"] = "He4,p0p3,n0p3,p0p1,n0p1,p0d5,n0d5,p1s1,n1s1"
+params["valence_space"] = "fp-shell"
+# fp-shell is a built-in IMSRG model space (Ca40 core + f7/2,p3/2,f5/2,p1/2 for
+# protons and neutrons), so imsrg++ parses the short name directly. For a
+# built-in space, comment out custom_valence_space instead of removing it.
+# params["custom_valence_space"] = "Ca40,p0f7,n0f7,p1p3,n1p3,p0f5,n0f5,p1p1,n1p1"
 params["Operators"] = "Sigma,SigmaTau3,Ltau3"
 
 space_tag = params["valence_space"]
@@ -122,13 +133,17 @@ def path_token(value):
     return f"{value:g}"
 
 
-def add_header(output, partition=partition, qos=qos, cpus=cpus):
+def add_header(output, partition=partition, qos=qos, cpus=cpus, nodelist=nodelist):
     lib_dir = REPO_ROOT / "build"
     header_list = [
         "#!/bin/bash -l",
         f"#SBATCH --partition={partition}",
         f"#SBATCH --qos={qos}",
         "#SBATCH -J IMSRG",
+    ]
+    if nodelist:
+        header_list.append(f"#SBATCH --nodelist={nodelist}")
+    header_list += [
         "#SBATCH --nodes=1",
         "#SBATCH --ntasks-per-node=1",
         f"#SBATCH --cpus-per-task={cpus}",
