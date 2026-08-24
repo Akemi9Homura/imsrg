@@ -53,7 +53,7 @@ class FlowSettings:
     max_step: float = 10.0
     initial_step: float | None = None
     residual_ratio: float = 1e-6
-    max_accepted_steps: int = 800
+    max_accepted_steps: int = 3000
     symmetry_tolerance: float = 2e-8
     checkpoint_s: float | None = None
 

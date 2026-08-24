@@ -37,7 +37,7 @@ class JobSettings:
     label: str | None = None
     partition: str = "c128m512"
     nodelist: str | None = None
-    smax: float = 2500.0
+    smax: float = 8000.0
     checkpoint_s: float = 40.0
     rtol: float = 1e-6
     atol: float = 1e-8
@@ -154,7 +154,7 @@ def main() -> int:
     )
     parser.add_argument("--partition", choices=_PARTITIONS, default="c128m512")
     parser.add_argument("--nodelist")
-    parser.add_argument("--smax", type=float, default=2500.0)
+    parser.add_argument("--smax", type=float, default=8000.0)
     parser.add_argument("--checkpoint-s", type=float, default=40.0)
     parser.add_argument("--rtol", type=float, default=1e-6)
     parser.add_argument("--atol", type=float, default=1e-8)
