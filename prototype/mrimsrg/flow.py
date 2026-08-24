@@ -2,8 +2,8 @@
 
 The structure follows the existing ``IMSRGSolver`` direct-flow path: update
 the generator from the current Hamiltonian, evaluate ``[eta,H]``, use an
-adaptive explicit Runge--Kutta method, and stop on the masked decoupling
-residual. SciPy's DOP853 is used here so accepted states can be inspected
+adaptive explicit Runge--Kutta method, and stop on the masked White-NCSM
+generator numerator. SciPy's DOP853 is used here so accepted states can be inspected
 without retaining a copy of every 40^4 tensor in memory.
 """
 
@@ -260,13 +260,13 @@ def integrate_flow(
     ]
     if observer is not None:
         observer(trajectory[0])
-    if initial_residual == 0.0:
+    if initial_generator_residual == 0.0:
         return FlowResult(
             hamiltonian=initial_hamiltonian,
             trajectory=tuple(trajectory),
             function_evaluations=0,
             converged=True,
-            message="initial Hamiltonian already satisfies the masked decoupling condition",
+            message="initial Hamiltonian already satisfies the masked White-NCSM condition",
         )
 
     function_evaluations = 0
@@ -297,7 +297,7 @@ def integrate_flow(
     )
 
     converged = False
-    message = "maximum flow parameter reached before residual target"
+    message = "maximum flow parameter reached before White-NCSM target"
     checkpoints: list[FlowCheckpoint] = []
     for step in range(1, settings.max_accepted_steps + 1):
         if solver.status == "finished":
@@ -372,9 +372,9 @@ def integrate_flow(
         ) > settings.symmetry_tolerance:
             message = "Hamiltonian symmetry error exceeded the configured tolerance"
             break
-        if point.residual_ratio <= settings.residual_ratio:
+        if point.generator_numerator_residual_ratio <= settings.residual_ratio:
             converged = True
-            message = "masked decoupling residual target reached"
+            message = "masked White-NCSM numerator target reached"
             break
         if solver.status == "finished":
             break

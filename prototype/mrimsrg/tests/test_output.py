@@ -61,7 +61,7 @@ class OutputTests(unittest.TestCase):
             )
             self.assertEqual(
                 metadata["acceptance_residual"]["lambda2_terms"],
-                "linear terms retained",
+                "all omitted by the published generator truncation",
             )
             self.assertEqual(
                 metadata["formula_basis"]["decoupling_mask_representation"],

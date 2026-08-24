@@ -24,8 +24,8 @@ except ImportError:
 def _print_point(point: FlowPoint) -> None:
     print(
         f"step={point.step:3d} s={point.s:.10g} E={point.zero_body:.12f} "
-        f"residual={point.residual:.8e} ratio={point.residual_ratio:.8e} "
-        f"generator_ratio={point.generator_numerator_residual_ratio:.8e} "
+        f"strict_residual={point.residual:.8e} strict_ratio={point.residual_ratio:.8e} "
+        f"acceptance_ratio={point.generator_numerator_residual_ratio:.8e} "
         f"sym={max(point.one_body_hermiticity_error, point.two_body_hermiticity_error, point.two_body_antisymmetry_error):.2e}",
         flush=True,
     )

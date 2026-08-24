@@ -175,9 +175,10 @@ def save_flow_output(
             "two_body": "e(p)+e(q) != e(r)+e(s)",
         },
         "acceptance_residual": {
-            "formula": "masked strict D-D^dagger from Mongelli Eqs. (5.216)-(5.217)",
-            "lambda2_terms": "linear terms retained",
-            "generator_numerator_recorded_separately": True,
+            "formula": "masked lambda-free White-NCSM numerator from Vobig Sec. 6.5.4",
+            "lambda2_terms": "all omitted by the published generator truncation",
+            "target_ratio": settings.residual_ratio,
+            "strict_D_Ddagger_recorded_separately": True,
         },
         "ode_method": "DOP853 direct flow",
         "flow_settings": asdict(settings),

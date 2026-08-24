@@ -77,7 +77,7 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(result.function_evaluations, 0)
         np.testing.assert_array_equal(result.hamiltonian.one_body, initial.one_body)
 
-    def test_truncated_generator_numerator_cannot_fake_strict_convergence(self) -> None:
+    def test_published_generator_fixed_point_keeps_strict_diagnostic_visible(self) -> None:
         densities = compute_densities(
             occupations((0, 1), (2, 3), norb=4),
             np.array([np.sqrt(0.4), np.sqrt(0.6)]),
@@ -95,7 +95,7 @@ class FlowTests(unittest.TestCase):
             np.arange(4),
             FlowSettings(smax=1.0, max_step=1.0),
         )
-        self.assertFalse(result.converged)
+        self.assertTrue(result.converged)
         self.assertAlmostEqual(result.trajectory[-1].residual_ratio, 1.0)
         self.assertEqual(
             result.trajectory[-1].generator_numerator_residual_ratio, 0.0

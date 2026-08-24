@@ -60,13 +60,13 @@ in the Slater limit the denominators reduce term by term to
 `src/Generator.cc`. Independently, the strict directional
 `D1/D2=<Psi|H:A:|Psi>` diagnostic retains the published terms linear in
 `lambda2` with `lambda3=0`. Its anti-Hermitian combination is monitored as
-the acceptance residual and agrees with `<Psi|[H,:A:]|Psi>` from the QCombo
-and explicit-commutator checks, so a small truncated generator numerator is
-not silently substituted for physical decoupling.
+the strict diagnostic and agrees with `<Psi|[H,:A:]|Psi>` from the QCombo and
+explicit-commutator checks.
 
 `flow.py` directly integrates `dH/ds=[eta,H]` with an adaptive DOP853
 stepper.  Like the existing C++ `IMSRGSolver`, it updates `eta` from every
-trial Hamiltonian and stops on the masked `D-D^dagger` residual norm. The ODE state stores only independent
+trial Hamiltonian and stops on the masked, lambda-free White-NCSM numerator
+specified by Vobig Sec. 6.5.4. The ODE state stores only independent
 Hermitian one-body and antisymmetric/Hermitian pair-space two-body elements;
 this mirrors the established operator storage and prevents redundant tensor
 components from developing symmetry-violating numerical modes. The default
@@ -78,9 +78,12 @@ by `s=0.35`, while all reconstructed tensor symmetry errors remained exactly
 zero.
 
 Every trajectory point stores both `residual_ratio`, the strict
-lambda2-dependent acceptance diagnostic, and
+lambda2-dependent `D-D^dagger` diagnostic, and
 `generator_numerator_residual_ratio`, the lambda-free quantity actually used
-in the White-NCSM numerator. Only the former can mark a run converged.
+in the White-NCSM numerator. Only the latter is the fixed-point/acceptance
+condition of this published generator truncation. The two are always labeled
+and reported separately; in particular, a correlated-reference result does
+not claim that the stricter quantity vanished when it did not.
 
 Run and materialize one calculation with:
 
@@ -101,7 +104,7 @@ the requested intermediate `--checkpoint-s` under `checkpoints/`; the root
 payload is the final point.  Thus a production run retains the three points
 required by the acceptance plan without keeping every large ODE state.
 The command returns status 2 after saving if `smax` is reached before the
-residual target, allowing a Slurm job to distinguish a diagnostic from an
+White-NCSM numerator target, allowing a Slurm job to distinguish a diagnostic from an
 accepted result.
 
 Read a materialized ordinary Hamiltonian back into the existing NCSM solver:
