@@ -81,6 +81,8 @@ def save_flow_output(
     initial: MRHamiltonian,
     result: FlowResult,
     settings: FlowSettings,
+    *,
+    resumed_from: str | Path | None = None,
 ) -> VacuumHamiltonian:
     """Save all inputs and both MR/vacuum final representations.
 
@@ -122,7 +124,7 @@ def save_flow_output(
     saved_checkpoints = [
         _write_vacuum_checkpoint(
             root,
-            0.0,
+            result.trajectory[0].s,
             asdict(result.trajectory[0]),
             initial_vacuum,
             reference.norb,
@@ -190,6 +192,24 @@ def save_flow_output(
         },
         "ode_method": "DOP853 direct flow",
         "flow_settings": asdict(settings),
+        "flow_start_s": result.trajectory[0].s,
+        "resumed_from": (
+            None if resumed_from is None else str(Path(resumed_from).resolve())
+        ),
+        "residual_normalization": {
+            "strict": _recover_initial_norm(
+                result.trajectory[0].residual,
+                result.trajectory[0].residual_ratio,
+            ),
+            "generator": _recover_initial_norm(
+                result.trajectory[0].generator_residual,
+                result.trajectory[0].generator_residual_ratio,
+            ),
+            "generator_numerator": _recover_initial_norm(
+                result.trajectory[0].generator_numerator_residual,
+                result.trajectory[0].generator_numerator_residual_ratio,
+            ),
+        },
         "flow_converged": result.converged,
         "flow_message": result.message,
         "function_evaluations": result.function_evaluations,
@@ -209,3 +229,10 @@ def save_flow_output(
         json.dump(metadata, stream, indent=2, sort_keys=True)
         stream.write("\n")
     return final_vacuum
+
+
+def _recover_initial_norm(value: float, ratio: float) -> float:
+    """Recover the original normalization from any recorded flow point."""
+    if ratio > 0.0:
+        return float(value / ratio)
+    return float(value)

@@ -18,8 +18,9 @@ Hamiltonian、RDM 和日志均保留在被 Git 忽略的本机/集群结果目�
   不可约密度项，Epstein--Nesbet 分母舍去文献标记的
   `O(lambda2)` 项，保持分母符号并用 `1e-6 MeV` cutoff。
 - `Rgen` 是 Vobig 式 (6.5.28)--(6.5.29) 中带 EN 分母、反对称化后
-  的实际掩码生成元范数，是正式固定点判据，与现有
-  `IMSRGSolver` 的 `Eta.Norm()` 停止语义一致。`Rnum` 是不带分母的
+  的实际掩码生成元范数，是正式固定点判据。现有 `IMSRGSolver`
+  监测同一个 `Eta.Norm()`，但使用绝对阈值；本原型按照计划采用更严格的
+  相对初值 `1e-6` 门槛。`Rnum` 是不带分母的
   lambda-free White-NCSM 分子；`Rstrict` 是含线性 `lambda2`
   的 `D-D^dagger` 诊断。对分数占据，分母加权与反对称化不对易，
   因此三者始终分别报告。

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import re
 import subprocess
@@ -43,6 +44,7 @@ class JobSettings:
     atol: float = 1e-8
     max_step: float = 10.0
     residual_ratio: float = 1e-6
+    resume_from: Path | None = None
 
 
 def _number_tag(value: float) -> str:
@@ -60,8 +62,20 @@ def _validate(settings: JobSettings) -> None:
         raise ValueError("nodelist contains unsupported characters")
     if settings.label is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", settings.label):
         raise ValueError("label contains unsupported characters")
-    if not 0.0 < settings.checkpoint_s < settings.smax:
-        raise ValueError("checkpoint_s must lie strictly between zero and smax")
+    start_s = 0.0
+    if settings.resume_from is not None:
+        metadata_path = settings.resume_from / "metadata.json"
+        if not metadata_path.is_file():
+            raise FileNotFoundError(
+                f"resume flow is unavailable: {settings.resume_from}"
+            )
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        trajectory = metadata.get("trajectory")
+        if not isinstance(trajectory, list) or not trajectory:
+            raise ValueError("resume flow has no recorded trajectory")
+        start_s = float(trajectory[-1]["s"])
+    if not start_s < settings.checkpoint_s < settings.smax:
+        raise ValueError("checkpoint_s must lie strictly between start_s and smax")
     if settings.rtol <= 0.0 or settings.atol <= 0.0 or settings.max_step <= 0.0:
         raise ValueError("ODE tolerances and max_step must be positive")
     if not 0.0 < settings.residual_ratio < 1.0:
@@ -114,6 +128,8 @@ def generate_job(
         f"--max-step {settings.max_step:.17g} "
         f"--residual-ratio {settings.residual_ratio:.17g}"
     )
+    if settings.resume_from is not None:
+        command += f" --resume-from {settings.resume_from.resolve()}"
     contents = f"""#!/bin/bash
 #SBATCH --job-name=mr_{settings.nucleus.lower()}
 #SBATCH --partition={settings.partition}
@@ -160,6 +176,7 @@ def main() -> int:
     parser.add_argument("--atol", type=float, default=1e-8)
     parser.add_argument("--max-step", type=float, default=10.0)
     parser.add_argument("--residual-ratio", type=float, default=1e-6)
+    parser.add_argument("--resume-from", type=Path)
     parser.add_argument("--submit", action="store_true")
     parser.add_argument(
         "--repo-root",
@@ -189,6 +206,7 @@ def main() -> int:
         atol=args.atol,
         max_step=args.max_step,
         residual_ratio=args.residual_ratio,
+        resume_from=args.resume_from,
     )
     script = generate_job(repo_root, result_root, settings)
     print(f"generated {script}")

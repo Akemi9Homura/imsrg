@@ -68,10 +68,12 @@ the strict diagnostic and agrees with `<Psi|[H,:A:]|Psi>` from the QCombo and
 explicit-commutator checks.
 
 `flow.py` directly integrates `dH/ds=[eta,H]` with an adaptive DOP853
-stepper.  Like the existing C++ `IMSRGSolver`, it updates `eta` from every
-trial Hamiltonian and stops when the norm of the actual masked White-NCSM
-generator in Vobig Eqs. (6.5.28)--(6.5.29) falls to the requested fraction of
-its initial value. The ODE state stores only independent
+stepper. Like the existing C++ `IMSRGSolver`, it updates `eta` from every
+trial Hamiltonian and monitors the norm of the actual masked White-NCSM
+generator in Vobig Eqs. (6.5.28)--(6.5.29). The C++ solver uses an absolute
+`Eta.Norm()` threshold; this prototype deliberately applies the plan's
+stricter normalized gate and stops when that norm falls to the requested
+fraction of its initial value. The ODE state stores only independent
 Hermitian one-body and antisymmetric/Hermitian pair-space two-body elements;
 this mirrors the established operator storage and prevents redundant tensor
 components from developing symmetry-violating numerical modes. The default
@@ -109,6 +111,22 @@ required by the acceptance plan without keeping every large ODE state.
 The command returns status 2 after saving if `smax` is reached before the
 White-NCSM generator target, allowing a Slurm job to distinguish a diagnostic from an
 accepted result.
+
+If a long correlated-reference flow reaches `smax`, continue from its saved
+MR-normal-ordered Hamiltonian without restarting or renormalizing the gate:
+
+```bash
+PYTHONPATH=prototype/mrimsrg python3 prototype/mrimsrg/run_mrimsrg.py \
+  prototype/mrimsrg/data/He4_Nrefmax2 next-flow \
+  --resume-from prior-flow --smax 50000 --checkpoint-s 40000
+```
+
+The continuation verifies that the reference metadata and exact
+`gamma1/gamma2/lambda2` arrays match, rejects legacy outputs that predate the
+separate `Rgen/Rnum` records, and retains the original three residual norms as
+the ratio denominators. `smax` and `checkpoint-s` are absolute flow parameters.
+The dedicated point7 generator accepts the same `--resume-from` option and
+still emits exactly one inspected Slurm job.
 
 Read a materialized ordinary Hamiltonian back into the existing NCSM solver:
 

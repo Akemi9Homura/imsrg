@@ -74,6 +74,81 @@ class FlowTests(unittest.TestCase):
             abs(initial.one_body[0, 1]),
         )
 
+    def test_continuation_preserves_original_residual_normalization(self) -> None:
+        densities = compute_densities(occupations((0,), norb=2), np.array([1.0]))
+        initial = MRHamiltonian(
+            0.0, np.array([[0.0, 0.2], [0.2, 2.0]]), np.zeros((2,) * 4)
+        )
+        first = integrate_flow(
+            initial,
+            densities,
+            np.array([0, 1]),
+            FlowSettings(
+                smax=0.4,
+                relative_tolerance=1e-10,
+                absolute_tolerance=1e-12,
+                max_step=0.1,
+                residual_ratio=1e-12,
+            ),
+        )
+        initial_point = first.trajectory[0]
+        normalization = (
+            initial_point.residual,
+            initial_point.generator_residual,
+            initial_point.generator_numerator_residual,
+        )
+        continued = integrate_flow(
+            first.hamiltonian,
+            densities,
+            np.array([0, 1]),
+            FlowSettings(
+                smax=0.8,
+                relative_tolerance=1e-10,
+                absolute_tolerance=1e-12,
+                max_step=0.1,
+                residual_ratio=1e-12,
+            ),
+            start_s=first.trajectory[-1].s,
+            residual_normalization=normalization,
+        )
+        direct = integrate_flow(
+            initial,
+            densities,
+            np.array([0, 1]),
+            FlowSettings(
+                smax=0.8,
+                relative_tolerance=1e-10,
+                absolute_tolerance=1e-12,
+                max_step=0.1,
+                residual_ratio=1e-12,
+            ),
+        )
+        self.assertEqual(continued.trajectory[0].s, 0.4)
+        self.assertAlmostEqual(
+            continued.trajectory[0].generator_residual_ratio,
+            first.trajectory[-1].generator_residual_ratio,
+            places=13,
+        )
+        np.testing.assert_allclose(
+            continued.hamiltonian.one_body,
+            direct.hamiltonian.one_body,
+            atol=2e-11,
+        )
+
+    def test_continuation_checkpoint_must_follow_start(self) -> None:
+        densities = compute_densities(occupations((0,), norb=2), np.array([1.0]))
+        initial = MRHamiltonian(
+            0.0, np.diag([0.0, 2.0]), np.zeros((2,) * 4)
+        )
+        with self.assertRaisesRegex(ValueError, "strictly between start_s"):
+            integrate_flow(
+                initial,
+                densities,
+                np.array([0, 1]),
+                FlowSettings(smax=2.0, checkpoint_s=0.5),
+                start_s=1.0,
+            )
+
     def test_equal_ho_quanta_are_not_decoupled(self) -> None:
         densities = compute_densities(occupations((0,), norb=2), np.array([1.0]))
         initial = MRHamiltonian(

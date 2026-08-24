@@ -14,6 +14,7 @@ from flow import FlowCheckpoint, FlowPoint, FlowResult, FlowSettings
 from normal_order import VacuumHamiltonian, normal_order
 from output import save_flow_output
 from reference_io import ReferenceData
+from run_mrimsrg import _load_resume_state
 
 
 class OutputTests(unittest.TestCase):
@@ -66,6 +67,12 @@ class OutputTests(unittest.TestCase):
             self.assertAlmostEqual(recovered.zero_body, vacuum.zero_body)
             metadata = json.loads((output_path / "metadata.json").read_text())
             self.assertEqual(metadata["density_approximation"], "lambda3=0")
+            self.assertEqual(metadata["flow_start_s"], 0.0)
+            self.assertIsNone(metadata["resumed_from"])
+            self.assertEqual(
+                metadata["residual_normalization"],
+                {"strict": 0.0, "generator": 0.0, "generator_numerator": 0.0},
+            )
             self.assertEqual(
                 metadata["generator_numerator"]["irreducible_density_terms"],
                 "all omitted",
@@ -90,6 +97,13 @@ class OutputTests(unittest.TestCase):
             self.assertTrue(
                 (output_path / "checkpoints" / "s0p5" / "vacuum_mscheme.bin").is_file()
             )
+            resumed, start_s, normalization = _load_resume_state(
+                output_path, reference.metadata, densities
+            )
+            self.assertEqual(start_s, 0.0)
+            self.assertEqual(normalization, (0.0, 0.0, 0.0))
+            np.testing.assert_array_equal(resumed.one_body, initial.one_body)
+            np.testing.assert_array_equal(resumed.two_body, initial.two_body)
             with (output_path / "vacuum_mscheme.bin").open("rb") as stream:
                 self.assertEqual(stream.read(16), b"mrimsrg_m_v1\0\0\0\0")
                 norb, zero_body = struct.unpack("<Qd", stream.read(16))

@@ -202,16 +202,28 @@ def integrate_flow(
     oscillator_quanta: np.ndarray,
     settings: FlowSettings = FlowSettings(),
     observer: Callable[[FlowPoint], None] | None = None,
+    *,
+    start_s: float = 0.0,
+    residual_normalization: tuple[float, float, float] | None = None,
 ) -> FlowResult:
-    """Integrate ``dH/ds=[eta(H),H]`` until convergence or ``smax``."""
+    """Integrate ``dH/ds=[eta(H),H]`` until convergence or ``smax``.
+
+    ``start_s`` and ``residual_normalization`` support a numerically exact
+    continuation from a previously materialized flow.  The three
+    normalization values are, in order, the original strict, generator, and
+    numerator norms.  Keeping those original values prevents a continuation
+    from silently weakening the relative convergence target.
+    """
     if settings.smax <= 0.0:
         raise ValueError("smax must be positive")
+    if not 0.0 <= start_s < settings.smax:
+        raise ValueError("start_s must be nonnegative and smaller than smax")
     if settings.relative_tolerance <= 0.0 or settings.absolute_tolerance <= 0.0:
         raise ValueError("ODE tolerances must be positive")
     if not 0.0 < settings.residual_ratio < 1.0:
         raise ValueError("residual_ratio must lie between zero and one")
-    if settings.checkpoint_s is not None and not 0.0 < settings.checkpoint_s < settings.smax:
-        raise ValueError("checkpoint_s must lie strictly between zero and smax")
+    if settings.checkpoint_s is not None and not start_s < settings.checkpoint_s < settings.smax:
+        raise ValueError("checkpoint_s must lie strictly between start_s and smax")
 
     norb = int(initial_hamiltonian.one_body.shape[0])
     mask1, mask2 = decoupling_masks(oscillator_quanta)
@@ -256,17 +268,33 @@ def integrate_flow(
             white_ncsm_numerator_residual(working_initial, working_densities)
         )
     )
+    if residual_normalization is None:
+        normalization_residual = initial_residual
+        normalization_generator_residual = initial_generator_residual
+        normalization_generator_numerator_residual = (
+            initial_generator_numerator_residual
+        )
+    else:
+        if len(residual_normalization) != 3:
+            raise ValueError("residual_normalization must contain three norms")
+        (
+            normalization_residual,
+            normalization_generator_residual,
+            normalization_generator_numerator_residual,
+        ) = (float(value) for value in residual_normalization)
+        if min(residual_normalization) < 0.0:
+            raise ValueError("residual normalization values must be nonnegative")
     trajectory = [
         _flow_point(
             0,
-            0.0,
+            start_s,
             working_initial,
             initial_residual,
-            initial_residual,
+            normalization_residual,
             initial_generator_residual,
-            initial_generator_residual,
+            normalization_generator_residual,
             initial_generator_numerator_residual,
-            initial_generator_numerator_residual,
+            normalization_generator_numerator_residual,
         )
     ]
     if observer is not None:
@@ -298,7 +326,7 @@ def integrate_flow(
 
     solver = DOP853(
         right_hand_side,
-        0.0,
+        start_s,
         _pack(working_initial),
         settings.smax,
         rtol=settings.relative_tolerance,
@@ -354,11 +382,11 @@ def integrate_flow(
                         settings.checkpoint_s,
                         checkpoint_hamiltonian,
                         checkpoint_residual,
-                        initial_residual,
+                        normalization_residual,
                         checkpoint_generator_residual,
-                        initial_generator_residual,
+                        normalization_generator_residual,
                         checkpoint_generator_numerator_residual,
-                        initial_generator_numerator_residual,
+                        normalization_generator_numerator_residual,
                     ),
                     hamiltonian=checkpoint_hamiltonian,
                 )
@@ -383,11 +411,11 @@ def integrate_flow(
             solver.t,
             hamiltonian,
             residual,
-            initial_residual,
+            normalization_residual,
             generator_residual,
-            initial_generator_residual,
+            normalization_generator_residual,
             generator_numerator_residual,
-            initial_generator_numerator_residual,
+            normalization_generator_numerator_residual,
         )
         trajectory.append(point)
         if observer is not None:

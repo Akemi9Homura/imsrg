@@ -67,6 +67,66 @@ class FlowJobTests(unittest.TestCase):
                     ),
                 )
 
+    def test_generates_single_continuation_job(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            reference = (
+                root
+                / "prototype"
+                / "mrimsrg"
+                / "data"
+                / "He4_Nrefmax2"
+            )
+            reference.mkdir(parents=True)
+            (reference / "metadata.json").write_text("{}\n", encoding="utf-8")
+            interaction = root / "interaction.minipack"
+            interaction.write_bytes(b"test")
+            resume = root / "prior" / "flow"
+            resume.mkdir(parents=True)
+            (resume / "metadata.json").write_text(
+                '{"trajectory": [{"s": 25000.0}]}\n', encoding="utf-8"
+            )
+            script = generate_job(
+                root,
+                root / "result",
+                JobSettings(
+                    nucleus="He4",
+                    nrefmax=2,
+                    interaction=interaction,
+                    label="continue50k",
+                    checkpoint_s=40000.0,
+                    smax=50000.0,
+                    resume_from=resume,
+                ),
+            )
+            contents = script.read_text(encoding="utf-8")
+            self.assertIn("--smax 50000", contents)
+            self.assertIn("--checkpoint-s 40000", contents)
+            self.assertIn(f"--resume-from {resume}", contents)
+
+    def test_rejects_continuation_checkpoint_before_start(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            interaction = root / "interaction.minipack"
+            interaction.write_bytes(b"test")
+            resume = root / "prior" / "flow"
+            resume.mkdir(parents=True)
+            (resume / "metadata.json").write_text(
+                '{"trajectory": [{"s": 25000.0}]}\n', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ValueError, "between start_s"):
+                generate_job(
+                    root,
+                    root / "result",
+                    JobSettings(
+                        nucleus="He4",
+                        interaction=interaction,
+                        smax=50000.0,
+                        checkpoint_s=40.0,
+                        resume_from=resume,
+                    ),
+                )
+
     def test_rejects_unplanned_open_shell_nrefmax2_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
