@@ -125,3 +125,8 @@ N2LOopt spaces but not this exact emax2 file.
 The production path is compatible with point7's system Python 3.9 and the
 generated batch script initializes Environment Modules explicitly before it
 sources the machine-aware repository environment.
+Compute nodes do not carry the login node's `/usr/local` NumPy/SciPy install,
+so this standalone prototype calls the shared
+`/opt/library/miniconda-3.12.9/bin/python3` interpreter explicitly and logs its
+versions.  It does not activate or load miniconda and does not import the
+system-Python pyIMSRG module.

@@ -24,6 +24,7 @@ _POINT7_INTERACTION = Path(
     "/tns/mengziyan/mr-imsrg-inputs/"
     "TwBME_N2LO_opt_hw20_emax2_e2max4.minipack"
 )
+_POINT7_PYTHON = Path("/opt/library/miniconda-3.12.9/bin/python3")
 
 
 @dataclass(frozen=True)
@@ -87,7 +88,7 @@ def generate_job(
         f"#SBATCH --nodelist={settings.nodelist}\n" if settings.nodelist else ""
     )
     command = (
-        f"PYTHONPATH={repo_root / 'prototype' / 'mrimsrg'} python3 -u "
+        f"PYTHONPATH={repo_root / 'prototype' / 'mrimsrg'} {_POINT7_PYTHON} -u "
         f"{repo_root / 'prototype' / 'mrimsrg' / 'run_mrimsrg.py'} "
         f"{reference} {output} "
         f"--interaction {settings.interaction.resolve()} "
@@ -114,6 +115,7 @@ export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 export MKL_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 
+{_POINT7_PYTHON} -c 'import sys, numpy, scipy; print("python", sys.version.split()[0], "numpy", numpy.__version__, "scipy", scipy.__version__, flush=True)'
 {command}
 """
     script.write_text(contents, encoding="utf-8")
