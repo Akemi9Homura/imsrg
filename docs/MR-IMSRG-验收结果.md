@@ -27,9 +27,11 @@ Hamiltonian、RDM 和日志均保留在被 Git 忽略的本机/集群结果目�
 
 ## 2. 实现正确性证据
 
-- Python 回归测试：`34/34` 通过。覆盖 RDM/cumulant、普通与 MR 正规序
+- Python 回归测试：`36/36` 通过。覆盖 RDM/cumulant、普通与 MR 正规序
   往返、QCombo/显式 Fock-space 对易子、SR 极限、生成元、掩码、
-  Hermiticity/anti-Hermiticity、自然基协变及输出。
+  Hermiticity/anti-Hermiticity、自然基协变及输出；其中专门的回归测试
+  区分了自然基和 HO 基掩码，并确认正式验收使用实际 `eta`
+  而非不带分母的分子。
 - QCombo 重生的 MR-IMSRG(2) 0B/1B/2B 公式与随机直接求和最大差异
   `1.8e-15`。
 - 六个参考态的 `Tr(gamma1)=A` 误差不超过 `5.0e-14`，
