@@ -32,6 +32,15 @@ Run the dependency-free unit tests with:
 python3 -m unittest discover -s prototype/mrimsrg/tests -v
 ```
 
+`commutator.py` implements the natural-orbital MR-IMSRG(2) commutator with
+`lambda3=0`.  Its equations were regenerated independently with QCombo 0.2.0:
+for a random four-orbit correlated reference, direct summation of the QCombo
+0B/1B/2B expressions agreed with the numerical implementation to
+`1.8e-15`.  The committed tests additionally compare the correlated 1B--2B
+zero-body term and the single-reference single/double-excitation blocks with
+explicit Fock-space matrix commutators.  A non-diagonal `gamma1` is rejected
+instead of being silently treated as natural occupations.
+
 The bridge requires NumPy and SciPy on the Python side.  The first checked
 integration run used `shell-model-obs` revision `1687f16` and reproduced the
 full He4 `emax=2` ground-state benchmark as `-20.3388325043 MeV`; contraction
