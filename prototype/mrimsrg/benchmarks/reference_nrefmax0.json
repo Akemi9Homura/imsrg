@@ -17,7 +17,7 @@
     "prepare_reference": "prototype/mrimsrg/build/mrimsrg_prepare --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack --output <reference-dir> --Z <Z> --N <N> --nrefmax <Nrefmax>",
     "materialized_readback": "prototype/mrimsrg/build/mrimsrg_validate --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack --flow-output <flow-point-dir> --Z <Z> --N <N> --nmax <Nmax> --states 3"
   },
-  "shell_model_obs_revision": "1687f16250b8089b1b9c6fa4100a96a39c485b85",
+  "reference_preparation_shell_model_obs_revision": "1687f16250b8089b1b9c6fa4100a96a39c485b85",
   "references": {
     "He4": {
       "Z": 2,
@@ -60,6 +60,6 @@
     "density_contraction_energy_MeV": -20.33883250425531,
     "materialized_s0_readback_energy_MeV": -20.3388325043,
     "materialized_s0_readback_J2": 0,
-    "readback_shell_model_obs_revision": "4b10afa"
+    "readback_shell_model_obs_revision": "4b10afab0218711b0278ef66ad73e88bc7791c34"
   }
 }
