@@ -38,8 +38,16 @@ for a random four-orbit correlated reference, direct summation of the QCombo
 0B/1B/2B expressions agreed with the numerical implementation to
 `1.8e-15`.  The committed tests additionally compare the correlated 1B--2B
 zero-body term and the single-reference single/double-excitation blocks with
-explicit Fock-space matrix commutators.  A non-diagonal `gamma1` is rejected
-instead of being silently treated as natural occupations.
+explicit Fock-space matrix commutators. Direct calls reject a non-diagonal
+`gamma1` instead of silently treating its diagonal as natural occupations.
+For the required `He4/O16, Nrefmax=2` flows, `flow.py` diagonalizes only the
+connected off-diagonal blocks of `gamma1`, evaluates the published equations
+in that temporary basis, and transforms every generator back before applying
+the `Delta e` mask in the original HO basis. Final and checkpoint Hamiltonians
+are transformed back to the unchanged input orbit ordering; the exact
+orthogonal matrix is saved as `formula_basis_vectors.npy`. This is an internal
+basis-covariant evaluation, not a natural-orbital NCSM optimization or a
+replacement of the HO quantum-number labels.
 
 `generator.py` implements one generator only: the modified White generator
 used in the IM-NCSM literature, restricted by the relaxed `Delta e != 0`
@@ -112,6 +120,7 @@ On point7, generate and inspect exactly one Slurm job at a time with:
 ```bash
 python3 prototype/mrimsrg/gen_flow_job.py --nucleus He4
 python3 prototype/mrimsrg/gen_flow_job.py --nucleus He4 --submit
+python3 prototype/mrimsrg/gen_flow_job.py --nucleus He4 --nrefmax 2
 ```
 
 The dedicated generator is for this Python prototype; it deliberately does

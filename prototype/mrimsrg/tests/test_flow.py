@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from densities import compute_densities
 from flow import FlowSettings, _pack, _unpack, integrate_flow
-from normal_order import MRHamiltonian
+from normal_order import MRHamiltonian, VacuumHamiltonian, normal_order
 
 
 def occupations(*occupied_sets: tuple[int, ...], norb: int) -> np.ndarray:
@@ -76,6 +76,41 @@ class FlowTests(unittest.TestCase):
         self.assertTrue(result.converged)
         self.assertEqual(result.function_evaluations, 0)
         np.testing.assert_array_equal(result.hamiltonian.one_body, initial.one_body)
+
+    def test_nondiagonal_gamma_is_evaluated_naturally_but_masked_in_ho_basis(self) -> None:
+        determinants = occupations((0,), (1,), norb=2)
+        densities = compute_densities(
+            determinants, np.array([3.0, 4.0]) / 5.0
+        )
+        self.assertGreater(abs(densities.gamma1[0, 1]), 0.1)
+        vacuum = VacuumHamiltonian(
+            0.0, np.diag([0.0, 2.0]), np.zeros((2,) * 4)
+        )
+        initial = normal_order(vacuum, densities)
+
+        # Equal HO quanta must suppress the flow even though the temporary
+        # natural orbitals are mixtures of the two original orbitals.
+        blocked = integrate_flow(initial, densities, np.array([0, 0]))
+        self.assertTrue(blocked.converged)
+        self.assertEqual(blocked.function_evaluations, 0)
+        np.testing.assert_allclose(blocked.hamiltonian.one_body, initial.one_body)
+
+        active = integrate_flow(
+            initial,
+            densities,
+            np.array([0, 1]),
+            FlowSettings(
+                smax=0.2,
+                max_step=0.1,
+                residual_ratio=1e-12,
+            ),
+        )
+        self.assertGreater(active.function_evaluations, 0)
+        np.testing.assert_allclose(
+            active.hamiltonian.one_body,
+            active.hamiltonian.one_body.T,
+            atol=2e-12,
+        )
 
 
 if __name__ == "__main__":

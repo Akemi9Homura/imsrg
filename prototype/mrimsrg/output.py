@@ -11,13 +11,17 @@ import struct
 import numpy as np
 
 try:
+    from .basis import prepare_natural_basis
     from .densities import Densities
     from .flow import FlowResult, FlowSettings
+    from .generator import WHITE_DENOMINATOR_CUTOFF
     from .normal_order import MRHamiltonian, VacuumHamiltonian, to_vacuum
     from .reference_io import ReferenceData
 except ImportError:
+    from basis import prepare_natural_basis
     from densities import Densities
     from flow import FlowResult, FlowSettings
+    from generator import WHITE_DENOMINATOR_CUTOFF
     from normal_order import MRHamiltonian, VacuumHamiltonian, to_vacuum
     from reference_io import ReferenceData
 
@@ -89,12 +93,15 @@ def save_flow_output(
         raise FileExistsError(f"refusing to overwrite existing output: {root}")
     root.mkdir(parents=True)
     final_vacuum = to_vacuum(result.hamiltonian, densities)
+    formula_basis = prepare_natural_basis(densities)
+    gamma1_off_diagonal = densities.gamma1 - np.diag(np.diag(densities.gamma1))
 
     arrays = {
         "orbits": reference.orbits,
         "gamma1": densities.gamma1,
         "gamma2": densities.gamma2,
         "lambda2": densities.lambda2,
+        "formula_basis_vectors": formula_basis.vectors,
         "initial_mr_one_body": initial.one_body,
         "initial_mr_two_body": initial.two_body,
         "final_mr_one_body": result.hamiltonian.one_body,
@@ -141,11 +148,24 @@ def save_flow_output(
         "generator_denominator": {
             "formula": "Mongelli Eqs. (5.213)-(5.214), leading terms",
             "lambda2_terms": "omitted as O(lambda2)",
-            "cutoff_mev": 1e-6,
+            "cutoff_mev": WHITE_DENOMINATOR_CUTOFF,
             "cutoff_sign": "preserved",
         },
         "commutator": "MR-IMSRG(2), lambda3=0",
         "density_approximation": "lambda3=0",
+        "formula_basis": {
+            "external_representation": "original HO m-scheme orbit ordering",
+            "equation_evaluation": (
+                "original basis already diagonal in gamma1"
+                if formula_basis.is_identity
+                else "temporary connected-block natural basis"
+            ),
+            "vectors": "formula_basis_vectors.npy",
+            "max_original_gamma1_offdiagonal": float(
+                np.max(np.abs(gamma1_off_diagonal))
+            ),
+            "decoupling_mask_representation": "original HO basis",
+        },
         "decoupling_mask": {
             "one_body": "2*n(p)+l(p) != 2*n(q)+l(q)",
             "two_body": "e(p)+e(q) != e(r)+e(s)",

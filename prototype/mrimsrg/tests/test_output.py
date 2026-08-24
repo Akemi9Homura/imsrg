@@ -53,6 +53,11 @@ class OutputTests(unittest.TestCase):
             self.assertAlmostEqual(recovered.zero_body, vacuum.zero_body)
             metadata = json.loads((output_path / "metadata.json").read_text())
             self.assertEqual(metadata["density_approximation"], "lambda3=0")
+            self.assertEqual(
+                metadata["formula_basis"]["decoupling_mask_representation"],
+                "original HO basis",
+            )
+            self.assertTrue((output_path / "formula_basis_vectors.npy").is_file())
             self.assertAlmostEqual(metadata["final_vacuum_zero_body"], vacuum.zero_body)
             self.assertEqual(
                 [entry["s"] for entry in metadata["vacuum_checkpoints"]],

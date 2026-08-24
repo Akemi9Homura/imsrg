@@ -14,10 +14,12 @@ import subprocess
 
 
 _REFERENCE_NAMES = {
-    "He4": "He4_Nrefmax0_final",
-    "Be8": "Be8_Nrefmax0_final",
-    "C12": "C12_Nrefmax0_final",
-    "O16": "O16_Nrefmax0_final",
+    ("He4", 0): "He4_Nrefmax0_final",
+    ("Be8", 0): "Be8_Nrefmax0_final",
+    ("C12", 0): "C12_Nrefmax0_final",
+    ("O16", 0): "O16_Nrefmax0_final",
+    ("He4", 2): "He4_Nrefmax2",
+    ("O16", 2): "O16_Nrefmax2",
 }
 _PARTITIONS = ("c128m1024", "c128m512", "compute_C", "compute_A")
 _POINT7_INTERACTION = Path(
@@ -30,6 +32,7 @@ _POINT7_PYTHON = Path("/opt/library/miniconda-3.12.9/bin/python3")
 @dataclass(frozen=True)
 class JobSettings:
     nucleus: str
+    nrefmax: int = 0
     interaction: Path = _POINT7_INTERACTION
     label: str | None = None
     partition: str = "c128m512"
@@ -47,8 +50,10 @@ def _number_tag(value: float) -> str:
 
 
 def _validate(settings: JobSettings) -> None:
-    if settings.nucleus not in _REFERENCE_NAMES:
-        raise ValueError(f"unsupported nucleus: {settings.nucleus}")
+    if (settings.nucleus, settings.nrefmax) not in _REFERENCE_NAMES:
+        raise ValueError(
+            f"unsupported reference: {settings.nucleus}, Nrefmax={settings.nrefmax}"
+        )
     if settings.partition not in _PARTITIONS:
         raise ValueError(f"unsupported point7 partition: {settings.partition}")
     if settings.nodelist is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", settings.nodelist):
@@ -72,12 +77,18 @@ def generate_job(
     _validate(settings)
     repo_root = repo_root.resolve()
     result_root = result_root.resolve()
-    reference = repo_root / "prototype" / "mrimsrg" / "data" / _REFERENCE_NAMES[settings.nucleus]
+    reference = (
+        repo_root
+        / "prototype"
+        / "mrimsrg"
+        / "data"
+        / _REFERENCE_NAMES[(settings.nucleus, settings.nrefmax)]
+    )
     if not (reference / "metadata.json").is_file():
         raise FileNotFoundError(f"reference bundle is unavailable: {reference}")
 
     tag = (
-        f"{settings.nucleus}_Nrefmax0_rtol{_number_tag(settings.rtol)}"
+        f"{settings.nucleus}_Nrefmax{settings.nrefmax}_rtol{_number_tag(settings.rtol)}"
         f"_atol{_number_tag(settings.atol)}"
     )
     if settings.label:
@@ -130,7 +141,12 @@ export MKL_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--nucleus", required=True, choices=tuple(_REFERENCE_NAMES))
+    parser.add_argument(
+        "--nucleus",
+        required=True,
+        choices=tuple(sorted({nucleus for nucleus, _ in _REFERENCE_NAMES})),
+    )
+    parser.add_argument("--nrefmax", type=int, choices=(0, 2), default=0)
     parser.add_argument("--interaction", type=Path, default=_POINT7_INTERACTION)
     parser.add_argument(
         "--label",
@@ -162,6 +178,7 @@ def main() -> int:
     )
     settings = JobSettings(
         nucleus=args.nucleus,
+        nrefmax=args.nrefmax,
         interaction=args.interaction,
         label=args.label,
         partition=args.partition,

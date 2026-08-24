@@ -189,15 +189,32 @@ def masked_decoupling_residual(
     natural_tolerance: float = 1e-10,
 ) -> MRHamiltonian:
     """Build the masked anti-Hermitian ``D-D^dagger`` residual."""
-    d1, d2 = decoupling_matrix_elements(
+    residual = decoupling_residual(
         hamiltonian, densities, natural_tolerance=natural_tolerance
     )
     mask1, mask2 = decoupling_masks(oscillator_quanta)
-    if mask1.shape != d1.shape:
+    if mask1.shape != residual.one_body.shape:
         raise ValueError("oscillator-quanta array has an incompatible length")
-    residual1 = (d1 - d1.T) * mask1
-    residual2 = (d2 - d2.transpose(2, 3, 0, 1)) * mask2
-    return MRHamiltonian(0.0, residual1, residual2)
+    return MRHamiltonian(
+        0.0, residual.one_body * mask1, residual.two_body * mask2
+    )
+
+
+def decoupling_residual(
+    hamiltonian: MRHamiltonian,
+    densities: Densities,
+    *,
+    natural_tolerance: float = 1e-10,
+) -> MRHamiltonian:
+    """Build the unmasked anti-Hermitian ``D-D^dagger`` residual."""
+    d1, d2 = decoupling_matrix_elements(
+        hamiltonian, densities, natural_tolerance=natural_tolerance
+    )
+    return MRHamiltonian(
+        0.0,
+        d1 - d1.T,
+        d2 - d2.transpose(2, 3, 0, 1),
+    )
 
 
 def white_generator(
@@ -209,6 +226,26 @@ def white_generator(
     natural_tolerance: float = 1e-10,
 ) -> MRHamiltonian:
     """Build the single masked White generator used by the prototype."""
+    eta = white_generator_unmasked(
+        hamiltonian,
+        densities,
+        denominator_cutoff=denominator_cutoff,
+        natural_tolerance=natural_tolerance,
+    )
+    mask1, mask2 = decoupling_masks(oscillator_quanta)
+    if mask1.shape != eta.one_body.shape:
+        raise ValueError("oscillator-quanta array has an incompatible length")
+    return MRHamiltonian(0.0, eta.one_body * mask1, eta.two_body * mask2)
+
+
+def white_generator_unmasked(
+    hamiltonian: MRHamiltonian,
+    densities: Densities,
+    *,
+    denominator_cutoff: float = WHITE_DENOMINATOR_CUTOFF,
+    natural_tolerance: float = 1e-10,
+) -> MRHamiltonian:
+    """Build the unmasked White generator in a natural-orbital basis."""
     d1, d2 = decoupling_matrix_elements(
         hamiltonian, densities, natural_tolerance=natural_tolerance
     )
@@ -219,11 +256,6 @@ def white_generator(
     weighted2 = d2 / _safe_denominator(delta2, denominator_cutoff)
     eta1 = weighted1 - weighted1.T
     eta2 = weighted2 - weighted2.transpose(2, 3, 0, 1)
-    mask1, mask2 = decoupling_masks(oscillator_quanta)
-    if mask1.shape != eta1.shape:
-        raise ValueError("oscillator-quanta array has an incompatible length")
-    eta1 *= mask1
-    eta2 *= mask2
     return MRHamiltonian(0.0, eta1, eta2)
 
 

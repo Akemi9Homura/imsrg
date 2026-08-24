@@ -3,8 +3,8 @@
 The structure follows the existing ``IMSRGSolver`` direct-flow path: update
 the generator from the current Hamiltonian, evaluate ``[eta,H]``, use an
 adaptive explicit Runge--Kutta method, and stop on the masked decoupling
-residual. SciPy's DOP853 is used here so accepted states can be inspected without retaining a
-copy of every 40^4 tensor in memory.
+residual. SciPy's DOP853 is used here so accepted states can be inspected
+without retaining a copy of every 40^4 tensor in memory.
 """
 
 from __future__ import annotations
@@ -18,21 +18,25 @@ import numpy as np
 from scipy.integrate import DOP853
 
 try:
+    from .basis import prepare_natural_basis, transform_hamiltonian
     from .commutator import commutator
     from .densities import Densities
     from .generator import (
-        masked_decoupling_residual,
+        decoupling_masks,
+        decoupling_residual,
         masked_residual_norm,
-        white_generator,
+        white_generator_unmasked,
     )
     from .normal_order import MRHamiltonian
 except ImportError:
+    from basis import prepare_natural_basis, transform_hamiltonian
     from commutator import commutator
     from densities import Densities
     from generator import (
-        masked_decoupling_residual,
+        decoupling_masks,
+        decoupling_residual,
         masked_residual_norm,
-        white_generator,
+        white_generator_unmasked,
     )
     from normal_order import MRHamiltonian
 
@@ -184,12 +188,47 @@ def integrate_flow(
         raise ValueError("checkpoint_s must lie strictly between zero and smax")
 
     norb = int(initial_hamiltonian.one_body.shape[0])
-    initial_residual_operator = masked_decoupling_residual(
-        initial_hamiltonian, densities, oscillator_quanta
+    mask1, mask2 = decoupling_masks(oscillator_quanta)
+    if mask1.shape != initial_hamiltonian.one_body.shape:
+        raise ValueError("oscillator-quanta array has an incompatible length")
+
+    natural_basis = prepare_natural_basis(densities)
+    working_densities = natural_basis.densities
+    working_initial = (
+        initial_hamiltonian
+        if natural_basis.is_identity
+        else transform_hamiltonian(
+            initial_hamiltonian, natural_basis.vectors, to_natural=True
+        )
+    )
+
+    def apply_ho_mask(operator: MRHamiltonian) -> MRHamiltonian:
+        original_basis_operator = (
+            operator
+            if natural_basis.is_identity
+            else transform_hamiltonian(
+                operator, natural_basis.vectors, to_natural=False
+            )
+        )
+        masked_original = MRHamiltonian(
+            0.0,
+            original_basis_operator.one_body * mask1,
+            original_basis_operator.two_body * mask2,
+        )
+        return (
+            masked_original
+            if natural_basis.is_identity
+            else transform_hamiltonian(
+                masked_original, natural_basis.vectors, to_natural=True
+            )
+        )
+
+    initial_residual_operator = apply_ho_mask(
+        decoupling_residual(working_initial, working_densities)
     )
     initial_residual = masked_residual_norm(initial_residual_operator)
     trajectory = [
-        _flow_point(0, 0.0, initial_hamiltonian, initial_residual, initial_residual)
+        _flow_point(0, 0.0, working_initial, initial_residual, initial_residual)
     ]
     if observer is not None:
         observer(trajectory[0])
@@ -208,8 +247,10 @@ def integrate_flow(
         del s
         nonlocal function_evaluations
         hamiltonian = _unpack(values, norb)
-        eta = white_generator(hamiltonian, densities, oscillator_quanta)
-        derivative = commutator(eta, hamiltonian, densities)
+        eta = apply_ho_mask(
+            white_generator_unmasked(hamiltonian, working_densities)
+        )
+        derivative = commutator(eta, hamiltonian, working_densities)
         packed = _pack(derivative)
         if not np.all(np.isfinite(packed)):
             raise FloatingPointError("non-finite MR-IMSRG derivative")
@@ -219,7 +260,7 @@ def integrate_flow(
     solver = DOP853(
         right_hand_side,
         0.0,
-        _pack(initial_hamiltonian),
+        _pack(working_initial),
         settings.smax,
         rtol=settings.relative_tolerance,
         atol=settings.absolute_tolerance,
@@ -249,8 +290,8 @@ def integrate_flow(
             checkpoint_hamiltonian = _unpack(
                 solver.dense_output()(settings.checkpoint_s), norb
             )
-            checkpoint_residual_operator = masked_decoupling_residual(
-                checkpoint_hamiltonian, densities, oscillator_quanta
+            checkpoint_residual_operator = apply_ho_mask(
+                decoupling_residual(checkpoint_hamiltonian, working_densities)
             )
             checkpoint_residual = masked_residual_norm(checkpoint_residual_operator)
             checkpoints.append(
@@ -266,8 +307,8 @@ def integrate_flow(
                 )
             )
         hamiltonian = _unpack(solver.y, norb)
-        residual_operator = masked_decoupling_residual(
-            hamiltonian, densities, oscillator_quanta
+        residual_operator = apply_ho_mask(
+            decoupling_residual(hamiltonian, working_densities)
         )
         residual = masked_residual_norm(residual_operator)
         point = _flow_point(step, solver.t, hamiltonian, residual, initial_residual)
@@ -290,7 +331,26 @@ def integrate_flow(
     else:
         message = "maximum number of accepted ODE steps reached"
 
-    final_hamiltonian = _unpack(solver.y.copy(), norb)
+    working_final = _unpack(solver.y.copy(), norb)
+    final_hamiltonian = (
+        working_final
+        if natural_basis.is_identity
+        else transform_hamiltonian(
+            working_final, natural_basis.vectors, to_natural=False
+        )
+    )
+    if not natural_basis.is_identity:
+        checkpoints = [
+            FlowCheckpoint(
+                checkpoint.point,
+                transform_hamiltonian(
+                    checkpoint.hamiltonian,
+                    natural_basis.vectors,
+                    to_natural=False,
+                ),
+            )
+            for checkpoint in checkpoints
+        ]
     return FlowResult(
         hamiltonian=final_hamiltonian,
         trajectory=tuple(trajectory),

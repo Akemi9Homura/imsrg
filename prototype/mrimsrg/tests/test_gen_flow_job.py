@@ -65,6 +65,22 @@ class FlowJobTests(unittest.TestCase):
                     ),
                 )
 
+    def test_rejects_unplanned_open_shell_nrefmax2_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            interaction = root / "interaction.minipack"
+            interaction.write_bytes(b"test")
+            with self.assertRaisesRegex(ValueError, "unsupported reference"):
+                generate_job(
+                    root,
+                    root / "result",
+                    JobSettings(
+                        nucleus="Be8",
+                        nrefmax=2,
+                        interaction=interaction,
+                    ),
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
