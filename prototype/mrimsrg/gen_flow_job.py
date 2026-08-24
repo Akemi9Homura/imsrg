@@ -41,7 +41,7 @@ class JobSettings:
     checkpoint_s: float = 1.0
     rtol: float = 1e-6
     atol: float = 1e-8
-    max_step: float = 0.05
+    max_step: float = 10.0
     residual_ratio: float = 1e-6
 
 
@@ -158,7 +158,7 @@ def main() -> int:
     parser.add_argument("--checkpoint-s", type=float, default=1.0)
     parser.add_argument("--rtol", type=float, default=1e-6)
     parser.add_argument("--atol", type=float, default=1e-8)
-    parser.add_argument("--max-step", type=float, default=0.05)
+    parser.add_argument("--max-step", type=float, default=10.0)
     parser.add_argument("--residual-ratio", type=float, default=1e-6)
     parser.add_argument("--submit", action="store_true")
     parser.add_argument(

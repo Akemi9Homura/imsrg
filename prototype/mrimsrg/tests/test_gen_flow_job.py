@@ -42,6 +42,7 @@ class FlowJobTests(unittest.TestCase):
             self.assertIn("source /opt/modules/init/bash", contents)
             self.assertIn("source ./sourceme.sh", contents)
             self.assertIn("--checkpoint-s 1", contents)
+            self.assertIn("--max-step 10", contents)
             self.assertIn(f"--interaction {interaction}", contents)
             self.assertIn("/opt/library/miniconda-3.12.9/bin/python3 -u", contents)
             self.assertIn("import sys, numpy, scipy", contents)

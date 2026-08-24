@@ -46,7 +46,9 @@ class FlowSettings:
     smax: float = 2.0
     relative_tolerance: float = 1e-6
     absolute_tolerance: float = 1e-8
-    max_step: float = 0.05
+    # DOP853 still selects smaller steps from the error estimate; this only
+    # prevents an unnecessary fixed ceiling on the smooth late-time flow.
+    max_step: float = 10.0
     initial_step: float | None = None
     residual_ratio: float = 1e-6
     max_accepted_steps: int = 400
