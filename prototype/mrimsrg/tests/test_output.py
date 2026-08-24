@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 import tempfile
 import unittest
+import struct
 
 import numpy as np
 
@@ -43,6 +44,11 @@ class OutputTests(unittest.TestCase):
             metadata = json.loads((output_path / "metadata.json").read_text())
             self.assertEqual(metadata["density_approximation"], "lambda3=0")
             self.assertAlmostEqual(metadata["final_vacuum_zero_body"], vacuum.zero_body)
+            with (output_path / "vacuum_mscheme.bin").open("rb") as stream:
+                self.assertEqual(stream.read(16), b"mrimsrg_m_v1\0\0\0\0")
+                norb, zero_body = struct.unpack("<Qd", stream.read(16))
+                self.assertEqual(norb, 2)
+                self.assertAlmostEqual(zero_body, vacuum.zero_body)
             with self.assertRaises(FileExistsError):
                 save_flow_output(
                     output_path, "reference", reference, densities, initial, result, FlowSettings()

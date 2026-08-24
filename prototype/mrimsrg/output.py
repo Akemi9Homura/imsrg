@@ -6,6 +6,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import struct
 
 import numpy as np
 
@@ -57,6 +58,17 @@ def save_flow_output(
     for name, values in arrays.items():
         np.save(root / f"{name}.npy", values, allow_pickle=False)
 
+    # Compact bridge payload: 16-byte magic, uint64 norb, float64 E0, then
+    # row-major float64 one- and two-body arrays.  The NPY files remain the
+    # human-inspectable canonical output; this file only avoids embedding a
+    # general NPY parser in the validated C++ NCSM bridge.
+    magic = b"mrimsrg_m_v1\0\0\0\0"
+    with (root / "vacuum_mscheme.bin").open("wb") as stream:
+        stream.write(magic)
+        stream.write(struct.pack("<Qd", reference.norb, final_vacuum.zero_body))
+        stream.write(np.asarray(final_vacuum.one_body, dtype="<f8").tobytes(order="C"))
+        stream.write(np.asarray(final_vacuum.two_body, dtype="<f8").tobytes(order="C"))
+
     metadata = {
         "schema": "mrimsrg_flow_v1",
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -77,6 +89,8 @@ def save_flow_output(
         "initial_mr_zero_body": initial.zero_body,
         "final_mr_zero_body": result.hamiltonian.zero_body,
         "final_vacuum_zero_body": final_vacuum.zero_body,
+        "bridge_payload": "vacuum_mscheme.bin",
+        "bridge_payload_layout": "magic[16], uint64 norb, float64 E0, float64 t[norb,norb], float64 V[norb,norb,norb,norb], little-endian C-order",
         "one_body_convention": "t[p,q] a^dagger_p a_q",
         "two_body_convention": "(1/4) V[p,q,r,s] a^dagger_p a^dagger_q a_s a_r",
         "trajectory": [asdict(point) for point in result.trajectory],
@@ -85,4 +99,3 @@ def save_flow_output(
         json.dump(metadata, stream, indent=2, sort_keys=True)
         stream.write("\n")
     return final_vacuum
-

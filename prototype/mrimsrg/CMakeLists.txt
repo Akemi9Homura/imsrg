@@ -29,11 +29,14 @@ if(NOT SHELL_MODEL_OBS_GIT_RESULT EQUAL 0)
 endif()
 
 add_executable(mrimsrg_prepare cpp/prepare_reference.cpp)
-target_link_libraries(mrimsrg_prepare PRIVATE fci nucleus util)
-target_compile_definitions(mrimsrg_prepare PRIVATE
-    SIMPLE_FCI_EMAX=2
-    SHELL_MODEL_OBS_ROOT="${SHELL_MODEL_OBS_ROOT}"
-    SHELL_MODEL_OBS_REVISION="${SHELL_MODEL_OBS_REVISION}")
-target_compile_options(mrimsrg_prepare PRIVATE
-    -Wall -Wextra -Wpedantic
-    $<$<CONFIG:Release>:-march=native>)
+add_executable(mrimsrg_validate cpp/validate_flow.cpp)
+foreach(target mrimsrg_prepare mrimsrg_validate)
+    target_link_libraries(${target} PRIVATE fci nucleus util)
+    target_compile_definitions(${target} PRIVATE
+        SIMPLE_FCI_EMAX=2
+        SHELL_MODEL_OBS_ROOT="${SHELL_MODEL_OBS_ROOT}"
+        SHELL_MODEL_OBS_REVISION="${SHELL_MODEL_OBS_REVISION}")
+    target_compile_options(${target} PRIVATE
+        -Wall -Wextra -Wpedantic
+        $<$<CONFIG:Release>:-march=native>)
+endforeach()

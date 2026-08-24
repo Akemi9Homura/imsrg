@@ -11,7 +11,7 @@ Build the input bridge:
 cmake -S prototype/mrimsrg -B prototype/mrimsrg/build \
   -DSHELL_MODEL_OBS_ROOT=/home/mengziyan/shell-model-obs \
   -DCMAKE_BUILD_TYPE=Release
-cmake --build prototype/mrimsrg/build --target mrimsrg_prepare -j2
+cmake --build prototype/mrimsrg/build --target mrimsrg_prepare mrimsrg_validate -j2
 ```
 
 Prepare and check the first He4 reference:
@@ -76,7 +76,23 @@ The command returns status 2 after saving if `smax` is reached before the
 residual target, allowing a Slurm job to distinguish a diagnostic from an
 accepted result.
 
+Read a materialized ordinary Hamiltonian back into the existing NCSM solver:
+
+```bash
+prototype/mrimsrg/build/mrimsrg_validate \
+  --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack \
+  --flow-output prototype/mrimsrg/data/He4_flow_rtol1e-6 \
+  --Z 2 --N 2 --nmax 8
+```
+
+The validator uses the original interaction only to initialize the identical
+orbit/channel ordering, replaces its m-scheme matrix elements with the saved
+vacuum `E0+t+V`, and then calls the existing `simpleFCI`.  At `s=0` this path
+reproduces the complete 3060-dimensional He4 result as
+`-20.3388325043 MeV, J=0`.
+
 The bridge requires NumPy and SciPy on the Python side.  The first checked
 integration run used `shell-model-obs` revision `1687f16` and reproduced the
 full He4 `emax=2` ground-state benchmark as `-20.3388325043 MeV`; contraction
 of the independently constructed `gamma1/gamma2` gave the same value.
+The dense m-scheme readback interface is revision `4b10afa` of that dependency.
