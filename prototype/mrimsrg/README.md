@@ -49,6 +49,16 @@ excitation denominators are positive.  Random correlated tests compare
 selected generator elements directly with
 `<Psi|[H,:A:]|Psi>` evaluated through the verified commutator.
 
+`flow.py` directly integrates `dH/ds=[eta,H]` with an adaptive DOP853
+stepper.  Like the existing C++ `IMSRGSolver`, it updates `eta` from every
+trial Hamiltonian and stops on its norm.  The ODE state stores only independent
+Hermitian one-body and antisymmetric/Hermitian pair-space two-body elements;
+this mirrors the established operator storage and prevents redundant tensor
+components from developing symmetry-violating numerical modes.  On the first
+real He4 diagnostic, the masked residual fell to `4.79e-3` of its initial value
+by `s=0.35`, while all reconstructed tensor symmetry errors remained exactly
+zero.
+
 The bridge requires NumPy and SciPy on the Python side.  The first checked
 integration run used `shell-model-obs` revision `1687f16` and reproduced the
 full He4 `emax=2` ground-state benchmark as `-20.3388325043 MeV`; contraction
