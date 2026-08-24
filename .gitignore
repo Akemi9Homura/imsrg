@@ -26,4 +26,5 @@ src/.*.swp
 #Work folders should only contain the examples scripts
 work/
 result/
+refs/
 __pycache__

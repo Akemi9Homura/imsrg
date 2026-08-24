@@ -1,226 +1,98 @@
-# Repository Notes
+# MR-IMSRG 快速原型仓库说明
 
-## `fmt2=no2bpack`
+## 当前唯一目标
 
-This repository can read the packed binary NO2B interaction format produced by the `normal-order` code.
+本分支不以实现生产级、高效或通用的 MR-IMSRG 为目标。当前目标是尽快得到一个物理定义清楚、可验证、可物化为零/一/二体 Hamiltonian 的 MR-IMSRG(2) 结果，然后交给 NCSM 做确定性验证，也可把同一输出交给 FCIQMC 做后续测试。
 
-Use it by setting:
+执行计划以 `docs/MR-IMSRG-快速结果计划.md` 为准。不要让性能优化、J-scheme 化、显式 3N、一般张量算符或大模型空间重构阻塞第一批结果。
 
-```bash
-fmt2=no2bpack 2bme=<normal-order-output.bin> 3bme=none
-```
+## 固定物理范围
 
-The reader is `ReadWrite::Read_no2bpack()`. It reads the binary layout written by `normal-order`'s `Write_minipack()` implementation:
+- 相互作用：NNLOopt（本机文件名采用 `N2LO_opt`）。
+- `hw = 20 MeV`。
+- 单粒子截断 `emax = 2`，二体截断 `e2max = 4`。
+- 只用 NN；不加入显式 3N，不做初始 3N MR-NO2B。
+- 目标核：`He4`、`Be8`、`C12`、`O16`，均取最低 `J=0` 正宇称态。
+- 第一批统一使用 `Nrefmax=0`：`Be8`、`C12` 是非平凡多参考测试；`He4`、`O16` 是单参考极限对照，不能宣称为非平凡 MR。
+- 第一批管线通过后，仅把 `He4`、`O16` 升级到 `Nrefmax=2`，获得相关参考态版本。
 
-- oscillator frequency and `emax`
-- orbit table in `(n, l, 2j, 2tz)`
-- zero-body term
-- upper-triangular one-body matrix elements
-- packed J-coupled two-body matrix elements
-- optional center-of-mass TBME payloads, which are consumed and ignored
-
-The reader remaps file orbit indices into the active `ModelSpace` using `(n, l, 2j, 2tz)`, so it does not depend on matching raw orbit numbering between executables.
-
-Because `no2bpack` files already contain the normal-ordered Hamiltonian pieces from `normal-order`, the main IMSRG driver does not add another `Trel_Op` for this format.
-
-Do not confuse `fmt2=no2bpack` with `3bme_type=no2b`. They are different inputs:
-
-- `fmt2=no2bpack` means the `2bme` file is a packed binary normal-ordered Hamiltonian produced by `normal-order`; use `3bme=none`.
-- `3bme_type=no2b` means the calculation reads an ordinary two-body interaction, for example `fmt2=me2j`, plus a separate three-body NO2B-format file through `3bme=<...me3j.gz>`.
-
-Mass corrections and other bare-Hamiltonian additions belong in the ordinary `fmt2=me2j` plus `3bme_type=no2b` path. For this direct-read path, prefer setting:
-
-```python
-params["nucleon_mass_correction"] = "true"
-```
-
-The `normal-order` program uses this correction when producing the packed files used here, so direct `me2j` calculations should usually enable it for consistency. Leaving it off can shift results relative to the corresponding `no2bpack` calculation. For `fmt2=no2bpack`, those effects should already have been included when producing the packed file; the driver ignores `nucleon_mass_correction=true` for this format.
-
-## wm2 run conventions
-
-Use `source ./sourceme.sh` before building or running on wm2. This checkout is built with the executable and shared library under `build/`, so generated Slurm scripts should call:
-
-```bash
-/lustre/home/2401110128/imsrg/build/imsrg++
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/lustre/home/2401110128/imsrg/build"
-```
-
-Force-file paths differ between machines. On wm2, interaction files are under:
+固定核力文件：
 
 ```text
-/lustre/home/2401110128/Forces
+/home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack
 ```
 
-On point7, the corresponding shared interaction files are under:
+该文件 SHA-256：
 
 ```text
-/tns/public/Forces
+76b7243ef53d30955c0293d29da73688dc3839942143ccf147739108bb58ff84
 ```
 
-When inspecting available forces from point7, use `/tns/public/Forces`. When generating production Slurm scripts for wm2, use the wm2 `/lustre/home/2401110128/Forces` paths.
+`/home/mengziyan/ptqmc/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack` 是字节相同的副本。普通 NN `minipack` 与 `normal-order` 产生的 `no2bpack` 是不同格式，禁止混用 reader 或语义。
 
-On wm2, use the Slurm partition names exactly as:
+基准采用 HO 基、`BetaCM=0`、无库伦、无额外核子质量修正，和现有 N2LO_opt emax2 的 NCSM/FCI 基准保持一致。读取 `minipack` 时仍必须按目标质量数 `A` 构造内禀动能，因此四个核的 Hamiltonian 是四份 A-dependent 输出，不能互相复用。
 
-```bash
-#SBATCH --partition=C064M1024G   # 64 CPU cores, about 1 TB memory per node
-#SBATCH --partition=C064M0256G   # 64 CPU cores, about 256 GB memory per node
-```
+## 第一版算法边界
 
-For the production runs here, use `#SBATCH --qos=low` and request all 64 cores on one node:
+- 独立、低效、便于检查的 m-scheme MR-IMSRG(2) 原型；不要先改写现有高效 J-coupled commutator。
+- 参考态由 `Nrefmax` 截断 NCSM 波函数产生。
+- 至少输入 `gamma1`、`gamma2`，构造并真正保留 `lambda2`。
+- 第一版设 `lambda3=0`；这一近似必须写入输出元数据。
+- Hamiltonian 和生成元始终截断到参考态正规序 0B/1B/2B。
+- 直接积分 `dH/ds = [eta,H]_(0,1,2B)`；第一版不要求 Magnus。
+- 使用 IM-NCSM 的放松解耦：只处理 `Delta e != 0` 的 1p1h 与 2p2h 通道，保留同 HO 量子数参考空间内部耦合。
+- 首选一个有文献公式和 QCombo 输出可核对的生成元；第一批只实现一种。不要同时开发多种生成元。
+- 第一版不做自然轨道、显式 3N、`lambda3`、奇核、非标量密度、观测算符演化、MPI 或大规模优化。
 
-```bash
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=64
-export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-64}
-```
+## 输入输出硬要求
 
-Do not include `%N` in new log names unless the node name is intentionally needed. Prefer:
+内部中间格式至少保存：
 
-```bash
-#SBATCH -o <result-dir>/log_<prefix>_%j.txt
-```
+- 完整轨道表与指标顺序；
+- `A,Z,hw,emax,e2max,Nrefmax`；
+- NCSM 参考态标识以及 `gamma1/gamma2`；
+- 初始与演化后的 `E,f,Gamma`；
+- 生成元、流参数、ODE 容差、`lambda3=0` 和解耦掩码；
+- 核力路径及 SHA-256。
 
-Production calculations must be submitted from scripts generated by `gen_job.py`. Do not hand-write standalone Slurm scripts or use ad hoc `sbatch --wrap` commands for production runs. After generation, inspect the generated script before submission and verify that the interaction path, `fmt2/fmt3`, truncations, `reference`, `valence_space`, operators, `BetaCM`, output names, partition, QOS, and thread count match the intended run.
-
-For parameter scans, `gen_job.py` must remain a single-parameter-set generator. Do not add loops, lists of scan values, or batch-generation logic for beta values, frequencies, truncations, references, model spaces, interactions, or any other scan dimension. This is forbidden unless the user explicitly asks to redesign `gen_job.py` for batch generation. To run multiple parameter points, manually set exactly one parameter point in `gen_job.py`, generate/inspect/submit that script, then edit the single value and repeat.
-
-## Model-space selection
-
-In `gen_job.py`, treat `params["valence_space"]` as the short model-space name used for result paths and output prefixes. If it is a built-in IMSRG name such as `p-shell` or `sd-shell`, `imsrg++` can also parse it directly.
-
-For non-built-in or trimmed spaces, set `params["custom_valence_space"]` to the physical definition that `imsrg++` should parse. The format is:
-
-```python
-params["valence_space"] = "<short-name-for-output>"
-params["custom_valence_space"] = "<core>,<orbit>,<orbit>,..."
-```
-
-For example, a `He4` core with proton and neutron `p`, `d5/2`, and `s1/2` valence orbits is:
-
-```python
-params["valence_space"] = "pd5s1-shell"
-params["custom_valence_space"] = "He4,p0p3,n0p3,p0p1,n0p1,p0d5,n0d5,p1s1,n1s1"
-```
-
-When `custom_valence_space` is set, `imsrg++` uses it as the actual `ModelSpace` definition; the original `valence_space` is only a name. Before generating or submitting a production job, use physics/domain knowledge to check that the short name and the custom definition describe the same intended model space. If they do not match, tell the user what appears inconsistent and suggest a corrected name or orbit list. Always get explicit user confirmation before running or submitting the calculation.
-
-For a built-in space, comment out `params["custom_valence_space"]` instead of removing it, so the physical definition stays in the file for reference. For example, `fp-shell` is a built-in IMSRG space (`Ca40` core + `f7/2, p3/2, f5/2, p1/2` for protons and neutrons), so `imsrg++` parses the short name directly:
-
-```python
-params["valence_space"] = "fp-shell"
-# params["custom_valence_space"] = "Ca40,p0f7,n0f7,p1p3,n1p3,p0f5,n0f5,p1p1,n1p1"
-```
-
-## `gen_job.py` interaction parsing
-
-Keep the result path naming independent of the input file format. The top-level result directory should be the interaction name, for example:
+交给 NCSM/FCIQMC 的文件必须转换回普通真空正规序的
 
 ```text
-result/<interaction>/<valence>_<reference>_hw<hw>_emax<emax>_e3max<e3max>/
+E0 + one-body + two-body
 ```
 
-Do not add format labels such as `no2bpack`, `no2b`, or the reference nucleus to the interaction flag unless the physics interaction name itself includes them.
+不能直接把相对于相关参考态正规序的 `E,f,Gamma` 当成普通矩阵元输出。零体常数必须保留并由下游计入总能量。
 
-For `fmt2=me2j`, keep the original filename parsing rule:
+优先输出现有下游程序可读的普通 `minipack`；如第一版先用自描述 NPZ/HDF5，则必须同时提供到 NCSM reader 的转换器，不能只停在内部张量文件。
 
-```python
-_RE_E2MAX = re.compile(r'_emax(\d+)_e2max(\d+)\.')
-emax_nn, e2max_nn = extract_emax_e2max(params["2bme"])
-params["file2e1max"] = emax_nn
-params["file2e2max"] = e2max_nn
-```
+## 开发顺序
 
-For a separate 3BME file, keep the original 3B filename parsing rule:
+1. 冻结核力、轨道顺序、相位和普通 Hamiltonian 的现有 FCI/NCSM 基准。
+2. 打通 NCSM 参考态到 `gamma1/gamma2/lambda2` 的接口和恒等式测试。
+3. 实现 MR 正规序及其真空表示往返。
+4. 实现并逐项验证 MR-IMSRG(2) commutator。
+5. 实现单一生成元、`Delta e != 0` 掩码和直接流积分。
+6. 输出普通 0B/1B/2B Hamiltonian，先由 NCSM 读回验证。
+7. 按 `He4 -> Be8 -> C12 -> O16` 产生第一批结果。
+8. 管线通过后做 `He4/O16, Nrefmax=2`，最后才考虑 FCIQMC 性能测试或代码优化。
 
-```python
-_RE_E3MAX = re.compile(r'_emax(\d+)_e2max(\d+)_e3max(\d+)\.')
-emax_3n, e2max_3n, e3max_3n = extract_emax_e2max_e3max(params["3bme"])
-params["file3e1max"] = emax_3n
-params["file3e2max"] = e2max_3n
-params["file3e3max"] = e3max_3n
-```
+## 最低验收门槛
 
-For `fmt2=no2bpack`, use a separate parser. A packed file has `hw`, `emax`, and usually `e3max`, but it does not have `e2max`:
+- `Tr(gamma1)=A`，RDM 的 Hermiticity、反对称性和收缩关系通过。
+- 单 Slater 参考态给出 `lambda2=0`，并复现现有 SR-IMSRG(2) 极限。
+- `E=<Psi_ref|H|Psi_ref>`；真空正规序与 MR 正规序往返误差不高于 `1e-10` 相对量级。
+- 每步保持 `H` Hermitian、`eta` anti-Hermitian 和二体反对称性。
+- `s=0` 导出的 Hamiltonian 由下游读回后复现原始谱。
+- 只在 `Delta e != 0` 掩码内的解耦残差显著下降；目标相对初值至少 `1e-6`。
+- ODE 容差缩小十倍后，测试能量变化小于 `1 keV`。
+- 不以零体项 `E(s)` 代替后 NCSM 对角化结果。
+- 已知 He4 基准：上述设置下全 emax2 FCI 基态为 `-20.33883250 MeV`；首个读写闭环必须复现它。
 
-```python
-_RE_NO2BPACK = re.compile(r'_hw(\d+)_emax(\d+)_e3max(\d+)\.')
-hw, emax_nn, e3max_nn = extract_no2bpack_hw_emax_e3max(params["2bme"])
-params["hw"] = hw
-```
+## 仓库工作约定
 
-Use the parsed `hw`, `emax`, and `e3max` only for script naming and consistency checks. Do not run the normal me2j `_emax..._e2max...` parser on no2bpack files, and do not invent `file2e1max/file2e2max` values for this format.
-
-For `fmt2=no2bpack`, set:
-
-```python
-params["3bme"] = "none"
-```
-
-Do not add `file2e1max`, `file2e2max`, `file3e1max`, `file3e2max`, or `file3e3max` to the generated command for this format. Those limits are meaningful for ordinary 2B/3B input readers, not for `Read_no2bpack()`.
-
-## point7 run conventions
-
-The point7 checkout lives at `/tns/mengziyan/imsrg`, with `imsrg++` and the shared library under `/tns/mengziyan/imsrg/build`. Generated scripts use these point7 paths for the executable, `cd`, and `LD_LIBRARY_PATH`. The interaction files are under `/tns/public/Forces` (see "wm2 run conventions" for the wm2 `/lustre/...` equivalents).
-
-### Slurm partitions on point7
-
-```text
-c128m1024   128 CPU cores, ~1 TB  memory per node   (default; often busy/alloc)
-c128m512    128 CPU cores, ~512 GB memory per node
-compute_C    96 CPU cores per node
-compute_A    28 CPU cores per node
-```
-
-In `gen_job.py`, set the module-level `partition` to the point7 partition (for example `c128m512`) when running on point7. Keep the rest of the Slurm header the same as wm2: one node, one task, `--cpus-per-task` cores, `OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-<cpus>}`, and `-o <result-dir>/log_<prefix>_%j.txt`.
-
-### QOS on point7
-
-point7 runs `accounting_storage/none` with `AccountingStorageEnforce = none`, so there is no slurmdbd and no QOS objects exist (`sacctmgr` reports it is not running a supported accounting plugin, and partitions show `QoS=N/A`, `AllowQos=ALL`). Any `--qos=<name>` is silently ignored — it does not error and has no effect (verified with `sbatch --test-only`, including a bogus QOS name).
-
-Therefore keep `#SBATCH --qos=low` in the generated script even on point7: it is harmless there and means the wm2 setting does not need to change when switching machines.
-
-### Scheduling and memory on point7 (no memory protection)
-
-point7 uses `SelectType=select/cons_tres` with `SelectTypeParameters=CR_CORE`, `OverSubscribe=NO`. Cores are the only consumable resource and are allocated exclusively, so two jobs never share a core. The c128m512 nodes are dual AMD EPYC 7763, i.e. 128 physical cores (256 hardware threads with SMT). Slurm counts `CPUTot=128` (physical cores); a `--cpus-per-task=64` job takes 64 cores, so two such jobs fit on one node with no CPU contention.
-
-Memory, however, is **not tracked or constrained at all**: `DefMemPerNode=UNLIMITED`, `MaxMemPerNode=UNLIMITED`, and `cgroup.conf` has `ConstrainRAMSpace=no` (so `--mem` is not enforced). `scontrol show node` reports `AllocMem=0` even for a job using tens of GB. Consequences:
-
-- Slurm will not keep a second job off a node for lack of memory, and will not cap or kill a job that grows.
-- If the combined peak RSS of co-located jobs exceeds the node's RAM (~515 GB on c128m512), the node OOMs and the Linux OOM killer kills processes arbitrarily — there is no Slurm safeguard.
-- IMSRG Magnus memory rises through the flow (the `Omega` operators accumulate), so plan for the peak, not the current usage. An `emax=14 e3max=24` fp-shell run peaks well above 80 GB.
-
-To keep a job on its own node, pin it with `nodelist` in `gen_job.py` (see below) or check `scontrol show node <node> | grep FreeMem` before co-locating.
-
-### `nodelist` switch in `gen_job.py`
-
-`gen_job.py` has a module-level `nodelist`. When set (e.g. `"node2"`), the generated script gets `#SBATCH --nodelist=<node>`, pinning the job to that node; set it to `None`/`""` to let Slurm choose. Use it to keep a new run off a busy node and give each run its own node (because memory is unprotected, see above). It is a single value, not a scan list — keep it that way; to place several runs, set one node, generate/submit, then edit the single value and repeat, exactly like the other parameters.
-
-### `sourceme.sh` is machine-aware
-
-`sourceme.sh` branches on the machine because module names differ. wm2 is detected by the `/lustre/home/2401110128` tree; otherwise the point7 branch runs. Always `source ./sourceme.sh` before building or running.
-
-- wm2: `cmake/3.31.9`, `OpenBLAS/0.3.17`, `gsl/2.7.0`, `boost/1.83.0` (plus `GSL_ROOT_DIR` / `CMAKE_PREFIX_PATH` for the wm2 GSL).
-- point7: `cmake/3.25.2`, `openblas/0.3.10-single`, `gsl/2.7.1`, `boost/1.81.0`.
-
-The point7 `imsrg++` links `libopenblas.so.0` (provided by `openblas/0.3.10-single`) and `libgsl.so.27` (from `gsl/2.7.1`). If a point7 job fails immediately with `ERROR: Unable to locate a modulefile for ...`, the wm2 module names leaked into the point7 branch; `set -e` then aborts the script before `imsrg++` runs. Confirm runtime libraries resolve with `ldd build/imsrg++ | grep "not found"` after sourcing.
-
-Do not load `miniconda` by default: pyIMSRG is built against the system Python, and loading miniconda changes `python3` and breaks importing the existing module.
-
-### Running and submitting
-
-```bash
-python gen_job.py --generate-only   # write the script and print its path; inspect before submitting
-python gen_job.py --submit          # generate and submit with sbatch
-python gen_job.py --smoke-test       # run imsrg++ help as a lightweight build/runtime check
-python gen_job.py                   # generate, then prompt "submit job: y/n"; "n" runs it locally via bash
-```
-
-Inspect the generated script before submitting (interaction paths, `fmt2/fmt3`, truncations, `reference`, `valence_space`, operators, `BetaCM`, `denominator_delta`, output names, partition, QOS, thread count). After submitting, check `squeue -u $USER` and the `log_<prefix>_<jobid>.txt` file in the result directory to confirm the run progressed past module loading and started reading the interaction files.
-
-For valence-space (shell-model) targets, when the model space spans a single major shell so there is no cross-shell coupling, the intruder-suppression and CM terms can be turned off:
-
-```python
-params["BetaCM"] = 0.0
-params["denominator_delta"] = 0.0
-```
+- 新的项目设计文档放在 `docs/`；上游 Doxygen 文件留在 `doc/`。
+- `refs/` 是本地文献库，已被 `.gitignore` 排除，不要提交 PDF、提取文本或 QCombo 克隆。
+- 构建前执行 `source ./sourceme.sh`。
+- 不要为这个快速原型修改 `gen_job.py`、生产 Slurm 约定或现有 SR/VS-IMSRG 行为，除非任务明确要求。
+- 不要提交生成的 Hamiltonian、波函数、RDM、大日志或结果目录；提交小型测试 fixture 时必须说明来源与校验和。
+- 工作区可能已有用户修改。只提交当前任务明确生成或修改的文件，不顺手清理、移动或覆盖其他改动。
