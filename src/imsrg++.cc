@@ -46,6 +46,7 @@
 
 
 #include <stdlib.h>
+#include <cmath>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -1227,6 +1228,12 @@ int main(int argc, char** argv)
     const double imsrg_energy = imsrgsolver.GetH_s().ZeroBody;
     Operator Hvac = imsrgsolver.GetH_s().UndoNormalOrdering();
     const double reference_energy = Hvac.DoNormalOrdering().ZeroBody;
+    if (not std::isfinite(imsrg_energy) or not std::isfinite(reference_energy))
+    {
+      std::cerr << "write_H_no2bpack: the IMSRG flow produced a non-finite "
+                << "Hamiltonian; refusing to export " << write_H_no2bpack << std::endl;
+      return EXIT_FAILURE;
+    }
     std::cout << std::setprecision(12)
               << "IM-FCIQMC export check: H(s).ZeroBody = " << imsrg_energy
               << "  reference diagonal after UndoNormalOrdering = " << reference_energy

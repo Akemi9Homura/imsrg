@@ -11,6 +11,8 @@
 #include <chrono>
 #include <ctime>
 #include <array>
+#include <cmath>
+#include <limits>
 #include <map>
 #include <vector>
 #include <unordered_map>
@@ -389,6 +391,48 @@ void ReadWrite::Read_no2bpack( std::string filename, Operator& Hbare )
 void ReadWrite::Write_no2bpack( std::string filename, Operator& Hvac )
 {
   ModelSpace* modelspace = Hvac.GetModelSpace();
+  const double float_max = static_cast<double>(std::numeric_limits<float>::max());
+  bool representable = std::isfinite(Hvac.ZeroBody) and Hvac.OneBody.is_finite();
+  if (representable)
+  {
+    for (double value : Hvac.OneBody)
+    {
+      if (std::abs(value) > float_max)
+      {
+        representable = false;
+        break;
+      }
+    }
+  }
+  if (representable)
+  {
+    for (const auto& channel_matrix : Hvac.TwoBody.MatEl)
+    {
+      if (not channel_matrix.second.is_finite())
+      {
+        representable = false;
+        break;
+      }
+      for (double value : channel_matrix.second)
+      {
+        if (std::abs(value) > float_max)
+        {
+          representable = false;
+          break;
+        }
+      }
+      if (not representable) break;
+    }
+  }
+  if (not representable)
+  {
+    std::cerr << "Write_no2bpack: Hamiltonian contains values that cannot be "
+              << "represented by the no2bpack layout; refusing to write "
+              << filename << std::endl;
+    goodstate = false;
+    return;
+  }
+
   const int num_orbits = static_cast<int>(modelspace->GetNumberOrbits());
   const int num_obme = num_orbits * (num_orbits + 1) / 2;
   int num_tbme = 0;
@@ -6576,6 +6620,5 @@ void ReadWrite::CopyFile(std::string filename1, std::string filename2)
 //    f2 << f1.rdbuf ();
 //  } 
 }
-
 
 
