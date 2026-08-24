@@ -110,14 +110,17 @@ Read a materialized ordinary Hamiltonian back into the existing NCSM solver:
 prototype/mrimsrg/build/mrimsrg_validate \
   --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack \
   --flow-output prototype/mrimsrg/data/He4_flow_rtol1e-6 \
-  --Z 2 --N 2 --nmax 8
+  --Z 2 --N 2 --nmax 8 --states 3
 ```
 
 The validator uses the original interaction only to initialize the identical
 orbit/channel ordering, replaces its m-scheme matrix elements with the saved
 vacuum `E0+t+V`, and then calls the existing `simpleFCI`.  At `s=0` this path
 reproduces the complete 3060-dimensional He4 result as
-`-20.3388325043 MeV, J=0`.
+`-20.3388325043 MeV, J=0`. By default the validator requests the three
+lowest states (or the complete space when its dimension is smaller) and
+prints each energy, excitation energy, and `2J`; `--states` changes that
+small readback list without introducing another solver.
 
 The bridge requires NumPy and SciPy on the Python side.  The first checked
 integration run used `shell-model-obs` revision `1687f16` and reproduced the

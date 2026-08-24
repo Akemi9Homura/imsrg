@@ -29,6 +29,7 @@ struct Options
     int N = -1;
     int nmax = 0;
     int max_iter = 500;
+    int states = 3;
 };
 
 [[noreturn]] void usage_error(const std::string &message)
@@ -36,7 +37,7 @@ struct Options
     throw std::invalid_argument(
         message +
         "\nusage: mrimsrg_validate --interaction FILE --flow-output DIR --Z Z --N N "
-        "[--nmax N] [--max-iter N]");
+        "[--nmax N] [--max-iter N] [--states N]");
 }
 
 Options parse_options(int argc, char **argv)
@@ -60,13 +61,15 @@ Options parse_options(int argc, char **argv)
             options.nmax = std::stoi(value);
         else if (key == "--max-iter")
             options.max_iter = std::stoi(value);
+        else if (key == "--states")
+            options.states = std::stoi(value);
         else
             usage_error("unknown option " + key);
     }
     if (options.interaction.empty() || options.flow_output.empty() || options.Z < 0 || options.N < 0)
         usage_error("--interaction, --flow-output, --Z and --N are required");
-    if (options.nmax < 0 || options.max_iter <= 0)
-        usage_error("invalid Nmax or iteration limit");
+    if (options.nmax < 0 || options.max_iter <= 0 || options.states <= 0)
+        usage_error("invalid Nmax, iteration limit, or state count");
     return options;
 }
 
@@ -120,7 +123,7 @@ int main(int argc, char **argv)
         truncation.hw_trunc.hw = hamiltonian.get_jbasis().min_2n_l(options.Z, options.N) + options.nmax;
         truncation.parity_trunc.parity = 0;
         CIspace space(&hamiltonian, options.Z, options.N, truncation);
-        simpleFCI solver(space, 1);
+        simpleFCI solver(space, options.states);
         if (solver.get_configs().size() == 1)
             solver.brute_force();
         else
@@ -129,7 +132,15 @@ int main(int argc, char **argv)
         const auto state_j2 = solver.get_states_J2();
         std::cout << std::setprecision(12) << "readback A=" << A << " Nmax=" << options.nmax
                   << " dimension=" << solver.get_configs().size()
-                  << " E0=" << solver.get_eigenvalue(0) << " J2=" << state_j2.at(0) << "\n";
+                  << " states=" << state_j2.size() << " E0=" << solver.get_eigenvalue(0)
+                  << " twoJ=" << state_j2.at(0) << "\n";
+        for (std::size_t state = 0; state < state_j2.size(); ++state)
+        {
+            const double energy = solver.get_eigenvalue(static_cast<int>(state));
+            std::cout << "state=" << state << " E=" << energy
+                      << " Ex=" << energy - solver.get_eigenvalue(0)
+                      << " twoJ=" << state_j2[state] << "\n";
+        }
         return 0;
     }
     catch (const std::exception &error)
