@@ -4,14 +4,16 @@ The directional decoupling matrix elements ``D1`` and ``D2`` are Mongelli
 Eqs. (5.216)--(5.217), with ``lambda3=0`` and terms quadratic in ``lambda2``
 omitted. Their anti-Hermitian combination reproduces the Brillouin residual
 of Hergert Eqs. (58)--(59); the positive products were also regenerated with
-QCombo's generalized Wick expansion.
+QCombo's generalized Wick expansion.  They are retained as an independent,
+strict decoupling diagnostic.
 
-The one generator used by the flow is the White generator of Mongelli
-Eqs. (5.210)--(5.214). Its leading Epstein--Nesbet denominators omit the
-explicitly indicated ``O(lambda2)`` corrections. This is the same practical
-denominator truncation used for the White-NCSM calculations in Vobig Sec.
-6.5. A sign-preserving cutoff follows the established ``imsrg++`` handling
-of small denominators.
+The one generator used by the flow is the practical White-NCSM generator of
+Vobig Sec. 6.5.4.  In addition to omitting the explicitly indicated
+``O(lambda2)`` denominator corrections, that implementation defines
+"White-NCSM" by neglecting *all* irreducible-density terms in the generator
+matrix elements.  The MR-IMSRG(2) commutator itself still retains
+``lambda2``.  A sign-preserving cutoff follows the established ``imsrg++``
+handling of small denominators.
 
 Only matrix elements that change the sum of HO single-particle quanta are
 retained, i.e. the relaxed IM-NCSM pattern of Mongelli Eqs. (5.218)--(5.221).
@@ -115,6 +117,38 @@ def decoupling_matrix_elements(
             + mixed.swapaxes(2, 3)
             - mixed.swapaxes(0, 1).swapaxes(2, 3)
         )
+    return d1, d2
+
+
+def white_ncsm_matrix_elements(
+    hamiltonian: MRHamiltonian,
+    densities: Densities,
+    *,
+    natural_tolerance: float = 1e-10,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the lambda-free numerator used by White-NCSM.
+
+    Vobig Sec. 6.5.4 defines the production ``White-NCSM`` choice by
+    neglecting all terms involving irreducible densities in the generator.
+    These are therefore the leading terms of Eqs. (6.5.9)--(6.5.10), not the
+    strict ``D1/D2`` diagnostic returned by :func:`decoupling_matrix_elements`.
+    """
+    n = _natural_occupations(densities, natural_tolerance)
+    nbar = 1.0 - n
+    norb = len(n)
+    if hamiltonian.one_body.shape != (norb, norb):
+        raise ValueError("Hamiltonian and density shapes are incompatible")
+    if hamiltonian.two_body.shape != (norb,) * 4:
+        raise ValueError("Hamiltonian and density shapes are incompatible")
+
+    d1 = n[None, :] * nbar[:, None] * hamiltonian.one_body.T
+    d2 = (
+        nbar[:, None, None, None]
+        * nbar[None, :, None, None]
+        * n[None, None, :, None]
+        * n[None, None, None, :]
+        * hamiltonian.two_body.transpose(2, 3, 0, 1)
+    )
     return d1, d2
 
 
@@ -246,7 +280,7 @@ def white_generator_unmasked(
     natural_tolerance: float = 1e-10,
 ) -> MRHamiltonian:
     """Build the unmasked White generator in a natural-orbital basis."""
-    d1, d2 = decoupling_matrix_elements(
+    d1, d2 = white_ncsm_matrix_elements(
         hamiltonian, densities, natural_tolerance=natural_tolerance
     )
     delta1, delta2 = epstein_nesbet_denominators(

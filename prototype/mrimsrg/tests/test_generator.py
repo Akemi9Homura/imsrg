@@ -16,6 +16,7 @@ from generator import (
     masked_decoupling_residual,
     oscillator_quanta_from_orbits,
     white_generator,
+    white_ncsm_matrix_elements,
 )
 from normal_order import MRHamiltonian
 
@@ -130,6 +131,42 @@ class GeneratorTests(unittest.TestCase):
         _, d2 = decoupling_matrix_elements(hamiltonian, densities)
         np.testing.assert_allclose(d2, -d2.swapaxes(0, 1), atol=2e-12)
         np.testing.assert_allclose(d2, -d2.swapaxes(2, 3), atol=2e-12)
+
+    def test_white_ncsm_numerator_omits_irreducible_density_terms(self) -> None:
+        norb = 4
+        densities = compute_densities(
+            occupations((0, 1), (2, 3), norb=norb),
+            np.array([np.sqrt(0.4), -np.sqrt(0.6)]),
+        )
+        hamiltonian = random_hermitian_hamiltonian(norb, 901)
+        d1, d2 = white_ncsm_matrix_elements(hamiltonian, densities)
+        n = np.diag(densities.gamma1)
+        nbar = 1.0 - n
+        np.testing.assert_allclose(
+            d1,
+            n[None, :] * nbar[:, None] * hamiltonian.one_body.T,
+            atol=2e-12,
+        )
+        np.testing.assert_allclose(
+            d2,
+            nbar[:, None, None, None]
+            * nbar[None, :, None, None]
+            * n[None, None, :, None]
+            * n[None, None, None, :]
+            * hamiltonian.two_body.transpose(2, 3, 0, 1),
+            atol=2e-12,
+        )
+
+        # The published White-NCSM truncation uses gamma1 occupations but no
+        # lambda2 terms in the generator numerator.
+        altered = type(densities)(
+            gamma1=densities.gamma1,
+            gamma2=densities.gamma2,
+            lambda2=3.0 * densities.lambda2,
+        )
+        changed1, changed2 = white_ncsm_matrix_elements(hamiltonian, altered)
+        np.testing.assert_array_equal(changed1, d1)
+        np.testing.assert_array_equal(changed2, d2)
 
     def test_epstein_nesbet_denominator_reduces_to_imsrg_sr_formula(self) -> None:
         norb = 6

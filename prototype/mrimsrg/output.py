@@ -144,7 +144,11 @@ def save_flow_output(
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "reference_path": str(Path(reference_path).resolve()),
         "reference_metadata": reference.metadata,
-        "generator": "white_epstein_nesbet_delta_e_masked",
+        "generator": "white_ncsm_epstein_nesbet_delta_e_masked",
+        "generator_numerator": {
+            "formula": "Vobig Eqs. (6.5.28)-(6.5.29), White-NCSM truncation",
+            "irreducible_density_terms": "all omitted",
+        },
         "generator_denominator": {
             "formula": "Mongelli Eqs. (5.213)-(5.214), leading terms",
             "lambda2_terms": "omitted as O(lambda2)",

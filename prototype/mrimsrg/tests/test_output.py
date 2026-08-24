@@ -54,6 +54,10 @@ class OutputTests(unittest.TestCase):
             metadata = json.loads((output_path / "metadata.json").read_text())
             self.assertEqual(metadata["density_approximation"], "lambda3=0")
             self.assertEqual(
+                metadata["generator_numerator"]["irreducible_density_terms"],
+                "all omitted",
+            )
+            self.assertEqual(
                 metadata["formula_basis"]["decoupling_mask_representation"],
                 "original HO basis",
             )

@@ -51,16 +51,18 @@ replacement of the HO quantum-number labels.
 
 `generator.py` implements one generator only: the modified White generator
 used in the IM-NCSM literature, restricted by the relaxed `Delta e != 0`
-one- and two-body masks. Directional `D1/D2=<Psi|H:A:|Psi>` matrix elements
-retain the published terms linear in `lambda2` and set `lambda3=0`; their
-anti-Hermitian combination is monitored as the decoupling residual. The
-leading Epstein--Nesbet denominators are Mongelli Eqs. (5.213)--(5.214), with
-the displayed `O(lambda2)` denominator corrections omitted and a
-sign-preserving `1e-6 MeV` cutoff. In the Slater limit they reduce term by
-term to the denominator in `src/Generator.cc`. QCombo positive-product
-expansions fix the directional index order, while random correlated tests
-compare the anti-Hermitian residual directly with
-`<Psi|[H,:A:]|Psi>` from the independently verified commutator.
+one- and two-body masks. It follows the production `White-NCSM` truncation
+defined in Vobig Sec. 6.5.4: all irreducible-density terms are omitted from
+the generator numerator and the displayed `O(lambda2)` terms are omitted
+from the Epstein--Nesbet denominators. The MR-IMSRG(2) commutator itself still
+retains `lambda2`. A sign-preserving `1e-6 MeV` denominator cutoff is used;
+in the Slater limit the denominators reduce term by term to
+`src/Generator.cc`. Independently, the strict directional
+`D1/D2=<Psi|H:A:|Psi>` diagnostic retains the published terms linear in
+`lambda2` with `lambda3=0`. Its anti-Hermitian combination is monitored as
+the acceptance residual and agrees with `<Psi|[H,:A:]|Psi>` from the QCombo
+and explicit-commutator checks, so a small truncated generator numerator is
+not silently substituted for physical decoupling.
 
 `flow.py` directly integrates `dH/ds=[eta,H]` with an adaptive DOP853
 stepper.  Like the existing C++ `IMSRGSolver`, it updates `eta` from every

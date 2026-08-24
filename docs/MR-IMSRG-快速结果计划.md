@@ -159,7 +159,11 @@ prototype/mrimsrg/
 
 任务：
 
-1. 从文献/QCombo 已核对公式中选择一种生成元；第一批只实现这一种。
+1. 只实现 Vobig 论文 6.5.28--6.5.34 及其命名表中实际使用的
+   `White-NCSM`：生成元分子保留 `D1/D2` 的领头占据数项，不含
+   `lambda^(2,3,...)`；Epstein--Nesbet 分母同样舍去文献标为
+   `O(lambda2)` 的修正。这是生成元截断，不是对易子截断；
+   MR-IMSRG(2) 对易子仍保留线性 `lambda2`。
 2. 应用 IM-NCSM 掩码：
 
    \[
@@ -171,6 +175,9 @@ prototype/mrimsrg/
    \]
 
 3. 直接积分 `dH/ds=[eta,H]_(0,1,2B)`，记录每步残差和对称性误差。
+   当前验收量保持为不带分母、含线性 `lambda2` 的严格
+   `D-D^dagger`；另外区分记录 White-NCSM 的无 `lambda2` 生成元分子，
+   不得用后者较小来代替前者的验收。
 
 退出条件：
 
