@@ -73,11 +73,7 @@ Hermitian one-body and antisymmetric/Hermitian pair-space two-body elements;
 this mirrors the established operator storage and prevents redundant tensor
 components from developing symmetry-violating numerical modes. The default
 `max_step=10` is only an upper bound: DOP853 continues to reduce trial steps
-to satisfy `rtol/atol`, while the smooth late-time flow is not forced through
-hundreds of unnecessary fixed-size steps. On the first
-real He4 diagnostic, the masked residual fell to `4.79e-3` of its initial value
-by `s=0.35`, while all reconstructed tensor symmetry errors remained exactly
-zero.
+to satisfy `rtol/atol`.
 
 Every trajectory point stores three separately labeled quantities:
 `generator_residual_ratio` is the norm of the denominator-weighted,

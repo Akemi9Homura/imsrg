@@ -261,8 +261,10 @@ def white_ncsm_numerator_residual(
     """Return the unmasked anti-Hermitian White-NCSM numerator.
 
     This is recorded separately from the strict, lambda2-dependent
-    decoupling residual.  Its masked norm is the fixed-point and acceptance
-    criterion of the published, lambda-free White-NCSM generator.
+    decoupling residual and from the denominator-weighted anti-Hermitian
+    generator.  Its masked norm is a diagnostic, not the formal acceptance
+    condition: denominator weighting and anti-Hermitization do not commute
+    for fractional occupations.
     """
     d1, d2 = white_ncsm_matrix_elements(
         hamiltonian, densities, natural_tolerance=natural_tolerance
