@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 from itertools import combinations
+from typing import Callable
 
 import numpy as np
 from scipy.integrate import DOP853
@@ -154,6 +155,7 @@ def integrate_flow(
     densities: Densities,
     oscillator_quanta: np.ndarray,
     settings: FlowSettings = FlowSettings(),
+    observer: Callable[[FlowPoint], None] | None = None,
 ) -> FlowResult:
     """Integrate ``dH/ds=[eta(H),H]`` until convergence or ``smax``."""
     if settings.smax <= 0.0:
@@ -171,6 +173,8 @@ def integrate_flow(
     trajectory = [
         _flow_point(0, 0.0, initial_hamiltonian, initial_residual, initial_residual)
     ]
+    if observer is not None:
+        observer(trajectory[0])
     if initial_residual == 0.0:
         return FlowResult(
             hamiltonian=initial_hamiltonian,
@@ -223,6 +227,8 @@ def integrate_flow(
         residual = masked_residual_norm(eta)
         point = _flow_point(step, solver.t, hamiltonian, residual, initial_residual)
         trajectory.append(point)
+        if observer is not None:
+            observer(point)
         if max(
             point.one_body_hermiticity_error,
             point.two_body_hermiticity_error,

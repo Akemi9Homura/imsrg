@@ -59,6 +59,23 @@ real He4 diagnostic, the masked residual fell to `4.79e-3` of its initial value
 by `s=0.35`, while all reconstructed tensor symmetry errors remained exactly
 zero.
 
+Run and materialize one calculation with:
+
+```bash
+PYTHONPATH=prototype/mrimsrg python3 prototype/mrimsrg/run_mrimsrg.py \
+  prototype/mrimsrg/data/He4_Nrefmax0_final \
+  prototype/mrimsrg/data/He4_flow_rtol1e-6
+```
+
+The output directory contains `gamma1/gamma2/lambda2`, initial and final
+MR-normal-ordered tensors, and the final ordinary vacuum-normal-ordered
+`E0+t+V` tensors.  `metadata.json` records the fixed interaction identity,
+reference metadata, `lambda3=0`, generator/mask, ODE settings and every
+accepted-step residual.  Existing output directories are never overwritten.
+The command returns status 2 after saving if `smax` is reached before the
+residual target, allowing a Slurm job to distinguish a diagnostic from an
+accepted result.
+
 The bridge requires NumPy and SciPy on the Python side.  The first checked
 integration run used `shell-model-obs` revision `1687f16` and reproduced the
 full He4 `emax=2` ground-state benchmark as `-20.3388325043 MeV`; contraction
