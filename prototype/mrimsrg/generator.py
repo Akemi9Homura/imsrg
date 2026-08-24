@@ -15,8 +15,9 @@ matrix elements.  The MR-IMSRG(2) commutator itself still retains
 ``lambda2``.  A sign-preserving cutoff follows the established ``imsrg++``
 handling of small denominators.
 
-Only matrix elements that change the sum of HO single-particle quanta are
-retained, i.e. the relaxed IM-NCSM pattern of Mongelli Eqs. (5.218)--(5.221).
+Only natural-orbital matrix elements whose inherited labels change the sum of
+HO single-particle quanta are retained, i.e. the relaxed IM-NCSM pattern of
+Vobig Eqs. (6.5.13)--(6.5.27) and Mongelli Eqs. (5.218)--(5.221).
 """
 
 from __future__ import annotations
@@ -260,8 +261,8 @@ def white_ncsm_numerator_residual(
     """Return the unmasked anti-Hermitian White-NCSM numerator.
 
     This is recorded separately from the strict, lambda2-dependent
-    decoupling residual. It is a diagnostic of the truncated generator and
-    is never used as the physical convergence criterion.
+    decoupling residual.  Its masked norm is the fixed-point and acceptance
+    criterion of the published, lambda-free White-NCSM generator.
     """
     d1, d2 = white_ncsm_matrix_elements(
         hamiltonian, densities, natural_tolerance=natural_tolerance

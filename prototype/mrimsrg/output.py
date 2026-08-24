@@ -168,16 +168,24 @@ def save_flow_output(
             "max_original_gamma1_offdiagonal": float(
                 np.max(np.abs(gamma1_off_diagonal))
             ),
-            "decoupling_mask_representation": "original HO basis",
+            "decoupling_mask_representation": (
+                "original basis (already natural)"
+                if formula_basis.is_identity
+                else "temporary connected-block natural basis"
+            ),
+            "decoupling_mask_orbit_labels": (
+                "natural orbitals inherit e=2n+l from their output slots"
+            ),
         },
         "decoupling_mask": {
             "one_body": "2*n(p)+l(p) != 2*n(q)+l(q)",
             "two_body": "e(p)+e(q) != e(r)+e(s)",
         },
         "acceptance_residual": {
-            "formula": "masked lambda-free White-NCSM numerator from Vobig Sec. 6.5.4",
-            "lambda2_terms": "all omitted by the published generator truncation",
+            "formula": "norm of the masked White-NCSM generator eta from Vobig Eqs. (6.5.28)-(6.5.29)",
+            "normalization": "ratio to the initial generator norm",
             "target_ratio": settings.residual_ratio,
+            "unweighted_lambda_free_numerator_recorded_separately": True,
             "strict_D_Ddagger_recorded_separately": True,
         },
         "ode_method": "DOP853 direct flow",

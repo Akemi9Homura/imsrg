@@ -3,10 +3,11 @@
 The published explicit MR-IMSRG(2) equations used by this prototype are
 written in a natural-orbital basis.  A correlated Nrefmax=2 NCSM reference
 need not have diagonal ``gamma1`` in the original HO basis.  We therefore
-diagonalize only connected off-diagonal blocks of ``gamma1``, evaluate the
-natural-basis equations, and transform operators back before applying the HO
-``Delta e`` mask.  The externally visible Hamiltonian always remains in the
-original HO orbit ordering.
+diagonalize only connected off-diagonal blocks of ``gamma1`` and evaluate both
+the natural-basis equations and the IM-NCSM ``Delta e`` mask in that basis, as
+specified in Vobig Sec. 6.5.3.  Each natural orbital inherits the oscillator
+label of its output slot.  The externally visible Hamiltonian is transformed
+back to the original HO orbit ordering.
 """
 
 from __future__ import annotations

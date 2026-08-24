@@ -41,10 +41,11 @@ zero-body term and the single-reference single/double-excitation blocks with
 explicit Fock-space matrix commutators. Direct calls reject a non-diagonal
 `gamma1` instead of silently treating its diagonal as natural occupations.
 For the required `He4/O16, Nrefmax=2` flows, `flow.py` diagonalizes only the
-connected off-diagonal blocks of `gamma1`, evaluates the published equations
-in that temporary basis, and transforms every generator back before applying
-the `Delta e` mask in the original HO basis. Final and checkpoint Hamiltonians
-are transformed back to the unchanged input orbit ordering; the exact
+connected off-diagonal blocks of `gamma1` and evaluates the published equations
+and `Delta e` mask in that temporary spherical natural-orbital basis, as stated
+in Vobig Sec. 6.5.3.  The natural orbitals inherit the `e` labels of their
+output slots. Final and checkpoint Hamiltonians are transformed back to the
+unchanged input HO orbit ordering; the exact
 orthogonal matrix is saved as `formula_basis_vectors.npy`. This is an internal
 basis-covariant evaluation, not a natural-orbital NCSM optimization or a
 replacement of the HO quantum-number labels.
@@ -65,8 +66,9 @@ explicit-commutator checks.
 
 `flow.py` directly integrates `dH/ds=[eta,H]` with an adaptive DOP853
 stepper.  Like the existing C++ `IMSRGSolver`, it updates `eta` from every
-trial Hamiltonian and stops on the masked, lambda-free White-NCSM numerator
-specified by Vobig Sec. 6.5.4. The ODE state stores only independent
+trial Hamiltonian and stops when the norm of the actual masked White-NCSM
+generator in Vobig Eqs. (6.5.28)--(6.5.29) falls to the requested fraction of
+its initial value. The ODE state stores only independent
 Hermitian one-body and antisymmetric/Hermitian pair-space two-body elements;
 this mirrors the established operator storage and prevents redundant tensor
 components from developing symmetry-violating numerical modes. The default
@@ -77,13 +79,15 @@ real He4 diagnostic, the masked residual fell to `4.79e-3` of its initial value
 by `s=0.35`, while all reconstructed tensor symmetry errors remained exactly
 zero.
 
-Every trajectory point stores both `residual_ratio`, the strict
-lambda2-dependent `D-D^dagger` diagnostic, and
-`generator_numerator_residual_ratio`, the lambda-free quantity actually used
-in the White-NCSM numerator. Only the latter is the fixed-point/acceptance
-condition of this published generator truncation. The two are always labeled
-and reported separately; in particular, a correlated-reference result does
-not claim that the stricter quantity vanished when it did not.
+Every trajectory point stores three separately labeled quantities:
+`generator_residual_ratio` is the norm of the denominator-weighted,
+anti-Hermitian generator and is the formal acceptance condition;
+`generator_numerator_residual_ratio` is the unweighted lambda-free numerator;
+and `residual_ratio` is the strict lambda2-dependent `D-D^dagger` diagnostic.
+The latter two are diagnostics and need not vanish at the approximate
+generator's fixed point. This matches the `Eta.Norm()` convergence criterion
+of the existing C++ `IMSRGSolver` and avoids claiming that the stricter
+quantity vanished when it did not.
 
 Run and materialize one calculation with:
 
@@ -104,7 +108,7 @@ the requested intermediate `--checkpoint-s` under `checkpoints/`; the root
 payload is the final point.  Thus a production run retains the three points
 required by the acceptance plan without keeping every large ODE state.
 The command returns status 2 after saving if `smax` is reached before the
-White-NCSM numerator target, allowing a Slurm job to distinguish a diagnostic from an
+White-NCSM generator target, allowing a Slurm job to distinguish a diagnostic from an
 accepted result.
 
 Read a materialized ordinary Hamiltonian back into the existing NCSM solver:

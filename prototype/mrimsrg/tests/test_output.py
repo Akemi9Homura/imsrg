@@ -25,10 +25,21 @@ class OutputTests(unittest.TestCase):
         vacuum = VacuumHamiltonian(0.3, np.diag([1.0, 2.0]), np.zeros((2,) * 4))
         initial = normal_order(vacuum, densities)
         point = FlowPoint(
-            0, 0.0, initial.zero_body, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            step=0,
+            s=0.0,
+            zero_body=initial.zero_body,
+            residual=0.0,
+            residual_ratio=0.0,
+            generator_residual=0.0,
+            generator_residual_ratio=0.0,
+            generator_numerator_residual=0.0,
+            generator_numerator_residual_ratio=0.0,
+            one_body_hermiticity_error=0.0,
+            two_body_hermiticity_error=0.0,
+            two_body_antisymmetry_error=0.0,
         )
         middle_point = FlowPoint(
-            1, 0.5, initial.zero_body, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            **{**point.__dict__, "step": 1, "s": 0.5}
         )
         result = FlowResult(
             initial,
@@ -60,12 +71,12 @@ class OutputTests(unittest.TestCase):
                 "all omitted",
             )
             self.assertEqual(
-                metadata["acceptance_residual"]["lambda2_terms"],
-                "all omitted by the published generator truncation",
+                metadata["acceptance_residual"]["normalization"],
+                "ratio to the initial generator norm",
             )
             self.assertEqual(
                 metadata["formula_basis"]["decoupling_mask_representation"],
-                "original HO basis",
+                "original basis (already natural)",
             )
             self.assertTrue((output_path / "formula_basis_vectors.npy").is_file())
             self.assertAlmostEqual(metadata["final_vacuum_zero_body"], vacuum.zero_body)

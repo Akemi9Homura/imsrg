@@ -1,13 +1,20 @@
 import sys
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from densities import compute_densities
+from basis import prepare_natural_basis, transform_hamiltonian
 from flow import FlowSettings, _pack, _unpack, integrate_flow
+from generator import (
+    decoupling_masks,
+    masked_residual_norm,
+    white_ncsm_numerator_residual,
+)
 from normal_order import MRHamiltonian, VacuumHamiltonian, normal_order
 
 
@@ -103,7 +110,24 @@ class FlowTests(unittest.TestCase):
         np.testing.assert_array_equal(result.hamiltonian.one_body, initial.one_body)
         np.testing.assert_array_equal(result.hamiltonian.two_body, initial.two_body)
 
-    def test_nondiagonal_gamma_is_evaluated_naturally_but_masked_in_ho_basis(self) -> None:
+    def test_acceptance_uses_actual_generator_not_unweighted_numerator(self) -> None:
+        densities = compute_densities(occupations((0,), norb=2), np.array([1.0]))
+        initial = MRHamiltonian(
+            0.0, np.array([[0.0, 0.2], [0.2, 2.0]]), np.zeros((2,) * 4)
+        )
+        zero_generator = MRHamiltonian(
+            0.0, np.zeros((2, 2)), np.zeros((2,) * 4)
+        )
+        with patch("flow.white_generator_unmasked", return_value=zero_generator):
+            result = integrate_flow(initial, densities, np.array([0, 1]))
+        self.assertTrue(result.converged)
+        self.assertEqual(result.function_evaluations, 0)
+        self.assertEqual(result.trajectory[0].generator_residual_ratio, 0.0)
+        self.assertEqual(
+            result.trajectory[0].generator_numerator_residual_ratio, 1.0
+        )
+
+    def test_nondiagonal_gamma_is_evaluated_and_masked_in_natural_basis(self) -> None:
         determinants = occupations((0,), (1,), norb=2)
         densities = compute_densities(
             determinants, np.array([3.0, 4.0]) / 5.0
@@ -136,6 +160,56 @@ class FlowTests(unittest.TestCase):
             active.hamiltonian.one_body,
             active.hamiltonian.one_body.T,
             atol=2e-12,
+        )
+
+    def test_initial_residual_uses_published_natural_basis_mask(self) -> None:
+        determinants = occupations((0,), (1,), norb=3)
+        densities = compute_densities(
+            determinants, np.array([3.0, 4.0]) / 5.0
+        )
+        vacuum = VacuumHamiltonian(
+            0.0,
+            np.array(
+                [
+                    [0.0, 0.3, 0.7],
+                    [0.3, 2.0, -0.4],
+                    [0.7, -0.4, 5.0],
+                ]
+            ),
+            np.zeros((3,) * 4),
+        )
+        initial = normal_order(vacuum, densities)
+        quanta = np.array([0, 1, 1])
+        natural = prepare_natural_basis(densities)
+        working = transform_hamiltonian(
+            initial, natural.vectors, to_natural=True
+        )
+        raw = white_ncsm_numerator_residual(working, natural.densities)
+        mask1, mask2 = decoupling_masks(quanta)
+        expected = masked_residual_norm(
+            MRHamiltonian(0.0, raw.one_body * mask1, raw.two_body * mask2)
+        )
+
+        # The obsolete HO-basis projection is intentionally distinguishable
+        # for this three-orbit example.
+        raw_ho = transform_hamiltonian(raw, natural.vectors, to_natural=False)
+        projected_ho = masked_residual_norm(
+            MRHamiltonian(
+                0.0, raw_ho.one_body * mask1, raw_ho.two_body * mask2
+            )
+        )
+        self.assertGreater(abs(expected - projected_ho), 1e-4)
+
+        result = integrate_flow(
+            initial,
+            densities,
+            quanta,
+            FlowSettings(smax=1e-4, max_step=1e-4, residual_ratio=1e-12),
+        )
+        self.assertAlmostEqual(
+            result.trajectory[0].generator_numerator_residual,
+            expected,
+            places=13,
         )
 
 
