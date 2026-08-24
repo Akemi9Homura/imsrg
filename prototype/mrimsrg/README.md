@@ -148,9 +148,11 @@ not alter the existing production `gen_job.py` used by `imsrg++`.  It fixes the
 documented point7 paths, one node/task, 64 cores, QOS/log conventions, sources
 `sourceme.sh`, and prints the complete generated script before an optional
 submission. Its single-point defaults are the accepted emax2 production window
-`smax=1000`, `checkpoint_s=40`, `rtol=1e-6`, and `atol=1e-8`; the flow stops
+`smax=2500`, `checkpoint_s=40`, `rtol=1e-6`, and `atol=1e-8`; the flow stops
 early when its generator target is reached, so this upper limit also covers
-the slower O16 correlated-reference case. Use explicit
+the slowest small-occupation modes seen in the He4 correlated-reference case.
+The accepted-step safety cap is 800; neither upper bound changes the ODE when
+the generator criterion is reached earlier. Use explicit
 smaller values only for a labeled diagnostic. Reinvoke it for one different
 nucleus or tolerance at a time;
 there is no scan or batch-generation mode.
