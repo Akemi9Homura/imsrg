@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from itertools import combinations
 from pathlib import Path
@@ -43,14 +45,14 @@ def random_operator(norb: int, seed: int, adjoint_sign: int | None) -> MRHamilto
 def annihilate(det: int, orbit: int) -> tuple[int, int] | None:
     if not ((det >> orbit) & 1):
         return None
-    phase = -1 if (det & ((1 << orbit) - 1)).bit_count() % 2 else 1
+    phase = -1 if bin(det & ((1 << orbit) - 1)).count("1") % 2 else 1
     return det ^ (1 << orbit), phase
 
 
 def create(det: int, orbit: int) -> tuple[int, int] | None:
     if (det >> orbit) & 1:
         return None
-    phase = -1 if (det & ((1 << orbit) - 1)).bit_count() % 2 else 1
+    phase = -1 if bin(det & ((1 << orbit) - 1)).count("1") % 2 else 1
     return det | (1 << orbit), phase
 
 
@@ -147,7 +149,7 @@ class CommutatorTests(unittest.TestCase):
         left_matrix, basis = vacuum_matrix(left, densities, 2)
         right_matrix, _ = vacuum_matrix(right, densities, 2)
         reference = np.zeros(len(basis))
-        for occupied, coefficient in zip(((0, 1), (2, 3)), coefficients, strict=True):
+        for occupied, coefficient in zip(((0, 1), (2, 3)), coefficients):
             det = sum(1 << p for p in occupied)
             reference[basis.index(det)] = coefficient
         expected = reference @ (left_matrix @ right_matrix - right_matrix @ left_matrix) @ reference

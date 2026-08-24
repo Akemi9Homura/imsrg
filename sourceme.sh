@@ -1,3 +1,17 @@
+if ! type module >/dev/null 2>&1; then
+    if [ -r /opt/modules/init/bash ]; then
+        source /opt/modules/init/bash
+    else
+        echo "ERROR: Environment Modules is not initialized" >&2
+        return 1 2>/dev/null || exit 1
+    fi
+fi
+
+# point7 keeps site modulefiles outside the Modules package's default path.
+if [ -d /opt/library/modulefiles ]; then
+    module use /opt/library/modulefiles
+fi
+
 module purge
 
 # Module names differ between machines, so branch on the machine. wm2 has the

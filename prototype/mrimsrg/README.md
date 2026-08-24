@@ -122,3 +122,6 @@ does not trust the path alone and still requires the frozen SHA-256 before it
 starts a flow.  The point7 generator uses the task-specific copy under
 `/tns/mengziyan/mr-imsrg-inputs/` because the shared force tree has larger
 N2LOopt spaces but not this exact emax2 file.
+The production path is compatible with point7's system Python 3.9 and the
+generated batch script initializes Environment Modules explicitly before it
+sources the machine-aware repository environment.

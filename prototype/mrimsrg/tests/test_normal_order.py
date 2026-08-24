@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 import unittest
@@ -30,14 +32,14 @@ def occupations(*occupied_sets: tuple[int, ...], norb: int) -> np.ndarray:
 def apply_annihilation(det: int, orbit: int) -> tuple[int, int] | None:
     if not ((det >> orbit) & 1):
         return None
-    phase = -1 if (det & ((1 << orbit) - 1)).bit_count() % 2 else 1
+    phase = -1 if bin(det & ((1 << orbit) - 1)).count("1") % 2 else 1
     return det ^ (1 << orbit), phase
 
 
 def apply_creation(det: int, orbit: int) -> tuple[int, int] | None:
     if (det >> orbit) & 1:
         return None
-    phase = -1 if (det & ((1 << orbit) - 1)).bit_count() % 2 else 1
+    phase = -1 if bin(det & ((1 << orbit) - 1)).count("1") % 2 else 1
     return det | (1 << orbit), phase
 
 

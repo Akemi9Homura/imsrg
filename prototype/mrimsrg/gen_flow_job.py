@@ -108,6 +108,7 @@ def generate_job(
 
 set -eo pipefail
 cd {repo_root}
+source /opt/modules/init/bash
 source ./sourceme.sh
 export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}

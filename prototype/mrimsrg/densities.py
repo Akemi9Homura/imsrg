@@ -41,7 +41,7 @@ def _annihilate(det: int, orbit: int) -> tuple[int, int]:
     if not ((det >> orbit) & 1):
         raise ValueError("cannot annihilate an unoccupied orbital")
     lower_mask = (1 << orbit) - 1
-    phase = -1 if (det & lower_mask).bit_count() % 2 else 1
+    phase = -1 if bin(det & lower_mask).count("1") % 2 else 1
     return det ^ (1 << orbit), phase
 
 
@@ -63,7 +63,7 @@ def _annihilation_amplitudes(
     cols: list[int] = []
     values: list[float] = []
 
-    for det, coefficient in zip(determinants, coefficients, strict=True):
+    for det, coefficient in zip(determinants, coefficients):
         occupied = _occupied_orbits(det, norb)
         for orbits in combinations(occupied, rank):
             reduced = det
@@ -84,6 +84,10 @@ def _annihilation_amplitudes(
 
 
 def compute_densities(determinants: np.ndarray, coefficients: np.ndarray) -> Densities:
+    if determinants.ndim != 2:
+        raise ValueError("determinants must be a two-dimensional occupation array")
+    if coefficients.shape != (determinants.shape[0],):
+        raise ValueError("there must be exactly one coefficient per determinant")
     norb = int(determinants.shape[1])
     det_ints = _determinant_ints(determinants)
 

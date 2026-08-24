@@ -35,6 +35,7 @@ class FlowJobTests(unittest.TestCase):
             self.assertIn("#SBATCH --qos=low", contents)
             self.assertIn("#SBATCH --cpus-per-task=64", contents)
             self.assertIn("#SBATCH --nodelist=node2", contents)
+            self.assertIn("source /opt/modules/init/bash", contents)
             self.assertIn("source ./sourceme.sh", contents)
             self.assertIn("--checkpoint-s 1", contents)
             self.assertIn(f"--interaction {interaction}", contents)
