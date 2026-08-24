@@ -41,6 +41,14 @@ zero-body term and the single-reference single/double-excitation blocks with
 explicit Fock-space matrix commutators.  A non-diagonal `gamma1` is rejected
 instead of being silently treated as natural occupations.
 
+`generator.py` implements one generator only: the denominator-free
+Brillouin generator with `lambda3=0`, restricted by the relaxed IM-NCSM
+`Delta e != 0` one- and two-body masks.  Its single-reference sign agrees
+with the existing `src/Generator.cc` imaginary-time construction when the
+excitation denominators are positive.  Random correlated tests compare
+selected generator elements directly with
+`<Psi|[H,:A:]|Psi>` evaluated through the verified commutator.
+
 The bridge requires NumPy and SciPy on the Python side.  The first checked
 integration run used `shell-model-obs` revision `1687f16` and reproduced the
 full He4 `emax=2` ground-state benchmark as `-20.3388325043 MeV`; contraction
