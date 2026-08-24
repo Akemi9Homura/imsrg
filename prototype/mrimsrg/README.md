@@ -41,17 +41,22 @@ zero-body term and the single-reference single/double-excitation blocks with
 explicit Fock-space matrix commutators.  A non-diagonal `gamma1` is rejected
 instead of being silently treated as natural occupations.
 
-`generator.py` implements one generator only: the denominator-free
-Brillouin generator with `lambda3=0`, restricted by the relaxed IM-NCSM
-`Delta e != 0` one- and two-body masks.  Its single-reference sign agrees
-with the existing `src/Generator.cc` imaginary-time construction when the
-excitation denominators are positive.  Random correlated tests compare
-selected generator elements directly with
-`<Psi|[H,:A:]|Psi>` evaluated through the verified commutator.
+`generator.py` implements one generator only: the modified White generator
+used in the IM-NCSM literature, restricted by the relaxed `Delta e != 0`
+one- and two-body masks. Directional `D1/D2=<Psi|H:A:|Psi>` matrix elements
+retain the published terms linear in `lambda2` and set `lambda3=0`; their
+anti-Hermitian combination is monitored as the decoupling residual. The
+leading Epstein--Nesbet denominators are Mongelli Eqs. (5.213)--(5.214), with
+the displayed `O(lambda2)` denominator corrections omitted and a
+sign-preserving `1e-6 MeV` cutoff. In the Slater limit they reduce term by
+term to the denominator in `src/Generator.cc`. QCombo positive-product
+expansions fix the directional index order, while random correlated tests
+compare the anti-Hermitian residual directly with
+`<Psi|[H,:A:]|Psi>` from the independently verified commutator.
 
 `flow.py` directly integrates `dH/ds=[eta,H]` with an adaptive DOP853
 stepper.  Like the existing C++ `IMSRGSolver`, it updates `eta` from every
-trial Hamiltonian and stops on its norm.  The ODE state stores only independent
+trial Hamiltonian and stops on the masked `D-D^dagger` residual norm. The ODE state stores only independent
 Hermitian one-body and antisymmetric/Hermitian pair-space two-body elements;
 this mirrors the established operator storage and prevents redundant tensor
 components from developing symmetry-violating numerical modes.  On the first

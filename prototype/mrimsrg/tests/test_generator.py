@@ -8,7 +8,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from commutator import commutator
 from densities import compute_densities
-from generator import brillouin_generator, decoupling_masks, oscillator_quanta_from_orbits
+from generator import (
+    _safe_denominator,
+    decoupling_masks,
+    decoupling_matrix_elements,
+    epstein_nesbet_denominators,
+    masked_decoupling_residual,
+    oscillator_quanta_from_orbits,
+    white_generator,
+)
 from normal_order import MRHamiltonian
 
 
@@ -62,7 +70,7 @@ class GeneratorTests(unittest.TestCase):
         )
         hamiltonian = random_hermitian_hamiltonian(norb, 531)
         quanta = np.array([0, 0, 1, 2])
-        eta = brillouin_generator(hamiltonian, densities, quanta)
+        eta = white_generator(hamiltonian, densities, quanta)
         mask1, mask2 = decoupling_masks(quanta)
         np.testing.assert_allclose(eta.one_body, -eta.one_body.T, atol=2e-12)
         np.testing.assert_allclose(
@@ -73,7 +81,7 @@ class GeneratorTests(unittest.TestCase):
         np.testing.assert_allclose(eta.one_body[~mask1], 0.0, atol=1e-14)
         np.testing.assert_allclose(eta.two_body[~mask2], 0.0, atol=1e-14)
 
-    def test_selected_elements_equal_explicit_brillouin_residuals(self) -> None:
+    def test_selected_elements_equal_explicit_decoupling_residuals(self) -> None:
         norb = 4
         densities = compute_densities(
             occupations((0, 1), (2, 3), norb=norb),
@@ -81,14 +89,14 @@ class GeneratorTests(unittest.TestCase):
         )
         hamiltonian = random_hermitian_hamiltonian(norb, 8128)
         quanta = np.arange(norb)
-        eta = brillouin_generator(hamiltonian, densities, quanta)
+        residual = masked_decoupling_residual(hamiltonian, densities, quanta)
 
         for i, j in ((0, 1), (2, 0), (3, 1)):
             basis = np.zeros((norb, norb))
             basis[i, j] = 1.0
             elementary = MRHamiltonian(0.0, basis, np.zeros((norb,) * 4))
             expected = commutator(hamiltonian, elementary, densities).zero_body
-            self.assertAlmostEqual(eta.one_body[i, j], expected, places=11)
+            self.assertAlmostEqual(residual.one_body[i, j], expected, places=11)
 
         for i, j, k, l in ((0, 1, 2, 3), (0, 2, 1, 3), (1, 3, 0, 2)):
             basis = np.zeros((norb,) * 4)
@@ -100,17 +108,83 @@ class GeneratorTests(unittest.TestCase):
             basis[j, i, l, k] = 1.0
             elementary = MRHamiltonian(0.0, np.zeros((norb, norb)), basis)
             expected = commutator(hamiltonian, elementary, densities).zero_body
-            self.assertAlmostEqual(eta.two_body[i, j, k, l], expected, places=11)
+            self.assertAlmostEqual(residual.two_body[i, j, k, l], expected, places=11)
 
-    def test_single_reference_one_body_limit_matches_imaginary_time_sign(self) -> None:
+    def test_single_reference_one_body_limit_matches_white_generator(self) -> None:
         densities = compute_densities(occupations((0,), norb=2), np.array([1.0]))
         one_body = np.array([[0.0, 0.2], [0.2, 2.0]])
         hamiltonian = MRHamiltonian(0.0, one_body, np.zeros((2,) * 4))
-        eta = brillouin_generator(hamiltonian, densities, np.array([0, 1]))
-        self.assertAlmostEqual(eta.one_body[1, 0], 0.2)
-        self.assertAlmostEqual(eta.one_body[0, 1], -0.2)
+        eta = white_generator(hamiltonian, densities, np.array([0, 1]))
+        self.assertAlmostEqual(eta.one_body[1, 0], 0.1)
+        self.assertAlmostEqual(eta.one_body[0, 1], -0.1)
         derivative = commutator(eta, hamiltonian, densities)
         self.assertLess(derivative.one_body[1, 0], 0.0)
+
+    def test_directional_two_body_elements_have_required_antisymmetry(self) -> None:
+        norb = 4
+        densities = compute_densities(
+            occupations((0, 1), (2, 3), norb=norb),
+            np.array([np.sqrt(0.4), -np.sqrt(0.6)]),
+        )
+        hamiltonian = random_hermitian_hamiltonian(norb, 614)
+        _, d2 = decoupling_matrix_elements(hamiltonian, densities)
+        np.testing.assert_allclose(d2, -d2.swapaxes(0, 1), atol=2e-12)
+        np.testing.assert_allclose(d2, -d2.swapaxes(2, 3), atol=2e-12)
+
+    def test_epstein_nesbet_denominator_reduces_to_imsrg_sr_formula(self) -> None:
+        norb = 6
+        occupied = (0, 1)
+        particles = (2, 3, 4, 5)
+        densities = compute_densities(
+            occupations(occupied, norb=norb), np.array([1.0])
+        )
+        hamiltonian = random_hermitian_hamiltonian(norb, 1701)
+        delta1, delta2 = epstein_nesbet_denominators(hamiltonian, densities)
+        f = hamiltonian.one_body
+        gamma = hamiltonian.two_body
+        for particle in particles:
+            for hole in occupied:
+                expected = (
+                    f[particle, particle]
+                    - f[hole, hole]
+                    - gamma[particle, hole, particle, hole]
+                )
+                self.assertAlmostEqual(delta1[particle, hole], expected, places=12)
+        for particle1, particle2 in ((2, 3), (4, 5)):
+            hole1, hole2 = occupied
+            expected = (
+                f[particle1, particle1]
+                + f[particle2, particle2]
+                - f[hole1, hole1]
+                - f[hole2, hole2]
+                + gamma[particle1, particle2, particle1, particle2]
+                + gamma[hole1, hole2, hole1, hole2]
+                - gamma[particle1, hole1, particle1, hole1]
+                - gamma[particle1, hole2, particle1, hole2]
+                - gamma[particle2, hole1, particle2, hole1]
+                - gamma[particle2, hole2, particle2, hole2]
+            )
+            self.assertAlmostEqual(
+                delta2[particle1, particle2, hole1, hole2], expected, places=12
+            )
+
+    def test_correlated_two_body_denominator_is_pair_symmetric(self) -> None:
+        norb = 4
+        densities = compute_densities(
+            occupations((0, 1), (2, 3), norb=norb),
+            np.array([np.sqrt(0.3), np.sqrt(0.7)]),
+        )
+        hamiltonian = random_hermitian_hamiltonian(norb, 701)
+        _, delta2 = epstein_nesbet_denominators(hamiltonian, densities)
+        np.testing.assert_allclose(delta2, delta2.swapaxes(0, 1), atol=2e-12)
+        np.testing.assert_allclose(delta2, delta2.swapaxes(2, 3), atol=2e-12)
+
+    def test_denominator_cutoff_preserves_nonzero_sign(self) -> None:
+        values = np.array([-1e-12, 0.0, 1e-12, -2.0, 3.0])
+        np.testing.assert_array_equal(
+            _safe_denominator(values, 1e-6),
+            np.array([-1e-6, 1e-6, 1e-6, -2.0, 3.0]),
+        )
 
 
 if __name__ == "__main__":

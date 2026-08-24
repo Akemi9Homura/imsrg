@@ -137,7 +137,13 @@ def save_flow_output(
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "reference_path": str(Path(reference_path).resolve()),
         "reference_metadata": reference.metadata,
-        "generator": "brillouin_delta_e_masked",
+        "generator": "white_epstein_nesbet_delta_e_masked",
+        "generator_denominator": {
+            "formula": "Mongelli Eqs. (5.213)-(5.214), leading terms",
+            "lambda2_terms": "omitted as O(lambda2)",
+            "cutoff_mev": 1e-6,
+            "cutoff_sign": "preserved",
+        },
         "commutator": "MR-IMSRG(2), lambda3=0",
         "density_approximation": "lambda3=0",
         "decoupling_mask": {

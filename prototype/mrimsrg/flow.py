@@ -2,8 +2,8 @@
 
 The structure follows the existing ``IMSRGSolver`` direct-flow path: update
 the generator from the current Hamiltonian, evaluate ``[eta,H]``, use an
-adaptive explicit Runge--Kutta method, and stop on the generator norm.  SciPy's
-DOP853 is used here so accepted states can be inspected without retaining a
+adaptive explicit Runge--Kutta method, and stop on the masked decoupling
+residual. SciPy's DOP853 is used here so accepted states can be inspected without retaining a
 copy of every 40^4 tensor in memory.
 """
 
@@ -20,12 +20,20 @@ from scipy.integrate import DOP853
 try:
     from .commutator import commutator
     from .densities import Densities
-    from .generator import brillouin_generator, masked_residual_norm
+    from .generator import (
+        masked_decoupling_residual,
+        masked_residual_norm,
+        white_generator,
+    )
     from .normal_order import MRHamiltonian
 except ImportError:
     from commutator import commutator
     from densities import Densities
-    from generator import brillouin_generator, masked_residual_norm
+    from generator import (
+        masked_decoupling_residual,
+        masked_residual_norm,
+        white_generator,
+    )
     from normal_order import MRHamiltonian
 
 
@@ -176,10 +184,10 @@ def integrate_flow(
         raise ValueError("checkpoint_s must lie strictly between zero and smax")
 
     norb = int(initial_hamiltonian.one_body.shape[0])
-    initial_eta = brillouin_generator(
+    initial_residual_operator = masked_decoupling_residual(
         initial_hamiltonian, densities, oscillator_quanta
     )
-    initial_residual = masked_residual_norm(initial_eta)
+    initial_residual = masked_residual_norm(initial_residual_operator)
     trajectory = [
         _flow_point(0, 0.0, initial_hamiltonian, initial_residual, initial_residual)
     ]
@@ -200,7 +208,7 @@ def integrate_flow(
         del s
         nonlocal function_evaluations
         hamiltonian = _unpack(values, norb)
-        eta = brillouin_generator(hamiltonian, densities, oscillator_quanta)
+        eta = white_generator(hamiltonian, densities, oscillator_quanta)
         derivative = commutator(eta, hamiltonian, densities)
         packed = _pack(derivative)
         if not np.all(np.isfinite(packed)):
@@ -241,10 +249,10 @@ def integrate_flow(
             checkpoint_hamiltonian = _unpack(
                 solver.dense_output()(settings.checkpoint_s), norb
             )
-            checkpoint_eta = brillouin_generator(
+            checkpoint_residual_operator = masked_decoupling_residual(
                 checkpoint_hamiltonian, densities, oscillator_quanta
             )
-            checkpoint_residual = masked_residual_norm(checkpoint_eta)
+            checkpoint_residual = masked_residual_norm(checkpoint_residual_operator)
             checkpoints.append(
                 FlowCheckpoint(
                     point=_flow_point(
@@ -258,8 +266,10 @@ def integrate_flow(
                 )
             )
         hamiltonian = _unpack(solver.y, norb)
-        eta = brillouin_generator(hamiltonian, densities, oscillator_quanta)
-        residual = masked_residual_norm(eta)
+        residual_operator = masked_decoupling_residual(
+            hamiltonian, densities, oscillator_quanta
+        )
+        residual = masked_residual_norm(residual_operator)
         point = _flow_point(step, solver.t, hamiltonian, residual, initial_residual)
         trajectory.append(point)
         if observer is not None:
@@ -273,7 +283,7 @@ def integrate_flow(
             break
         if point.residual_ratio <= settings.residual_ratio:
             converged = True
-            message = "masked Brillouin residual target reached"
+            message = "masked decoupling residual target reached"
             break
         if solver.status == "finished":
             break

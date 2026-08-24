@@ -1,14 +1,20 @@
-"""Single Brillouin generator with the relaxed IM-NCSM decoupling mask.
+"""Single modified White generator for the rapid IM-NCSM flow.
 
-The matrix elements are Eqs. (58)--(59) of Hergert, Phys. Scripta 92,
-023002 (2017), with ``lambda3=0``.  They are the irreducible Brillouin
-residuals ``<Psi|[H,{A}]|Psi>`` and therefore form an anti-Hermitian
-generator without energy denominators.  The same expressions are generated
-by ``refs/qcombo/examples/Brillouin.ipynb``.
+The directional decoupling matrix elements ``D1`` and ``D2`` are Mongelli
+Eqs. (5.216)--(5.217), with ``lambda3=0`` and terms quadratic in ``lambda2``
+omitted. Their anti-Hermitian combination reproduces the Brillouin residual
+of Hergert Eqs. (58)--(59); the positive products were also regenerated with
+QCombo's generalized Wick expansion.
+
+The one generator used by the flow is the White generator of Mongelli
+Eqs. (5.210)--(5.214). Its leading Epstein--Nesbet denominators omit the
+explicitly indicated ``O(lambda2)`` corrections. This is the same practical
+denominator truncation used for the White-NCSM calculations in Vobig Sec.
+6.5. A sign-preserving cutoff follows the established ``imsrg++`` handling
+of small denominators.
 
 Only matrix elements that change the sum of HO single-particle quanta are
-retained.  This is the relaxed IM-NCSM pattern of Vobig Eqs. (6.5.13)--
-(6.5.16) and Mongelli Eqs. (5.218)--(5.221).
+retained, i.e. the relaxed IM-NCSM pattern of Mongelli Eqs. (5.218)--(5.221).
 """
 
 from __future__ import annotations
@@ -23,6 +29,9 @@ except ImportError:
     from commutator import _natural_occupations
     from densities import Densities
     from normal_order import MRHamiltonian
+
+
+WHITE_DENOMINATOR_CUTOFF = 1e-6
 
 
 def oscillator_quanta_from_orbits(orbits: np.ndarray) -> np.ndarray:
@@ -43,14 +52,20 @@ def decoupling_masks(oscillator_quanta: np.ndarray) -> tuple[np.ndarray, np.ndar
     return one_body, two_body
 
 
-def brillouin_generator(
+def decoupling_matrix_elements(
     hamiltonian: MRHamiltonian,
     densities: Densities,
-    oscillator_quanta: np.ndarray,
     *,
     natural_tolerance: float = 1e-10,
-) -> MRHamiltonian:
-    """Build the masked, lambda3=0 Brillouin generator."""
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return directional ``D1=<H A1>`` and ``D2=<H A2>`` elements.
+
+    Array indices follow this prototype's coefficient convention. In
+    particular, the leading one-body term is
+    ``D1[i,j] = n[j] (1-n[i]) f[j,i]``. This apparent transpose relative to
+    some printed formulas is fixed by the convention that ``f[p,q]``
+    multiplies ``a^dagger_p a_q``.
+    """
     n = _natural_occupations(densities, natural_tolerance)
     nbar = 1.0 - n
     f = hamiltonian.one_body
@@ -59,71 +74,164 @@ def brillouin_generator(
     norb = len(n)
     if f.shape != (norb, norb) or gamma.shape != (norb,) * 4:
         raise ValueError("Hamiltonian and density shapes are incompatible")
-    mask1, mask2 = decoupling_masks(oscillator_quanta)
-    if mask1.shape != f.shape:
-        raise ValueError("oscillator-quanta array has an incompatible length")
 
-    # QCombo form of Eq. (58), with output indices (i,j).
-    eta1 = (n[None, :] - n[:, None]) * f.T
+    # QCombo positive products H(1B) A(1B) and H(2B) A(1B), after setting
+    # lambda3=0. The f-lambda2 term is Hermitian for Hermitian inputs, but it
+    # must be retained before applying the directional White denominators.
+    d1 = n[None, :] * nbar[:, None] * f.T
     if np.any(lambda2):
-        eta1 += 0.5 * (
-            np.einsum("abci,abcj->ij", gamma, lambda2, optimize=True)
-            - np.einsum("ajcd,aicd->ij", gamma, lambda2, optimize=True)
+        d1 += np.einsum("pq,piqj->ij", f, lambda2, optimize=True)
+        d1 += 0.5 * (
+            np.einsum("i,abci,abcj->ij", nbar, gamma, lambda2, optimize=True)
+            - np.einsum("j,ajcd,aicd->ij", n, gamma, lambda2, optimize=True)
         )
 
-    # Eq. (59), first line and the f-lambda2 terms.
-    forward_weight = (
+    # Mongelli Eq. (5.217). Each permutation is explicit so the two
+    # antisymmetric index pairs can be checked independently.
+    d2 = (
+        nbar[:, None, None, None]
+        * nbar[None, :, None, None]
+        * n[None, None, :, None]
+        * n[None, None, None, :]
+        * gamma.transpose(2, 3, 0, 1)
+    )
+    if np.any(lambda2):
+        d2 += np.einsum("l,lp,ijpk->ijkl", n, f, lambda2, optimize=True)
+        d2 -= np.einsum("k,kp,ijpl->ijkl", n, f, lambda2, optimize=True)
+        d2 -= np.einsum("j,pj,pikl->ijkl", nbar, f, lambda2, optimize=True)
+        d2 += np.einsum("i,pi,pjkl->ijkl", nbar, f, lambda2, optimize=True)
+        d2 += 0.5 * np.einsum(
+            "i,j,pqij,pqkl->ijkl", nbar, nbar, gamma, lambda2, optimize=True
+        )
+        d2 += 0.5 * np.einsum(
+            "k,l,klpq,ijpq->ijkl", n, n, gamma, lambda2, optimize=True
+        )
+        mixed = np.einsum(
+            "k,i,pkiq,pjql->ijkl", n, nbar, gamma, lambda2, optimize=True
+        )
+        d2 += (
+            -mixed
+            + mixed.swapaxes(0, 1)
+            + mixed.swapaxes(2, 3)
+            - mixed.swapaxes(0, 1).swapaxes(2, 3)
+        )
+    return d1, d2
+
+
+def epstein_nesbet_denominators(
+    hamiltonian: MRHamiltonian,
+    densities: Densities,
+    *,
+    natural_tolerance: float = 1e-10,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return leading MR Epstein--Nesbet denominators.
+
+    These are Mongelli Eqs. (5.213)--(5.214), without their
+    ``O(lambda2)`` terms. In the Slater limit the two-body expression reduces
+    exactly to the Epstein--Nesbet denominator in ``src/Generator.cc``.
+    """
+    n = _natural_occupations(densities, natural_tolerance)
+    nbar = 1.0 - n
+    f_diagonal = np.diag(hamiltonian.one_body)
+    gamma_diagonal = np.einsum("ijij->ij", hamiltonian.two_body)
+    energy = hamiltonian.zero_body
+
+    delta1 = (
+        -(nbar[:, None] ** 2)
+        * (n[None, :] ** 2)
+        * gamma_diagonal
+        + (nbar[:, None] ** 2) * n[None, :] * f_diagonal[:, None]
+        - nbar[:, None] * (n[None, :] ** 2) * f_diagonal[None, :]
+        + energy * (nbar[:, None] * n[None, :] - 1.0)
+    )
+
+    weight = (
         nbar[:, None, None, None]
         * nbar[None, :, None, None]
         * n[None, None, :, None]
         * n[None, None, None, :]
     )
-    reverse_weight = (
-        n[:, None, None, None]
-        * n[None, :, None, None]
-        * nbar[None, None, :, None]
-        * nbar[None, None, None, :]
+    first_ordering = weight * (
+        0.5
+        * nbar[:, None, None, None]
+        * nbar[None, :, None, None]
+        * gamma_diagonal[:, :, None, None]
+        + 0.5
+        * n[None, None, :, None]
+        * n[None, None, None, :]
+        * gamma_diagonal[None, None, :, :]
+        - nbar[:, None, None, None]
+        * n[None, None, None, :]
+        * gamma_diagonal[:, None, None, :]
+        - nbar[:, None, None, None]
+        * n[None, None, :, None]
+        * gamma_diagonal[:, None, :, None]
+        + nbar[:, None, None, None] * f_diagonal[:, None, None, None]
+        - n[None, None, :, None] * f_diagonal[None, None, :, None]
     )
-    eta2 = gamma.transpose(2, 3, 0, 1) * (forward_weight - reverse_weight)
+    first_ordering += 0.5 * energy * (weight - 1.0)
+    delta2 = first_ordering + first_ordering.swapaxes(0, 1).swapaxes(2, 3)
+    return delta1, delta2
 
-    if np.any(lambda2):
-        eta2 += (
-            np.einsum("ai,ajkl->ijkl", f, lambda2, optimize=True)
-            - np.einsum("aj,aikl->ijkl", f, lambda2, optimize=True)
-            - np.einsum("ka,ijal->ijkl", f, lambda2, optimize=True)
-            + np.einsum("la,ijak->ijkl", f, lambda2, optimize=True)
-        )
-        eta2 += 0.5 * (
-            np.einsum("abij,abkl,ij->ijkl", gamma, lambda2, 1.0 - n[:, None] - n[None, :], optimize=True)
-            - np.einsum("klab,ijab,kl->ijkl", gamma, lambda2, 1.0 - n[:, None] - n[None, :], optimize=True)
-        )
 
-        # (1-Pij)(1-Pkl) sum_ac (n_j-n_k) Gamma^{ak}_{cj} lambda^{ai}_{cl}.
-        # Write all four permutations explicitly so every exchanged index is
-        # visible and independently testable.
-        eta2 += np.einsum(
-            "akcj,aicl,jk->ijkl", gamma, lambda2, n[:, None] - n[None, :], optimize=True
-        )
-        eta2 -= np.einsum(
-            "akci,ajcl,ik->ijkl", gamma, lambda2, n[:, None] - n[None, :], optimize=True
-        )
-        eta2 -= np.einsum(
-            "alcj,aick,jl->ijkl", gamma, lambda2, n[:, None] - n[None, :], optimize=True
-        )
-        eta2 += np.einsum(
-            "alci,ajck,il->ijkl", gamma, lambda2, n[:, None] - n[None, :], optimize=True
-        )
+def _safe_denominator(values: np.ndarray, cutoff: float) -> np.ndarray:
+    if cutoff <= 0.0:
+        raise ValueError("denominator cutoff must be positive")
+    signs = np.where(values < 0.0, -1.0, 1.0)
+    return np.where(np.abs(values) < cutoff, signs * cutoff, values)
 
+
+def masked_decoupling_residual(
+    hamiltonian: MRHamiltonian,
+    densities: Densities,
+    oscillator_quanta: np.ndarray,
+    *,
+    natural_tolerance: float = 1e-10,
+) -> MRHamiltonian:
+    """Build the masked anti-Hermitian ``D-D^dagger`` residual."""
+    d1, d2 = decoupling_matrix_elements(
+        hamiltonian, densities, natural_tolerance=natural_tolerance
+    )
+    mask1, mask2 = decoupling_masks(oscillator_quanta)
+    if mask1.shape != d1.shape:
+        raise ValueError("oscillator-quanta array has an incompatible length")
+    residual1 = (d1 - d1.T) * mask1
+    residual2 = (d2 - d2.transpose(2, 3, 0, 1)) * mask2
+    return MRHamiltonian(0.0, residual1, residual2)
+
+
+def white_generator(
+    hamiltonian: MRHamiltonian,
+    densities: Densities,
+    oscillator_quanta: np.ndarray,
+    *,
+    denominator_cutoff: float = WHITE_DENOMINATOR_CUTOFF,
+    natural_tolerance: float = 1e-10,
+) -> MRHamiltonian:
+    """Build the single masked White generator used by the prototype."""
+    d1, d2 = decoupling_matrix_elements(
+        hamiltonian, densities, natural_tolerance=natural_tolerance
+    )
+    delta1, delta2 = epstein_nesbet_denominators(
+        hamiltonian, densities, natural_tolerance=natural_tolerance
+    )
+    weighted1 = d1 / _safe_denominator(delta1, denominator_cutoff)
+    weighted2 = d2 / _safe_denominator(delta2, denominator_cutoff)
+    eta1 = weighted1 - weighted1.T
+    eta2 = weighted2 - weighted2.transpose(2, 3, 0, 1)
+    mask1, mask2 = decoupling_masks(oscillator_quanta)
+    if mask1.shape != eta1.shape:
+        raise ValueError("oscillator-quanta array has an incompatible length")
     eta1 *= mask1
     eta2 *= mask2
     return MRHamiltonian(0.0, eta1, eta2)
 
 
-def masked_residual_norm(generator: MRHamiltonian) -> float:
-    """Frobenius norm used to monitor the selected Brillouin residuals."""
+def masked_residual_norm(residual: MRHamiltonian) -> float:
+    """Frobenius norm used to monitor the selected decoupling residuals."""
     return float(
         np.sqrt(
-            np.vdot(generator.one_body, generator.one_body).real
-            + 0.25 * np.vdot(generator.two_body, generator.two_body).real
+            np.vdot(residual.one_body, residual.one_body).real
+            + 0.25 * np.vdot(residual.two_body, residual.two_body).real
         )
     )

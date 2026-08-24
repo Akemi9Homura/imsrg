@@ -44,10 +44,10 @@ class FlowTests(unittest.TestCase):
         one_body = np.array([[0.0, 0.2], [0.2, 2.0]])
         initial = MRHamiltonian(0.0, one_body, np.zeros((2,) * 4))
         settings = FlowSettings(
-            smax=10.0,
+            smax=25.0,
             relative_tolerance=1e-10,
             absolute_tolerance=1e-12,
-            max_step=0.1,
+            max_step=0.5,
             residual_ratio=1e-8,
             checkpoint_s=0.5,
         )
