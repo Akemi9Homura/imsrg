@@ -10,7 +10,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from densities import compute_densities
-from flow import FlowPoint, FlowResult, FlowSettings
+from flow import FlowCheckpoint, FlowPoint, FlowResult, FlowSettings
 from normal_order import VacuumHamiltonian, normal_order
 from output import save_flow_output
 from reference_io import ReferenceData
@@ -25,7 +25,17 @@ class OutputTests(unittest.TestCase):
         vacuum = VacuumHamiltonian(0.3, np.diag([1.0, 2.0]), np.zeros((2,) * 4))
         initial = normal_order(vacuum, densities)
         point = FlowPoint(0, 0.0, initial.zero_body, 0.0, 0.0, 0.0, 0.0, 0.0)
-        result = FlowResult(initial, (point,), 0, True, "test")
+        middle_point = FlowPoint(
+            1, 0.5, initial.zero_body, 0.0, 0.0, 0.0, 0.0, 0.0
+        )
+        result = FlowResult(
+            initial,
+            (point,),
+            0,
+            True,
+            "test",
+            (FlowCheckpoint(middle_point, initial),),
+        )
         reference = ReferenceData(
             metadata={"A": 1, "interaction_sha256": "test"},
             orbits=orbits,
@@ -44,6 +54,16 @@ class OutputTests(unittest.TestCase):
             metadata = json.loads((output_path / "metadata.json").read_text())
             self.assertEqual(metadata["density_approximation"], "lambda3=0")
             self.assertAlmostEqual(metadata["final_vacuum_zero_body"], vacuum.zero_body)
+            self.assertEqual(
+                [entry["s"] for entry in metadata["vacuum_checkpoints"]],
+                [0.0, 0.5],
+            )
+            self.assertTrue(
+                (output_path / "checkpoints" / "s0" / "vacuum_mscheme.bin").is_file()
+            )
+            self.assertTrue(
+                (output_path / "checkpoints" / "s0p5" / "vacuum_mscheme.bin").is_file()
+            )
             with (output_path / "vacuum_mscheme.bin").open("rb") as stream:
                 self.assertEqual(stream.read(16), b"mrimsrg_m_v1\0\0\0\0")
                 norb, zero_body = struct.unpack("<Qd", stream.read(16))

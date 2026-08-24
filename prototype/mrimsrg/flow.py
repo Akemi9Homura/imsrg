@@ -39,6 +39,7 @@ class FlowSettings:
     residual_ratio: float = 1e-6
     max_accepted_steps: int = 400
     symmetry_tolerance: float = 2e-8
+    checkpoint_s: float | None = None
 
 
 @dataclass(frozen=True)
@@ -54,12 +55,19 @@ class FlowPoint:
 
 
 @dataclass(frozen=True)
+class FlowCheckpoint:
+    point: FlowPoint
+    hamiltonian: MRHamiltonian
+
+
+@dataclass(frozen=True)
 class FlowResult:
     hamiltonian: MRHamiltonian
     trajectory: tuple[FlowPoint, ...]
     function_evaluations: int
     converged: bool
     message: str
+    checkpoints: tuple[FlowCheckpoint, ...] = ()
 
 
 @lru_cache(maxsize=None)
@@ -164,6 +172,8 @@ def integrate_flow(
         raise ValueError("ODE tolerances must be positive")
     if not 0.0 < settings.residual_ratio < 1.0:
         raise ValueError("residual_ratio must lie between zero and one")
+    if settings.checkpoint_s is not None and not 0.0 < settings.checkpoint_s < settings.smax:
+        raise ValueError("checkpoint_s must lie strictly between zero and smax")
 
     norb = int(initial_hamiltonian.one_body.shape[0])
     initial_eta = brillouin_generator(
@@ -211,6 +221,7 @@ def integrate_flow(
 
     converged = False
     message = "maximum flow parameter reached before residual target"
+    checkpoints: list[FlowCheckpoint] = []
     for step in range(1, settings.max_accepted_steps + 1):
         if solver.status == "finished":
             break
@@ -222,6 +233,30 @@ def integrate_flow(
         if solver.t == previous_s:
             message = "ODE solver made no progress"
             break
+        if (
+            settings.checkpoint_s is not None
+            and not checkpoints
+            and previous_s < settings.checkpoint_s <= solver.t
+        ):
+            checkpoint_hamiltonian = _unpack(
+                solver.dense_output()(settings.checkpoint_s), norb
+            )
+            checkpoint_eta = brillouin_generator(
+                checkpoint_hamiltonian, densities, oscillator_quanta
+            )
+            checkpoint_residual = masked_residual_norm(checkpoint_eta)
+            checkpoints.append(
+                FlowCheckpoint(
+                    point=_flow_point(
+                        step,
+                        settings.checkpoint_s,
+                        checkpoint_hamiltonian,
+                        checkpoint_residual,
+                        initial_residual,
+                    ),
+                    hamiltonian=checkpoint_hamiltonian,
+                )
+            )
         hamiltonian = _unpack(solver.y, norb)
         eta = brillouin_generator(hamiltonian, densities, oscillator_quanta)
         residual = masked_residual_norm(eta)
@@ -252,4 +287,5 @@ def integrate_flow(
         function_evaluations=function_evaluations,
         converged=converged,
         message=message,
+        checkpoints=tuple(checkpoints),
     )

@@ -39,6 +39,12 @@ def main() -> int:
     parser.add_argument("--atol", type=float, default=1e-8)
     parser.add_argument("--max-step", type=float, default=0.05)
     parser.add_argument("--residual-ratio", type=float, default=1e-6)
+    parser.add_argument(
+        "--checkpoint-s",
+        type=float,
+        default=None,
+        help="materialize one intermediate Hamiltonian at this flow parameter",
+    )
     args = parser.parse_args()
 
     reference = load_reference(args.reference)
@@ -59,6 +65,7 @@ def main() -> int:
         absolute_tolerance=args.atol,
         max_step=args.max_step,
         residual_ratio=args.residual_ratio,
+        checkpoint_s=args.checkpoint_s,
     )
     result = integrate_flow(
         initial,
@@ -81,4 +88,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

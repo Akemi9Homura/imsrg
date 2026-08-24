@@ -64,7 +64,8 @@ Run and materialize one calculation with:
 ```bash
 PYTHONPATH=prototype/mrimsrg python3 prototype/mrimsrg/run_mrimsrg.py \
   prototype/mrimsrg/data/He4_Nrefmax0_final \
-  prototype/mrimsrg/data/He4_flow_rtol1e-6
+  prototype/mrimsrg/data/He4_flow_rtol1e-6 \
+  --checkpoint-s 1.0
 ```
 
 The output directory contains `gamma1/gamma2/lambda2`, initial and final
@@ -72,6 +73,10 @@ MR-normal-ordered tensors, and the final ordinary vacuum-normal-ordered
 `E0+t+V` tensors.  `metadata.json` records the fixed interaction identity,
 reference metadata, `lambda3=0`, generator/mask, ODE settings and every
 accepted-step residual.  Existing output directories are never overwritten.
+The output also materializes the ordinary vacuum Hamiltonian at `s=0` and at
+the requested intermediate `--checkpoint-s` under `checkpoints/`; the root
+payload is the final point.  Thus a production run retains the three points
+required by the acceptance plan without keeping every large ODE state.
 The command returns status 2 after saving if `smax` is reached before the
 residual target, allowing a Slurm job to distinguish a diagnostic from an
 accepted result.
@@ -96,3 +101,17 @@ integration run used `shell-model-obs` revision `1687f16` and reproduced the
 full He4 `emax=2` ground-state benchmark as `-20.3388325043 MeV`; contraction
 of the independently constructed `gamma1/gamma2` gave the same value.
 The dense m-scheme readback interface is revision `4b10afa` of that dependency.
+
+On point7, generate and inspect exactly one Slurm job at a time with:
+
+```bash
+python3 prototype/mrimsrg/gen_flow_job.py --nucleus He4
+python3 prototype/mrimsrg/gen_flow_job.py --nucleus He4 --submit
+```
+
+The dedicated generator is for this Python prototype; it deliberately does
+not alter the existing production `gen_job.py` used by `imsrg++`.  It fixes the
+documented point7 paths, one node/task, 64 cores, QOS/log conventions, sources
+`sourceme.sh`, and prints the complete generated script before an optional
+submission.  Reinvoke it for one different nucleus or tolerance at a time;
+there is no scan or batch-generation mode.

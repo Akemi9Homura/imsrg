@@ -49,6 +49,7 @@ class FlowTests(unittest.TestCase):
             absolute_tolerance=1e-12,
             max_step=0.1,
             residual_ratio=1e-8,
+            checkpoint_s=0.5,
         )
         result = integrate_flow(initial, densities, np.array([0, 1]), settings)
         self.assertTrue(result.converged, result.message)
@@ -59,6 +60,12 @@ class FlowTests(unittest.TestCase):
             atol=2e-10,
         )
         self.assertLess(abs(result.hamiltonian.one_body[0, 1]), 2e-9)
+        self.assertEqual(len(result.checkpoints), 1)
+        self.assertEqual(result.checkpoints[0].point.s, 0.5)
+        self.assertLess(
+            abs(result.checkpoints[0].hamiltonian.one_body[0, 1]),
+            abs(initial.one_body[0, 1]),
+        )
 
     def test_equal_ho_quanta_are_not_decoupled(self) -> None:
         densities = compute_densities(occupations((0,), norb=2), np.array([1.0]))
