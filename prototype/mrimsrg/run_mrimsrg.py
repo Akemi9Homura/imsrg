@@ -34,6 +34,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("reference", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument(
+        "--interaction",
+        type=Path,
+        help="relocated copy of the fixed interaction, still verified by SHA-256",
+    )
     parser.add_argument("--smax", type=float, default=2.0)
     parser.add_argument("--rtol", type=float, default=1e-6)
     parser.add_argument("--atol", type=float, default=1e-8)
@@ -47,7 +52,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    reference = load_reference(args.reference)
+    reference = load_reference(args.reference, interaction_path=args.interaction)
     densities = compute_densities(reference.determinants, reference.coefficients)
     validate_densities(densities, int(reference.metadata["A"]))
     contracted = reference_energy(reference, densities)

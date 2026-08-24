@@ -20,11 +20,16 @@ _REFERENCE_NAMES = {
     "O16": "O16_Nrefmax0_final",
 }
 _PARTITIONS = ("c128m1024", "c128m512", "compute_C", "compute_A")
+_POINT7_INTERACTION = Path(
+    "/tns/mengziyan/mr-imsrg-inputs/"
+    "TwBME_N2LO_opt_hw20_emax2_e2max4.minipack"
+)
 
 
 @dataclass(frozen=True)
 class JobSettings:
     nucleus: str
+    interaction: Path = _POINT7_INTERACTION
     partition: str = "c128m512"
     nodelist: str | None = None
     smax: float = 2.0
@@ -52,6 +57,8 @@ def _validate(settings: JobSettings) -> None:
         raise ValueError("ODE tolerances and max_step must be positive")
     if not 0.0 < settings.residual_ratio < 1.0:
         raise ValueError("residual_ratio must lie between zero and one")
+    if not settings.interaction.is_file():
+        raise FileNotFoundError(f"fixed interaction is unavailable: {settings.interaction}")
 
 
 def generate_job(
@@ -83,6 +90,7 @@ def generate_job(
         f"PYTHONPATH={repo_root / 'prototype' / 'mrimsrg'} python3 -u "
         f"{repo_root / 'prototype' / 'mrimsrg' / 'run_mrimsrg.py'} "
         f"{reference} {output} "
+        f"--interaction {settings.interaction.resolve()} "
         f"--smax {settings.smax:.17g} "
         f"--checkpoint-s {settings.checkpoint_s:.17g} "
         f"--rtol {settings.rtol:.17g} --atol {settings.atol:.17g} "
@@ -115,6 +123,7 @@ export MKL_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--nucleus", required=True, choices=tuple(_REFERENCE_NAMES))
+    parser.add_argument("--interaction", type=Path, default=_POINT7_INTERACTION)
     parser.add_argument("--partition", choices=_PARTITIONS, default="c128m512")
     parser.add_argument("--nodelist")
     parser.add_argument("--smax", type=float, default=2.0)
@@ -141,6 +150,7 @@ def main() -> int:
     )
     settings = JobSettings(
         nucleus=args.nucleus,
+        interaction=args.interaction,
         partition=args.partition,
         nodelist=args.nodelist,
         smax=args.smax,

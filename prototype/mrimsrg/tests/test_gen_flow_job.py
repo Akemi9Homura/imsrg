@@ -21,10 +21,14 @@ class FlowJobTests(unittest.TestCase):
             )
             reference.mkdir(parents=True)
             (reference / "metadata.json").write_text("{}\n", encoding="utf-8")
+            interaction = root / "interaction.minipack"
+            interaction.write_bytes(b"test")
             script = generate_job(
                 root,
                 root / "result",
-                JobSettings(nucleus="He4", nodelist="node2"),
+                JobSettings(
+                    nucleus="He4", interaction=interaction, nodelist="node2"
+                ),
             )
             contents = script.read_text(encoding="utf-8")
             self.assertIn("#SBATCH --partition=c128m512", contents)
@@ -33,17 +37,25 @@ class FlowJobTests(unittest.TestCase):
             self.assertIn("#SBATCH --nodelist=node2", contents)
             self.assertIn("source ./sourceme.sh", contents)
             self.assertIn("--checkpoint-s 1", contents)
+            self.assertIn(f"--interaction {interaction}", contents)
             self.assertIn("--residual-ratio 9.9999999999999995e-07", contents)
             self.assertNotIn("%N", contents)
 
     def test_rejects_checkpoint_outside_flow_interval(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            interaction = root / "interaction.minipack"
+            interaction.write_bytes(b"test")
             with self.assertRaises(ValueError):
                 generate_job(
                     root,
                     root / "result",
-                    JobSettings(nucleus="He4", smax=1.0, checkpoint_s=1.0),
+                    JobSettings(
+                        nucleus="He4",
+                        interaction=interaction,
+                        smax=1.0,
+                        checkpoint_s=1.0,
+                    ),
                 )
 
 

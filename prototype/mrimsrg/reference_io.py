@@ -43,10 +43,16 @@ def _require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
-def load_reference(path: str | Path, verify_interaction: bool = True) -> ReferenceData:
+def load_reference(
+    path: str | Path,
+    verify_interaction: bool = True,
+    interaction_path: str | Path | None = None,
+) -> ReferenceData:
     root = Path(path)
     with (root / "metadata.json").open(encoding="utf-8") as stream:
         metadata = json.load(stream)
+    if interaction_path is not None:
+        metadata["validated_interaction_path"] = str(Path(interaction_path).resolve())
     data = ReferenceData(
         metadata=metadata,
         orbits=np.load(root / "orbits.npy"),
@@ -98,7 +104,9 @@ def validate_reference(data: ReferenceData, verify_interaction: bool = True) -> 
     _require(np.max(np.abs(data.two_body - data.two_body.transpose(2, 3, 0, 1))) < tolerance, "two-body Hamiltonian is not Hermitian")
 
     if verify_interaction:
-        interaction = Path(metadata["interaction"])
+        interaction = Path(
+            metadata.get("validated_interaction_path", metadata["interaction"])
+        )
         _require(interaction.is_file(), f"interaction file is unavailable: {interaction}")
         actual_sha256 = sha256_file(interaction)
         _require(actual_sha256 == FIXED_INTERACTION_SHA256, f"unexpected interaction SHA-256: {actual_sha256}")

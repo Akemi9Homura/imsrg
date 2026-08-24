@@ -115,3 +115,10 @@ documented point7 paths, one node/task, 64 cores, QOS/log conventions, sources
 `sourceme.sh`, and prints the complete generated script before an optional
 submission.  Reinvoke it for one different nucleus or tolerance at a time;
 there is no scan or batch-generation mode.
+
+Reference metadata records the original development-machine interaction path.
+When the exact fixed file is relocated, pass `--interaction <path>`; the runner
+does not trust the path alone and still requires the frozen SHA-256 before it
+starts a flow.  The point7 generator uses the task-specific copy under
+`/tns/mengziyan/mr-imsrg-inputs/` because the shared force tree has larger
+N2LOopt spaces but not this exact emax2 file.
