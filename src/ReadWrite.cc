@@ -380,6 +380,118 @@ void ReadWrite::Read_no2bpack( std::string filename, Operator& Hbare )
 }
 
 
+/// Write the packed binary NO2B layout consumed by Read_no2bpack() and FCIQMC.
+/// Hvac must already be normal ordered with respect to the vacuum.  The legacy
+/// format conditionally carries an HO center-of-mass TBME after each ordinary
+/// TBME; this writer emits a zero placeholder for compatibility.  Consequently
+/// downstream calculations must use beta_cm=0 for a Hamiltonian in a non-HO
+/// single-particle basis.
+void ReadWrite::Write_no2bpack( std::string filename, Operator& Hvac )
+{
+  ModelSpace* modelspace = Hvac.GetModelSpace();
+  const int num_orbits = static_cast<int>(modelspace->GetNumberOrbits());
+  const int num_obme = num_orbits * (num_orbits + 1) / 2;
+  int num_tbme = 0;
+  const int nchan = modelspace->GetNumberTwoBodyChannels();
+  for (int ch=0; ch<nchan; ++ch)
+  {
+    TwoBodyChannel& tbc = modelspace->GetTwoBodyChannel(ch);
+    const int nkets = static_cast<int>(tbc.GetNumberKets());
+    num_tbme += nkets * (nkets + 1) / 2;
+  }
+
+  std::ofstream outfile(filename, std::ios::binary);
+  if (not outfile.good())
+  {
+    std::cerr << "Write_no2bpack: cannot open " << filename << std::endl;
+    goodstate = false;
+    return;
+  }
+
+  auto write_value = [&](const auto& x)
+  {
+    outfile.write(reinterpret_cast<const char*>(&x), sizeof(x));
+  };
+
+  const double hw = modelspace->GetHbarOmega();
+  const int emax = modelspace->GetEmax();
+  write_value(hw);
+  write_value(emax);
+  write_value(num_orbits);
+  write_value(num_obme);
+  write_value(num_tbme);
+
+  for (int i=0; i<num_orbits; ++i)
+  {
+    Orbit& orbit = modelspace->GetOrbit(i);
+    write_value(orbit.n);
+    write_value(orbit.l);
+    write_value(orbit.j2);
+    write_value(orbit.tz2);
+  }
+
+  write_value(Hvac.ZeroBody);
+  for (int a=0; a<num_orbits; ++a)
+  {
+    for (int b=a; b<num_orbits; ++b)
+    {
+      const float obme = static_cast<float>(Hvac.OneBody(a,b));
+      write_value(obme);
+    }
+  }
+
+  const float zero_hcm = 0.0F;
+  for (int ch=0; ch<nchan; ++ch)
+  {
+    TwoBodyChannel& tbc = modelspace->GetTwoBodyChannel(ch);
+    const int J = tbc.J;
+    const int nkets = static_cast<int>(tbc.GetNumberKets());
+    for (int ibra=0; ibra<nkets; ++ibra)
+    {
+      Ket& bra = tbc.GetKet(ibra);
+      const int a = bra.p;
+      const int b = bra.q;
+      for (int iket=ibra; iket<nkets; ++iket)
+      {
+        Ket& ket = tbc.GetKet(iket);
+        const int c = ket.p;
+        const int d = ket.q;
+        const float tbme = static_cast<float>(Hvac.TwoBody.GetTBME_norm(ch,a,b,c,d));
+        write_value(a);
+        write_value(b);
+        write_value(c);
+        write_value(d);
+        write_value(J);
+        write_value(tbme);
+
+        Orbit& oa = modelspace->GetOrbit(a);
+        Orbit& ob = modelspace->GetOrbit(b);
+        Orbit& oc = modelspace->GetOrbit(c);
+        Orbit& od = modelspace->GetOrbit(d);
+        const int fab = 2*oa.n + oa.l + 2*ob.n + ob.l;
+        const int fcd = 2*oc.n + oc.l + 2*od.n + od.l;
+        if (std::abs(fab-fcd) == 0 or std::abs(fab-fcd) == 2)
+        {
+          write_value(zero_hcm);
+        }
+      }
+    }
+  }
+
+  outfile.close();
+  if (not outfile.good())
+  {
+    std::cerr << "Write_no2bpack: failed while writing " << filename << std::endl;
+    goodstate = false;
+    return;
+  }
+
+  std::cout << "Wrote final vacuum-normal-ordered Hamiltonian to " << filename
+            << " in no2bpack format: " << num_orbits << " orbits, "
+            << num_obme << " OBMEs, " << num_tbme << " TBMEs" << std::endl;
+}
+
+
 
 /// Read two-body matrix elements from an Oslo-formatted file
 void ReadWrite::WriteTwoBody_Oslo( std::string filename, Operator& Op)
@@ -6464,7 +6576,6 @@ void ReadWrite::CopyFile(std::string filename1, std::string filename2)
 //    f2 << f1.rdbuf ();
 //  } 
 }
-
 
 
 

@@ -65,6 +65,7 @@ std::map<std::string,std::string> Parameters::string_par = {
   {"valence_generator",		"shell-model-atan"},	// generator used for valence decoupling and 1-step (also single-ref)
   {"flowfile",			"default"},	// name of output flow file
   {"intfile",			"default"},	// name of output interaction fille
+  {"write_H_no2bpack",		"none"},	// write final IMSRG(2) H(s), vacuum normal ordered in the active basis
   {"fmt2",			"me2j"},	// can also be navratil/Navratil, oslo, oakridge, takayuki, nushellx, no2bpack
   {"fmt3",			"me3j"},	// can also be navratil or Navratil to read Petr's TBME format
   {"input_op_fmt",		"navratil"},	// navratil means read Petr Navratil's format for 2b currents. miyagi means Takayuki Miyagi's format.

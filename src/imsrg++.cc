@@ -82,6 +82,7 @@ int main(int argc, char** argv)
   std::string method = parameters.s("method");
   std::string flowfile = parameters.s("flowfile");
   std::string intfile = parameters.s("intfile");
+  std::string write_H_no2bpack = parameters.s("write_H_no2bpack");
   std::string core_generator = parameters.s("core_generator");
   std::string valence_generator = parameters.s("valence_generator");
   std::string fmt2 = parameters.s("fmt2");
@@ -1204,6 +1205,34 @@ int main(int argc, char** argv)
       std::cout << "selected imsrg3_at_end, but method != magnus, so I don't know what to do. Ignoring." << std::endl;
     }
 
+  }
+
+  // Diagnostic export for IM-FCIQMC.  Keep the active HF single-particle basis,
+  // but undo normal ordering with respect to the reference determinant so the
+  // resulting 0B/1B/2B operator can be consumed as an ordinary Hamiltonian.
+  // This must happen before any targeted/ensemble re-normal-ordering below.
+  if (write_H_no2bpack != "none")
+  {
+    if (basis != "HF")
+    {
+      std::cerr << "write_H_no2bpack requires basis=HF; got basis=" << basis << std::endl;
+      return EXIT_FAILURE;
+    }
+    if (IMSRG3 or imsrg3_at_end or imsrgsolver.GetH_s().GetParticleRank() > 2)
+    {
+      std::cerr << "write_H_no2bpack currently supports IMSRG(2) only." << std::endl;
+      return EXIT_FAILURE;
+    }
+
+    const double imsrg_energy = imsrgsolver.GetH_s().ZeroBody;
+    Operator Hvac = imsrgsolver.GetH_s().UndoNormalOrdering();
+    const double reference_energy = Hvac.DoNormalOrdering().ZeroBody;
+    std::cout << std::setprecision(12)
+              << "IM-FCIQMC export check: H(s).ZeroBody = " << imsrg_energy
+              << "  reference diagonal after UndoNormalOrdering = " << reference_energy
+              << "  difference = " << reference_energy-imsrg_energy << std::endl;
+    rw.Write_no2bpack(write_H_no2bpack, Hvac);
+    if (not rw.goodstate) return EXIT_FAILURE;
   }
 
 
