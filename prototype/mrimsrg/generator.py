@@ -251,6 +251,28 @@ def decoupling_residual(
     )
 
 
+def white_ncsm_numerator_residual(
+    hamiltonian: MRHamiltonian,
+    densities: Densities,
+    *,
+    natural_tolerance: float = 1e-10,
+) -> MRHamiltonian:
+    """Return the unmasked anti-Hermitian White-NCSM numerator.
+
+    This is recorded separately from the strict, lambda2-dependent
+    decoupling residual. It is a diagnostic of the truncated generator and
+    is never used as the physical convergence criterion.
+    """
+    d1, d2 = white_ncsm_matrix_elements(
+        hamiltonian, densities, natural_tolerance=natural_tolerance
+    )
+    return MRHamiltonian(
+        0.0,
+        d1 - d1.T,
+        d2 - d2.transpose(2, 3, 0, 1),
+    )
+
+
 def white_generator(
     hamiltonian: MRHamiltonian,
     densities: Densities,

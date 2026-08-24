@@ -77,6 +77,32 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(result.function_evaluations, 0)
         np.testing.assert_array_equal(result.hamiltonian.one_body, initial.one_body)
 
+    def test_truncated_generator_numerator_cannot_fake_strict_convergence(self) -> None:
+        densities = compute_densities(
+            occupations((0, 1), (2, 3), norb=4),
+            np.array([np.sqrt(0.4), np.sqrt(0.6)]),
+        )
+        # A diagonal 1B Hamiltonian has a zero lambda-free White-NCSM
+        # numerator, while its f-lambda2 terms give a nonzero strict D2.
+        initial = MRHamiltonian(
+            0.0,
+            np.diag([0.0, 1.0, 3.0, 7.0]),
+            np.zeros((4,) * 4),
+        )
+        result = integrate_flow(
+            initial,
+            densities,
+            np.arange(4),
+            FlowSettings(smax=1.0, max_step=1.0),
+        )
+        self.assertFalse(result.converged)
+        self.assertAlmostEqual(result.trajectory[-1].residual_ratio, 1.0)
+        self.assertEqual(
+            result.trajectory[-1].generator_numerator_residual_ratio, 0.0
+        )
+        np.testing.assert_array_equal(result.hamiltonian.one_body, initial.one_body)
+        np.testing.assert_array_equal(result.hamiltonian.two_body, initial.two_body)
+
     def test_nondiagonal_gamma_is_evaluated_naturally_but_masked_in_ho_basis(self) -> None:
         determinants = occupations((0,), (1,), norb=2)
         densities = compute_densities(

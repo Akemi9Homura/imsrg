@@ -77,6 +77,11 @@ real He4 diagnostic, the masked residual fell to `4.79e-3` of its initial value
 by `s=0.35`, while all reconstructed tensor symmetry errors remained exactly
 zero.
 
+Every trajectory point stores both `residual_ratio`, the strict
+lambda2-dependent acceptance diagnostic, and
+`generator_numerator_residual_ratio`, the lambda-free quantity actually used
+in the White-NCSM numerator. Only the former can mark a run converged.
+
 Run and materialize one calculation with:
 
 ```bash

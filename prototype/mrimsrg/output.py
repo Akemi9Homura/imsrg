@@ -174,6 +174,11 @@ def save_flow_output(
             "one_body": "2*n(p)+l(p) != 2*n(q)+l(q)",
             "two_body": "e(p)+e(q) != e(r)+e(s)",
         },
+        "acceptance_residual": {
+            "formula": "masked strict D-D^dagger from Mongelli Eqs. (5.216)-(5.217)",
+            "lambda2_terms": "linear terms retained",
+            "generator_numerator_recorded_separately": True,
+        },
         "ode_method": "DOP853 direct flow",
         "flow_settings": asdict(settings),
         "flow_converged": result.converged,

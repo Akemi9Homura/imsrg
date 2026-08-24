@@ -17,6 +17,7 @@ from generator import (
     oscillator_quanta_from_orbits,
     white_generator,
     white_ncsm_matrix_elements,
+    white_ncsm_numerator_residual,
 )
 from normal_order import MRHamiltonian
 
@@ -167,6 +168,13 @@ class GeneratorTests(unittest.TestCase):
         changed1, changed2 = white_ncsm_matrix_elements(hamiltonian, altered)
         np.testing.assert_array_equal(changed1, d1)
         np.testing.assert_array_equal(changed2, d2)
+        numerator = white_ncsm_numerator_residual(hamiltonian, densities)
+        np.testing.assert_allclose(numerator.one_body, d1 - d1.T, atol=2e-12)
+        np.testing.assert_allclose(
+            numerator.two_body,
+            d2 - d2.transpose(2, 3, 0, 1),
+            atol=2e-12,
+        )
 
     def test_epstein_nesbet_denominator_reduces_to_imsrg_sr_formula(self) -> None:
         norb = 6

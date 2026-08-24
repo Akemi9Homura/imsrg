@@ -24,9 +24,11 @@ class OutputTests(unittest.TestCase):
         densities = compute_densities(determinants, coefficients)
         vacuum = VacuumHamiltonian(0.3, np.diag([1.0, 2.0]), np.zeros((2,) * 4))
         initial = normal_order(vacuum, densities)
-        point = FlowPoint(0, 0.0, initial.zero_body, 0.0, 0.0, 0.0, 0.0, 0.0)
+        point = FlowPoint(
+            0, 0.0, initial.zero_body, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        )
         middle_point = FlowPoint(
-            1, 0.5, initial.zero_body, 0.0, 0.0, 0.0, 0.0, 0.0
+            1, 0.5, initial.zero_body, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         )
         result = FlowResult(
             initial,
@@ -56,6 +58,10 @@ class OutputTests(unittest.TestCase):
             self.assertEqual(
                 metadata["generator_numerator"]["irreducible_density_terms"],
                 "all omitted",
+            )
+            self.assertEqual(
+                metadata["acceptance_residual"]["lambda2_terms"],
+                "linear terms retained",
             )
             self.assertEqual(
                 metadata["formula_basis"]["decoupling_mask_representation"],

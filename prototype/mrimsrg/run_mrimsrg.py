@@ -25,6 +25,7 @@ def _print_point(point: FlowPoint) -> None:
     print(
         f"step={point.step:3d} s={point.s:.10g} E={point.zero_body:.12f} "
         f"residual={point.residual:.8e} ratio={point.residual_ratio:.8e} "
+        f"generator_ratio={point.generator_numerator_residual_ratio:.8e} "
         f"sym={max(point.one_body_hermiticity_error, point.two_body_hermiticity_error, point.two_body_antisymmetry_error):.2e}",
         flush=True,
     )
@@ -42,7 +43,7 @@ def main() -> int:
     parser.add_argument("--smax", type=float, default=2.0)
     parser.add_argument("--rtol", type=float, default=1e-6)
     parser.add_argument("--atol", type=float, default=1e-8)
-    parser.add_argument("--max-step", type=float, default=0.05)
+    parser.add_argument("--max-step", type=float, default=10.0)
     parser.add_argument("--residual-ratio", type=float, default=1e-6)
     parser.add_argument(
         "--checkpoint-s",

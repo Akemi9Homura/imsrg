@@ -26,6 +26,7 @@ try:
         decoupling_residual,
         masked_residual_norm,
         white_generator_unmasked,
+        white_ncsm_numerator_residual,
     )
     from .normal_order import MRHamiltonian
 except ImportError:
@@ -37,6 +38,7 @@ except ImportError:
         decoupling_residual,
         masked_residual_norm,
         white_generator_unmasked,
+        white_ncsm_numerator_residual,
     )
     from normal_order import MRHamiltonian
 
@@ -63,6 +65,8 @@ class FlowPoint:
     zero_body: float
     residual: float
     residual_ratio: float
+    generator_numerator_residual: float
+    generator_numerator_residual_ratio: float
     one_body_hermiticity_error: float
     two_body_hermiticity_error: float
     two_body_antisymmetry_error: float
@@ -157,15 +161,24 @@ def _flow_point(
     hamiltonian: MRHamiltonian,
     residual: float,
     initial_residual: float,
+    generator_residual: float,
+    initial_generator_residual: float,
 ) -> FlowPoint:
     one_error, two_error, antisymmetry_error = _symmetry_errors(hamiltonian)
     ratio = residual / initial_residual if initial_residual > 0.0 else 0.0
+    generator_ratio = (
+        generator_residual / initial_generator_residual
+        if initial_generator_residual > 0.0
+        else 0.0
+    )
     return FlowPoint(
         step=step,
         s=float(s),
         zero_body=float(hamiltonian.zero_body),
         residual=float(residual),
         residual_ratio=float(ratio),
+        generator_numerator_residual=float(generator_residual),
+        generator_numerator_residual_ratio=float(generator_ratio),
         one_body_hermiticity_error=one_error,
         two_body_hermiticity_error=two_error,
         two_body_antisymmetry_error=antisymmetry_error,
@@ -229,8 +242,21 @@ def integrate_flow(
         decoupling_residual(working_initial, working_densities)
     )
     initial_residual = masked_residual_norm(initial_residual_operator)
+    initial_generator_residual = masked_residual_norm(
+        apply_ho_mask(
+            white_ncsm_numerator_residual(working_initial, working_densities)
+        )
+    )
     trajectory = [
-        _flow_point(0, 0.0, working_initial, initial_residual, initial_residual)
+        _flow_point(
+            0,
+            0.0,
+            working_initial,
+            initial_residual,
+            initial_residual,
+            initial_generator_residual,
+            initial_generator_residual,
+        )
     ]
     if observer is not None:
         observer(trajectory[0])
@@ -296,6 +322,13 @@ def integrate_flow(
                 decoupling_residual(checkpoint_hamiltonian, working_densities)
             )
             checkpoint_residual = masked_residual_norm(checkpoint_residual_operator)
+            checkpoint_generator_residual = masked_residual_norm(
+                apply_ho_mask(
+                    white_ncsm_numerator_residual(
+                        checkpoint_hamiltonian, working_densities
+                    )
+                )
+            )
             checkpoints.append(
                 FlowCheckpoint(
                     point=_flow_point(
@@ -304,6 +337,8 @@ def integrate_flow(
                         checkpoint_hamiltonian,
                         checkpoint_residual,
                         initial_residual,
+                        checkpoint_generator_residual,
+                        initial_generator_residual,
                     ),
                     hamiltonian=checkpoint_hamiltonian,
                 )
@@ -313,7 +348,20 @@ def integrate_flow(
             decoupling_residual(hamiltonian, working_densities)
         )
         residual = masked_residual_norm(residual_operator)
-        point = _flow_point(step, solver.t, hamiltonian, residual, initial_residual)
+        generator_residual = masked_residual_norm(
+            apply_ho_mask(
+                white_ncsm_numerator_residual(hamiltonian, working_densities)
+            )
+        )
+        point = _flow_point(
+            step,
+            solver.t,
+            hamiltonian,
+            residual,
+            initial_residual,
+            generator_residual,
+            initial_generator_residual,
+        )
         trajectory.append(point)
         if observer is not None:
             observer(point)
