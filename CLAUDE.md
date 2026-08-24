@@ -103,7 +103,8 @@ E0 + one-body + two-body
 - 新的项目设计文档放在 `docs/`；上游 Doxygen 文件留在 `doc/`。
 - `refs/` 是本地文献库，已被 `.gitignore` 排除，不要提交 PDF、提取文本或 QCombo 克隆。
 - 构建前执行 `source ./sourceme.sh`。
-- 不要为这个快速原型修改 `gen_job.py`、生产 Slurm 约定或现有 SR/VS-IMSRG 行为，除非任务明确要求。
+- 不要为这个快速原型修改现有 `imsrg++` 生产 `gen_job.py`、Slurm 约定或 SR/VS-IMSRG 行为，除非任务明确要求。`gen_job.py` 的后续规则均适用于这条现有 `imsrg++` 路径。
+- 快速 Python MR-IMSRG 原型的集群作业必须由专用的 `prototype/mrimsrg/gen_flow_job.py` 单参数生成器产生；同样禁止手写 Slurm 或 `sbatch --wrap`。生成后必须按本文的 point7 规则检查完整脚本并通过 `sbatch --test-only` 再提交。
 - 不要提交生成的 Hamiltonian、波函数、RDM、大日志或结果目录；提交小型测试 fixture 时必须说明来源与校验和。
 - 工作区可能已有用户修改。只提交当前任务明确生成或修改的文件，不顺手清理、移动或覆盖其他改动。
 
