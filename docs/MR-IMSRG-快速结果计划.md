@@ -222,7 +222,7 @@ prototype/mrimsrg/
 
 ### M6：闭壳相关参考态补充
 
-只对 `He4/O16` 改用 `Nrefmax=2`，重复 M1–M5。若 `gamma1` 在 HO 基非对角，优先支持一般一体密度；不要为了这一补充先开发完整自然轨道生产链。
+只对 `He4/O16` 改用 `Nrefmax=2`，重复 M1–M5。若 `gamma1` 在 HO 基非对角，支持一般一体密度，并只在流方程内部按 M4 做临时自然基协变求值；不要为了这一补充先开发自然轨道 NCSM 变分优化或独立生产链。
 
 退出条件：
 
@@ -251,7 +251,7 @@ prototype/mrimsrg/
 - 完整 `lambda3` 或 3-RDM 接口；
 - 显式 3N 和 MR-NO2B；
 - Magnus 与观测算符一致演化；
-- natural-orbital 生产工作流；
+- natural-orbital NCSM 变分优化或独立生产工作流（不包括 M4 必需的内部临时自然基求值）；
 - 奇核或 `Jref != 0`；
 - MPI/OpenMP 优化和大型参数扫描；
 - 修改生产 `gen_job.py` 或提交集群大作业；
