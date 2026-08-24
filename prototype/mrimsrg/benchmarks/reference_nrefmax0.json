@@ -6,6 +6,17 @@
   "emax": 2,
   "e2max": 4,
   "beta_cm": 0,
+  "orbit_table": {
+    "columns": ["jindex", "n", "l", "2j", "2m", "2tz"],
+    "number_of_m_scheme_orbits": 40,
+    "orbits_npy_sha256": "7f0ab07b12fa5ede3eb5b5b4a5d2098e7205dba2ac7ad81569dbe0269f1c326a",
+    "little_endian_int64_c_order_sha256": "4a67d3771a6978fcc98c888c5c4920d1a98623f089a51715f0597a0020d07d91",
+    "shared_by_all_four_A_dependent_inputs": true
+  },
+  "command_templates": {
+    "prepare_reference": "prototype/mrimsrg/build/mrimsrg_prepare --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack --output <reference-dir> --Z <Z> --N <N> --nrefmax <Nrefmax>",
+    "materialized_readback": "prototype/mrimsrg/build/mrimsrg_validate --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack --flow-output <flow-point-dir> --Z <Z> --N <N> --nmax <Nmax> --states 3"
+  },
   "shell_model_obs_revision": "1687f16250b8089b1b9c6fa4100a96a39c485b85",
   "references": {
     "He4": {
