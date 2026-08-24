@@ -31,6 +31,7 @@ _POINT7_PYTHON = Path("/opt/library/miniconda-3.12.9/bin/python3")
 class JobSettings:
     nucleus: str
     interaction: Path = _POINT7_INTERACTION
+    label: str | None = None
     partition: str = "c128m512"
     nodelist: str | None = None
     smax: float = 2.0
@@ -52,6 +53,8 @@ def _validate(settings: JobSettings) -> None:
         raise ValueError(f"unsupported point7 partition: {settings.partition}")
     if settings.nodelist is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", settings.nodelist):
         raise ValueError("nodelist contains unsupported characters")
+    if settings.label is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", settings.label):
+        raise ValueError("label contains unsupported characters")
     if not 0.0 < settings.checkpoint_s < settings.smax:
         raise ValueError("checkpoint_s must lie strictly between zero and smax")
     if settings.rtol <= 0.0 or settings.atol <= 0.0 or settings.max_step <= 0.0:
@@ -77,6 +80,8 @@ def generate_job(
         f"{settings.nucleus}_Nrefmax0_rtol{_number_tag(settings.rtol)}"
         f"_atol{_number_tag(settings.atol)}"
     )
+    if settings.label:
+        tag += f"_{settings.label}"
     case_root = result_root / tag
     output = case_root / "flow"
     if output.exists():
@@ -127,6 +132,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--nucleus", required=True, choices=tuple(_REFERENCE_NAMES))
     parser.add_argument("--interaction", type=Path, default=_POINT7_INTERACTION)
+    parser.add_argument(
+        "--label",
+        help="optional single-run output label, for example smax5",
+    )
     parser.add_argument("--partition", choices=_PARTITIONS, default="c128m512")
     parser.add_argument("--nodelist")
     parser.add_argument("--smax", type=float, default=2.0)
@@ -154,6 +163,7 @@ def main() -> int:
     settings = JobSettings(
         nucleus=args.nucleus,
         interaction=args.interaction,
+        label=args.label,
         partition=args.partition,
         nodelist=args.nodelist,
         smax=args.smax,

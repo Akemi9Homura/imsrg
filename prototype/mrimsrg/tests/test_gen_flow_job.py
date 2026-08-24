@@ -27,9 +27,13 @@ class FlowJobTests(unittest.TestCase):
                 root,
                 root / "result",
                 JobSettings(
-                    nucleus="He4", interaction=interaction, nodelist="node2"
+                    nucleus="He4",
+                    interaction=interaction,
+                    label="smax5",
+                    nodelist="node2",
                 ),
             )
+            self.assertIn("smax5", script.name)
             contents = script.read_text(encoding="utf-8")
             self.assertIn("#SBATCH --partition=c128m512", contents)
             self.assertIn("#SBATCH --qos=low", contents)

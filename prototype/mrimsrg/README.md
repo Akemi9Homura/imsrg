@@ -115,6 +115,9 @@ documented point7 paths, one node/task, 64 cores, QOS/log conventions, sources
 `sourceme.sh`, and prints the complete generated script before an optional
 submission.  Reinvoke it for one different nucleus or tolerance at a time;
 there is no scan or batch-generation mode.
+Use an explicit single-run label such as `--label smax5` when preserving a
+short diagnostic and generating a longer flow with otherwise identical
+tolerances; an existing materialized output is still never overwritten.
 
 Reference metadata records the original development-machine interaction path.
 When the exact fixed file is relocated, pass `--interaction <path>`; the runner
