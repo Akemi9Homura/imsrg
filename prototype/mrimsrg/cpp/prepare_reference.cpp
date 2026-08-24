@@ -1,6 +1,7 @@
 #include "Hamiltonian.hpp"
 #include "fci.hpp"
 #include "fci_util.hpp"
+#include "fixed_interaction.hpp"
 #include "util.hpp"
 
 #include <algorithm>
@@ -169,6 +170,7 @@ int main(int argc, char **argv)
         nucleus::log_init(nucleus::LogLevel::Info);
         const Options options = parse_options(argc, argv);
         const int A = options.Z + options.N;
+        const std::string interaction_sha256 = mrimsrg::require_fixed_interaction(options.interaction);
 
         Hamiltonian hamiltonian;
         hamiltonian.read_minipack(options.interaction.string(), A, 0.0);
@@ -240,7 +242,7 @@ int main(int argc, char **argv)
                  << "{\n"
                  << "  \"schema\": \"mrimsrg_reference_v1\",\n"
                  << "  \"interaction\": \"" << json_escape(fs::absolute(options.interaction).string()) << "\",\n"
-                 << "  \"interaction_sha256\": \"76b7243ef53d30955c0293d29da73688dc3839942143ccf147739108bb58ff84\",\n"
+                 << "  \"interaction_sha256\": \"" << interaction_sha256 << "\",\n"
                  << "  \"shell_model_obs_root\": \"" << json_escape(SHELL_MODEL_OBS_ROOT) << "\",\n"
                  << "  \"shell_model_obs_revision\": \"" << SHELL_MODEL_OBS_REVISION << "\",\n"
                  << "  \"one_body_convention\": \"t[p,q] a^dagger_p a_q\",\n"

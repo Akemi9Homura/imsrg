@@ -25,6 +25,9 @@ python3 prototype/mrimsrg/densities.py prototype/mrimsrg/data/He4_Nrefmax0
 
 Generated Hamiltonians, wavefunctions and densities belong under `data/` and
 are ignored by Git.  The bridge refuses to overwrite an existing bundle.
+Both C++ entry points compute the fixed interaction's SHA-256 with the standard
+`sha256sum` utility before reading it; the Python runner independently repeats
+the content check, including when the file has been relocated.
 
 Run the dependency-free unit tests with:
 

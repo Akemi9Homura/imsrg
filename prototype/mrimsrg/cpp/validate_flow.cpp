@@ -1,6 +1,7 @@
 #include "Hamiltonian.hpp"
 #include "fci.hpp"
 #include "fci_util.hpp"
+#include "fixed_interaction.hpp"
 #include "util.hpp"
 
 #include <array>
@@ -88,6 +89,7 @@ int main(int argc, char **argv)
         nucleus::log_init(nucleus::LogLevel::Info);
         const Options options = parse_options(argc, argv);
         const int A = options.Z + options.N;
+        mrimsrg::require_fixed_interaction(options.interaction);
         Hamiltonian hamiltonian;
         hamiltonian.read_minipack(options.interaction.string(), A, 0.0);
         hamiltonian.init_mscheme();
