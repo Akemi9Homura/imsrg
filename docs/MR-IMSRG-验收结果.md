@@ -10,6 +10,8 @@ Hamiltonian、RDM 和日志均保留在被 Git 忽略的本机/集群结果目�
   `e2max=4`，仅 NN，无 Coulomb/显式 3N。
 - 文件 SHA-256：
   `76b7243ef53d30955c0293d29da73688dc3839942143ccf147739108bb58ff84`。
+- `mrimsrg_prepare`、`mrimsrg_validate` 和 Python runner 均会独立计算
+  该摘要并拒绝其他文件；不只信任路径或 metadata 中的文字。
 - MR-IMSRG(2) 对易子保留线性 `lambda2`，设 `lambda3=0`；直接积分
   `dH/ds=[eta,H]_(0,1,2B)`。
 - 生成元是 Vobig Sec. 6.5.4 定义的 `White-NCSM`：分子舍去所有
