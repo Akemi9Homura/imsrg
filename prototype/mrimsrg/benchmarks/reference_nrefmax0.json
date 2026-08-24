@@ -1,0 +1,51 @@
+{
+  "schema": "mrimsrg_reference_benchmark_v1",
+  "interaction": "N2LO_opt",
+  "interaction_sha256": "76b7243ef53d30955c0293d29da73688dc3839942143ccf147739108bb58ff84",
+  "hw": 20,
+  "emax": 2,
+  "e2max": 4,
+  "beta_cm": 0,
+  "shell_model_obs_revision": "1687f16250b8089b1b9c6fa4100a96a39c485b85",
+  "references": {
+    "He4": {
+      "Z": 2,
+      "N": 2,
+      "Nrefmax": 0,
+      "dimension_M0_positive": 1,
+      "energy_MeV": -13.76123332977296,
+      "max_abs_lambda2": 0.0
+    },
+    "Be8": {
+      "Z": 4,
+      "N": 4,
+      "Nrefmax": 0,
+      "dimension_M0_positive": 51,
+      "energy_MeV": -7.428654854539833,
+      "max_abs_lambda2": 0.2152291032155
+    },
+    "C12": {
+      "Z": 6,
+      "N": 6,
+      "Nrefmax": 0,
+      "dimension_M0_positive": 51,
+      "energy_MeV": -22.887767139596914,
+      "max_abs_lambda2": 0.2192112174672
+    },
+    "O16": {
+      "Z": 8,
+      "N": 8,
+      "Nrefmax": 0,
+      "dimension_M0_positive": 1,
+      "energy_MeV": -46.460225239396095,
+      "max_abs_lambda2": 0.0
+    }
+  },
+  "he4_full_emax2_check": {
+    "Nrefmax": 8,
+    "dimension_M0_positive": 3060,
+    "energy_MeV": -20.33883250425531,
+    "accepted_energy_MeV": -20.33883250,
+    "density_contraction_energy_MeV": -20.33883250425531
+  }
+}
