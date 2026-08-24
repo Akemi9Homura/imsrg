@@ -106,3 +106,193 @@ E0 + one-body + two-body
 - 不要为这个快速原型修改 `gen_job.py`、生产 Slurm 约定或现有 SR/VS-IMSRG 行为，除非任务明确要求。
 - 不要提交生成的 Hamiltonian、波函数、RDM、大日志或结果目录；提交小型测试 fixture 时必须说明来源与校验和。
 - 工作区可能已有用户修改。只提交当前任务明确生成或修改的文件，不顺手清理、移动或覆盖其他改动。
+
+## `fmt2=no2bpack` 输入约定
+
+本仓库能够读取 `normal-order` 程序产生的 packed binary NO2B interaction：
+
+```bash
+fmt2=no2bpack 2bme=<normal-order-output.bin> 3bme=none
+```
+
+reader 是 `ReadWrite::Read_no2bpack()`，其二进制布局与 `normal-order` 的
+`Write_minipack()` 完全对应，依次包含：
+
+- oscillator frequency 和 `emax`；
+- `(n,l,2j,2tz)` 轨道表；
+- zero-body term；
+- upper-triangular one-body matrix elements；
+- packed J-coupled two-body matrix elements；
+- 可选的 center-of-mass TBME payload（reader 消费但忽略）。
+
+reader 通过 `(n,l,2j,2tz)` 把文件轨道映射到当前 `ModelSpace`，不能依赖两个程序的原始轨道编号相同。因为这种文件已经包含 `normal-order` 产生的正规序 Hamiltonian，主 IMSRG driver 对 `fmt2=no2bpack` 不得再次加入 `Trel_Op`。
+
+不得混淆以下两条路径：
+
+- `fmt2=no2bpack`：`2bme` 是 `normal-order` 产生的 packed binary normal-ordered Hamiltonian，必须使用 `3bme=none`。
+- `3bme_type=no2b`：读取普通二体相互作用（例如 `fmt2=me2j`），并通过 `3bme=<...me3j.gz>` 读取单独的三体 NO2B 文件。
+
+质量修正和其他 bare-Hamiltonian 附加项属于普通 `fmt2=me2j` + `3bme_type=no2b` 路径。直接 `me2j` 计算为和 `normal-order` 产生的 packed 文件保持一致，通常应设置：
+
+```python
+params["nucleon_mass_correction"] = "true"
+```
+
+`fmt2=no2bpack` 的文件中这些效应应已在生成阶段加入；driver 对该格式忽略 `nucleon_mass_correction=true`，不得重复修正。
+
+## `gen_job.py` 输入解析与命名
+
+结果路径命名必须独立于输入文件格式。顶层目录使用物理 interaction 名称：
+
+```text
+result/<interaction>/<valence>_<reference>_hw<hw>_emax<emax>_e3max<e3max>/
+```
+
+不得仅因文件格式而把 `no2bpack`、`no2b` 或参考核名称拼入 interaction flag，除非它本来就是物理相互作用名称的一部分。
+
+对 `fmt2=me2j` 保留原有文件名解析：
+
+```python
+_RE_E2MAX = re.compile(r'_emax(\d+)_e2max(\d+)\.')
+emax_nn, e2max_nn = extract_emax_e2max(params["2bme"])
+params["file2e1max"] = emax_nn
+params["file2e2max"] = e2max_nn
+```
+
+单独的 3BME 文件保留原有解析：
+
+```python
+_RE_E3MAX = re.compile(r'_emax(\d+)_e2max(\d+)_e3max(\d+)\.')
+emax_3n, e2max_3n, e3max_3n = extract_emax_e2max_e3max(params["3bme"])
+params["file3e1max"] = emax_3n
+params["file3e2max"] = e2max_3n
+params["file3e3max"] = e3max_3n
+```
+
+`fmt2=no2bpack` 必须使用独立 parser。packed 文件名包含 `hw`、`emax`，通常还包含 `e3max`，但不包含 `e2max`：
+
+```python
+_RE_NO2BPACK = re.compile(r'_hw(\d+)_emax(\d+)_e3max(\d+)\.')
+hw, emax_nn, e3max_nn = extract_no2bpack_hw_emax_e3max(params["2bme"])
+params["hw"] = hw
+```
+
+解析出的 `hw/emax/e3max` 仅用于脚本命名和一致性检查。不得对 no2bpack 文件调用普通 me2j 的 `_emax..._e2max...` parser，也不得为该格式虚构 `file2e1max/file2e2max`。对 `fmt2=no2bpack` 必须设置 `params["3bme"] = "none"`，生成的命令中不得添加 `file2e1max`、`file2e2max`、`file3e1max`、`file3e2max` 或 `file3e3max`。
+
+## Model-space 选择
+
+在 `gen_job.py` 中，`params["valence_space"]` 是结果路径和输出 prefix 使用的短名称。`p-shell`、`sd-shell` 等内置 IMSRG 名称也可直接交给 `imsrg++` 解析。
+
+非内置或裁剪空间必须用 `params["custom_valence_space"]` 写出真正的物理定义：
+
+```python
+params["valence_space"] = "<short-name-for-output>"
+params["custom_valence_space"] = "<core>,<orbit>,<orbit>,..."
+```
+
+例如以 `He4` 为 core，包含质子和中子的 `p`、`d5/2`、`s1/2` 轨道：
+
+```python
+params["valence_space"] = "pd5s1-shell"
+params["custom_valence_space"] = "He4,p0p3,n0p3,p0p1,n0p1,p0d5,n0d5,p1s1,n1s1"
+```
+
+设置 `custom_valence_space` 后，它才是 `imsrg++` 使用的实际 `ModelSpace`，原 `valence_space` 仅是名称。生成或提交生产作业之前，必须用物理知识核对短名称和定义是否描述同一空间；若不一致，必须向用户说明疑点并给出建议的名称或轨道表，且必须获得用户明确确认后才能运行或提交。
+
+使用内置空间时，注释而不是删除 custom definition。例如 `fp-shell` 是内置空间（`Ca40` core，质子和中子均含 `f7/2,p3/2,f5/2,p1/2`）：
+
+```python
+params["valence_space"] = "fp-shell"
+# params["custom_valence_space"] = "Ca40,p0f7,n0f7,p1p3,n1p3,p0f5,n0f5,p1p1,n1p1"
+```
+
+## wm2 运行约定
+
+在 wm2 构建或运行前必须执行 `source ./sourceme.sh`。该 checkout 的 executable 和 shared library 在 `build/`，生成的 Slurm 脚本必须使用：
+
+```bash
+/lustre/home/2401110128/imsrg/build/imsrg++
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/lustre/home/2401110128/imsrg/build"
+```
+
+wm2 相互作用文件位于 `/lustre/home/2401110128/Forces`；point7 对应共享目录为 `/tns/public/Forces`。从 point7 检查 force 时用后者；生成 wm2 生产脚本时必须用前者。
+
+wm2 partition 名称必须精确使用：
+
+```bash
+#SBATCH --partition=C064M1024G   # 64 cores, ~1 TB/node
+#SBATCH --partition=C064M0256G   # 64 cores, ~256 GB/node
+```
+
+这里的生产计算使用 `#SBATCH --qos=low`，单节点、单 task、64 cores：
+
+```bash
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=64
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-64}
+```
+
+新日志名除非确实需要 node name，否则不得包含 `%N`，优先采用：
+
+```bash
+#SBATCH -o <result-dir>/log_<prefix>_%j.txt
+```
+
+生产计算必须由 `gen_job.py` 生成 Slurm 脚本；不得手写独立脚本或用临时 `sbatch --wrap`。生成后、提交前必须检查 interaction path、`fmt2/fmt3`、truncations、`reference`、`valence_space`、operators、`BetaCM`、输出名、partition、QOS 和线程数。
+
+`gen_job.py` 必须保持一次只生成一组参数。除非用户明确要求重新设计 batch generator，否则禁止在其中加入 beta、frequency、truncation、reference、model space、interaction 或其他扫描维度的循环/列表/批量生成逻辑。多个参数点必须手动设置一个值、生成/检查/提交，然后再改下一个单值。
+
+## point7 运行约定
+
+point7 checkout 位于 `/tns/mengziyan/imsrg`，executable 和 shared library 位于 `/tns/mengziyan/imsrg/build`；生成脚本的 executable、`cd` 和 `LD_LIBRARY_PATH` 必须使用这些路径。相互作用文件位于 `/tns/public/Forces`。
+
+point7 partitions：
+
+```text
+c128m1024   128 CPU cores, ~1 TB/node（默认，常 busy/alloc）
+c128m512    128 CPU cores, ~512 GB/node
+compute_C    96 CPU cores/node
+compute_A    28 CPU cores/node
+```
+
+在 point7 运行时，`gen_job.py` 模块级 `partition` 设置为对应名称（例如 `c128m512`）。其余 Slurm header 与 wm2 相同：一节点、一 task、`--cpus-per-task` cores、`OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-<cpus>}` 和 `-o <result-dir>/log_<prefix>_%j.txt`。
+
+point7 使用 `accounting_storage/none` 且 `AccountingStorageEnforce=none`，不存在 slurmdbd/QOS object；`--qos=<name>` 会被静默忽略。因此 point7 脚本仍保留 `#SBATCH --qos=low`，它在那里无作用但不会报错，也便于和 wm2 共用设置。
+
+### point7 调度与内存风险
+
+point7 使用 `select/cons_tres`、`CR_CORE`、`OverSubscribe=NO`，CPU core 独占。`c128m512` 是双 AMD EPYC 7763，Slurm 计 128 个物理 core；两个 64-core job 可在同一节点运行且 CPU 不争用。
+
+但是 point7 **完全不跟踪、不限制内存**：`DefMemPerNode=UNLIMITED`、`MaxMemPerNode=UNLIMITED`、`ConstrainRAMSpace=no`。`--mem` 不会保护作业，节点甚至在重负载时仍报告 `AllocMem=0`。必须据峰值 RSS 而不是当前 RSS 规划；IMSRG Magnus 的 `Omega` 会随 flow 累积，`emax=14,e3max=24` 的 fp-shell 运行峰值远超 80 GB。共址作业总 RSS 超过节点约 515 GB 时，Linux OOM killer 会任意杀进程，Slurm 不提供保护。
+
+需要独占节点时，在 `gen_job.py` 使用单值模块级 `nodelist`（例如 `"node2"`）写入 `#SBATCH --nodelist=<node>`；设为 `None`/`""` 则由 Slurm 选择。`nodelist` 不能改成扫描列表。多个作业必须逐个改一个 node、生成、检查、提交。共址前也可用 `scontrol show node <node> | grep FreeMem` 检查，但要记住该值不等于 Slurm 的内存约束。
+
+### machine-aware 环境
+
+`sourceme.sh` 必须根据机器分支，并在每次构建或运行前 source：
+
+- wm2：`cmake/3.31.9`、`OpenBLAS/0.3.17`、`gsl/2.7.0`、`boost/1.83.0`，并设置 wm2 GSL 所需的 `GSL_ROOT_DIR/CMAKE_PREFIX_PATH`。
+- point7：`cmake/3.25.2`、`openblas/0.3.10-single`、`gsl/2.7.1`、`boost/1.81.0`。
+
+point7 的 `imsrg++` 链接 `libopenblas.so.0`（来自 `openblas/0.3.10-single`）和 `libgsl.so.27`（来自 `gsl/2.7.1`）。若作业立即报 `ERROR: Unable to locate a modulefile for ...`，说明 wm2 module name 泄漏到 point7 分支，`set -e` 会使脚本在启动 `imsrg++` 前退出。source 后用 `ldd build/imsrg++ | grep "not found"` 检查运行库。
+
+默认不得加载 `miniconda`：pyIMSRG 针对 system Python 构建，加载 miniconda 会改变 `python3` 并破坏已有 module import。
+
+### 生成、提交和检查
+
+```bash
+python gen_job.py --generate-only   # 生成脚本并打印路径；提交前检查
+python gen_job.py --submit          # 生成并通过 sbatch 提交
+python gen_job.py --smoke-test      # 运行 imsrg++ help，轻量检查构建/运行环境
+python gen_job.py                   # 生成后询问 submit job: y/n；n 表示本地 bash 运行
+```
+
+提交前检查 interaction paths、`fmt2/fmt3`、truncations、`reference`、`valence_space`、operators、`BetaCM`、`denominator_delta`、输出名、partition、QOS 和 thread count。提交后必须检查 `squeue -u $USER` 以及结果目录中的 `log_<prefix>_<jobid>.txt`，确认已越过 module loading 并开始读取 interaction。
+
+对单一 major shell 且没有 cross-shell coupling 的 valence-space target，可以关闭 intruder suppression 和 CM terms：
+
+```python
+params["BetaCM"] = 0.0
+params["denominator_delta"] = 0.0
+```
