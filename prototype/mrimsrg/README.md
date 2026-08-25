@@ -85,6 +85,10 @@ its fixed target ``s`` without an early residual stop. The checker evaluates
 the correlated generator and RHS in the temporary NAT basis and transforms
 them back to HO for comparison; attempting to evaluate them directly with a
 non-diagonal HO-basis ``gamma1`` remains an error.
+On point7 this validator must be submitted through the same single-point job
+generator, using ``gen_flow_job.py --mr-check-flow FLOW --pyimsrg-dir
+build/src``; the generated job deliberately uses system Python matching the
+current ``pyIMSRG`` build rather than loading miniconda.
 
 `commutator.py` implements the natural-orbital MR-IMSRG(2) commutator with
 `lambda3=0`.  Its equations were regenerated independently with QCombo 0.2.0:

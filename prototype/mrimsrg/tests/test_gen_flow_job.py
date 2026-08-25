@@ -7,13 +7,50 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from gen_flow_job import (
     JobSettings,
+    MRCheckSettings,
     SRCheckSettings,
     generate_job,
+    generate_mr_check_job,
     generate_sr_check_job,
 )
 
 
 class FlowJobTests(unittest.TestCase):
+    def test_generates_one_correlated_full_flow_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            reference = root / "prototype/mrimsrg/data/He4_Nrefmax2"
+            reference.mkdir(parents=True)
+            (reference / "metadata.json").write_text("{}\n", encoding="utf-8")
+            interaction = root / "interaction.minipack"
+            interaction.write_bytes(b"test")
+            flow = root / "flow"
+            flow.mkdir()
+            (flow / "metadata.json").write_text("{}\n", encoding="utf-8")
+            pyimsrg = root / "pyimsrg"
+            pyimsrg.mkdir()
+            (pyimsrg / "pyIMSRG.so").write_bytes(b"test")
+            script = generate_mr_check_job(
+                root,
+                root / "result",
+                MRCheckSettings(
+                    nucleus="He4",
+                    nrefmax=2,
+                    interaction=interaction,
+                    production_flow=flow,
+                    pyimsrg_dir=pyimsrg,
+                    ode_tolerance=1e-9,
+                ),
+            )
+            contents = script.read_text(encoding="utf-8")
+            self.assertIn("mr_imsrgpp_flow_check.py", contents)
+            self.assertIn(f"--production-flow {flow}", contents)
+            self.assertIn("--ode-tolerance 1.0000000000000001e-09", contents)
+            self.assertIn("--output-jcoupled64", contents)
+            self.assertIn("/usr/bin/python3 -u", contents)
+            self.assertIn(f"ldd {pyimsrg / 'pyIMSRG.so'}", contents)
+            self.assertNotIn("%N", contents)
+
     def test_generates_one_strict_sr_full_flow_check(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -28,6 +28,7 @@ _POINT7_INTERACTION = Path(
     "TwBME_N2LO_opt_hw20_emax2_e2max4.minipack"
 )
 _POINT7_PYTHON = Path("/opt/library/miniconda-3.12.9/bin/python3")
+_POINT7_SYSTEM_PYTHON = Path("/usr/bin/python3")
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,21 @@ class SRCheckSettings:
     partition: str = "c128m512"
     nodelist: str | None = None
     ode_tolerance: float = 1e-8
+    initial_step: float = 1e-2
+    flow_tolerance: float = 1e-5
+
+
+@dataclass(frozen=True)
+class MRCheckSettings:
+    nucleus: str
+    nrefmax: int
+    production_flow: Path
+    pyimsrg_dir: Path
+    interaction: Path = _POINT7_INTERACTION
+    label: str | None = None
+    partition: str = "c128m512"
+    nodelist: str | None = None
+    ode_tolerance: float = 1e-9
     initial_step: float = 1e-2
     flow_tolerance: float = 1e-5
 
@@ -280,6 +296,91 @@ ldd {settings.pyimsrg_dir.resolve() / 'pyIMSRG.so'} | grep -E 'openblas|blas|lap
     return script
 
 
+def generate_mr_check_job(
+    repo_root: Path, result_root: Path, settings: MRCheckSettings
+) -> Path:
+    """Generate one correlated-reference C++/Python fixed-s comparison job."""
+    common = JobSettings(
+        nucleus=settings.nucleus,
+        nrefmax=settings.nrefmax,
+        interaction=settings.interaction,
+        label=settings.label,
+        partition=settings.partition,
+        nodelist=settings.nodelist,
+    )
+    _validate(common)
+    if not (settings.production_flow / "metadata.json").is_file():
+        raise FileNotFoundError(
+            f"production flow is unavailable: {settings.production_flow}"
+        )
+    if not (settings.pyimsrg_dir / "pyIMSRG.so").is_file():
+        raise FileNotFoundError(f"pyIMSRG module is unavailable: {settings.pyimsrg_dir}")
+    if min(settings.ode_tolerance, settings.initial_step, settings.flow_tolerance) <= 0:
+        raise ValueError("MR check tolerances and initial step must be positive")
+
+    repo_root = repo_root.resolve()
+    result_root = result_root.resolve()
+    reference = (
+        repo_root / "prototype" / "mrimsrg" / "data"
+        / _REFERENCE_NAMES[(settings.nucleus, settings.nrefmax)]
+    )
+    if not (reference / "metadata.json").is_file():
+        raise FileNotFoundError(f"reference bundle is unavailable: {reference}")
+    tag = (
+        f"{settings.nucleus}_Nrefmax{settings.nrefmax}_mrcheck_"
+        f"tol{_number_tag(settings.ode_tolerance)}"
+    )
+    if settings.label:
+        tag += f"_{settings.label}"
+    case_root = result_root / tag
+    if case_root.exists():
+        raise FileExistsError(f"refusing to overwrite an existing check: {case_root}")
+    case_root.mkdir(parents=True)
+    script = case_root / f"job_{tag}.sh"
+    nodelist_line = (
+        f"#SBATCH --nodelist={settings.nodelist}\n" if settings.nodelist else ""
+    )
+    report = case_root / "report.json"
+    output_j64 = case_root / "cpp_vacuum.jcoupled64"
+    command = (
+        f"PYTHONPATH={repo_root / 'prototype' / 'mrimsrg'} "
+        f"{_POINT7_SYSTEM_PYTHON} -u "
+        f"{repo_root / 'prototype' / 'mrimsrg' / 'mr_imsrgpp_flow_check.py'} "
+        f"--nucleus {settings.nucleus} --reference {reference} "
+        f"--interaction {settings.interaction.resolve()} "
+        f"--production-flow {settings.production_flow.resolve()} "
+        f"--pyimsrg-dir {settings.pyimsrg_dir.resolve()} "
+        f"--ode-tolerance {settings.ode_tolerance:.17g} "
+        f"--initial-step {settings.initial_step:.17g} "
+        f"--flow-tolerance {settings.flow_tolerance:.17g} "
+        f"--output-jcoupled64 {output_j64} --json {report}"
+    )
+    contents = f"""#!/bin/bash
+#SBATCH --job-name=mrcheck_{settings.nucleus.lower()}
+#SBATCH --partition={settings.partition}
+#SBATCH --qos=low
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=64
+{nodelist_line}#SBATCH -o {case_root}/log_{tag}_%j.txt
+
+set -eo pipefail
+cd {repo_root}
+source /opt/modules/init/bash
+source ./sourceme.sh
+export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
+export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
+
+echo repository_commit={_repository_commit(repo_root)}
+ldd {settings.pyimsrg_dir.resolve() / 'pyIMSRG.so'} | grep -E 'openblas|blas|lapack|gsl|boost|not found' || true
+{_POINT7_SYSTEM_PYTHON} -c 'import sys, numpy, scipy; print("python", sys.version.split()[0], "numpy", numpy.__version__, "scipy", scipy.__version__, flush=True)'
+{command}
+"""
+    script.write_text(contents, encoding="utf-8")
+    script.chmod(0o755)
+    return script
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -306,6 +407,11 @@ def main() -> int:
         "--sr-check-flow",
         type=Path,
         help="generate a strict C++/production comparison for this flow instead",
+    )
+    parser.add_argument(
+        "--mr-check-flow",
+        type=Path,
+        help="generate a correlated-reference C++/Python fixed-s comparison",
     )
     parser.add_argument("--jcoupled64", type=Path)
     parser.add_argument("--pyimsrg-dir", type=Path)
@@ -343,9 +449,11 @@ def main() -> int:
         residual_ratio=args.residual_ratio,
         resume_from=args.resume_from,
     )
-    if args.sr_check_flow is None:
+    if args.sr_check_flow is not None and args.mr_check_flow is not None:
+        parser.error("--sr-check-flow and --mr-check-flow are mutually exclusive")
+    if args.sr_check_flow is None and args.mr_check_flow is None:
         script = generate_job(repo_root, result_root, settings)
-    else:
+    elif args.sr_check_flow is not None:
         if args.jcoupled64 is None or args.pyimsrg_dir is None:
             parser.error("--sr-check-flow requires --jcoupled64 and --pyimsrg-dir")
         ode_tolerance = (
@@ -365,6 +473,31 @@ def main() -> int:
                 nodelist=args.nodelist,
                 production_flow=args.sr_check_flow,
                 jcoupled64=args.jcoupled64,
+                pyimsrg_dir=args.pyimsrg_dir,
+                ode_tolerance=ode_tolerance,
+                initial_step=args.sr_check_initial_step,
+                flow_tolerance=args.sr_check_flow_tolerance,
+            ),
+        )
+    else:
+        if args.pyimsrg_dir is None:
+            parser.error("--mr-check-flow requires --pyimsrg-dir")
+        ode_tolerance = (
+            args.sr_check_ode_tolerance
+            if args.sr_check_ode_tolerance is not None
+            else args.rtol
+        )
+        script = generate_mr_check_job(
+            repo_root,
+            result_root,
+            MRCheckSettings(
+                nucleus=args.nucleus,
+                nrefmax=args.nrefmax,
+                interaction=args.interaction,
+                label=args.label,
+                partition=args.partition,
+                nodelist=args.nodelist,
+                production_flow=args.mr_check_flow,
                 pyimsrg_dir=args.pyimsrg_dir,
                 ode_tolerance=ode_tolerance,
                 initial_step=args.sr_check_initial_step,
