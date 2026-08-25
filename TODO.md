@@ -192,10 +192,12 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       固定 RK4 一步已完成：56 个 J-orbit、467032 条 TBME；活跃支撑域优化后
       单线程 `6.81 s`、峰值 RSS `280880 KiB`，1/64 线程两体最坏差
       `8.88e-16 MeV`，且未构造 dense m-scheme Hamiltonian。
-- [ ] 对 `cef4fce6` 的活跃支撑域优化重新执行 point7 四核
-      `s=100, rtol=atol=1e-10` 完整流和 NCSM 谱回归；上一轮 jobs
-      `100377/100379/100381/100383` 只验收到了前一版 Pandya 复用实现，
-      不能替代本轮远端回归。
+- [x] 对 `cef4fce6` 的活跃支撑域优化重新执行 point7 四核
+      `s=100, rtol=atol=1e-10` 完整流和 NCSM 谱回归。generator jobs
+      `100385/100387/100389/100391` 全部通过；四核 C++/Python 全流最坏差
+      为 `2.212e-8/3.898e-8/8.871e-10/1.071e-9 MeV`。新旧 J64 的全局
+      max-abs 为 `8.384e-13 MeV`，`Nmax=8/0/0/2` 的 12 条 simpleFCI
+      低能谱全局最坏变化 `1.741e-13 MeV`。
 - [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
       Magnus/重启策略；登录节点禁止重计算，统一由 point7 Slurm 运行。
 

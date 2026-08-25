@@ -248,12 +248,12 @@
       "two_body_max_abs_mev": 8.881784197001252e-16,
       "passed": true
     },
-    "point7_full_flow_jobs": [100377, 100379, 100381, 100383],
-    "point7_full_flow_jobs_validate_through_commit": "2458d48c0365976a3bb11fb8dc12e4f99d0dd7a4",
-    "lambda_active_support_point7_full_flow_pending": true,
-    "point7_maximum_vacuum_h_abs_vs_preoptimization_mev": 7.442935157087049e-13,
-    "maximum_ncsm_spectral_abs_vs_preoptimization_mev": 2.1316282072803006e-13,
+    "point7_full_flow_jobs": [100385, 100387, 100389, 100391],
+    "point7_full_flow_jobs_validate_through_commit": "cef4fce6d94132c20d0dce939297b45041f7645a",
+    "lambda_active_support_point7_full_flow_pending": false,
+    "point7_maximum_vacuum_h_abs_vs_previous_mev": 8.384404281969182e-13,
+    "maximum_ncsm_spectral_abs_vs_previous_mev": 1.7408297026122455e-13,
     "local_regression_passed": true,
-    "passed": false
+    "passed": true
   }
 }

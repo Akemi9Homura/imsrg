@@ -1,5 +1,5 @@
 {
-  "schema": "mrimsrg_jscheme_full_flow_acceptance_v3",
+  "schema": "mrimsrg_jscheme_full_flow_acceptance_v4",
   "flow_commit": "d5cf2877594a856387f1179204ffad090867b54c",
   "validation": {
     "cpp_ode": "boost::odeint runge_kutta_dopri5",
@@ -206,6 +206,58 @@
         "nmax": 2,
         "ncsm_energies_mev": [-63.800524329407473, -55.634822811505082, -55.214536909283659],
         "ncsm_max_abs_vs_preoptimization_mev": 2.1316282072803006e-13
+      }
+    ]
+  },
+  "performance_regression_after_lambda_active_support": {
+    "implementation_commit": "cef4fce6d94132c20d0dce939297b45041f7645a",
+    "point7_checkout_commit": "0c3d7188cc2eada5f001976048383fbe86a403c5",
+    "target_s": 100.0,
+    "ode_tolerance": 1e-10,
+    "maximum_allowed_cpp_python_abs_mev": 1e-5,
+    "maximum_vacuum_h_abs_vs_previous_mev": 8.384404281969182e-13,
+    "maximum_ncsm_spectral_abs_vs_previous_mev": 1.7408297026122455e-13,
+    "passed": true,
+    "cases": [
+      {
+        "nucleus": "He4",
+        "nrefmax": 2,
+        "slurm_cpp_validation_job": 100385,
+        "cpp_python_max_abs_mev": 2.2121837122782384e-08,
+        "vacuum_h_max_abs_vs_previous_mev": {"zero_body": 1.0302869668521453e-13, "one_body": 1.5987211554602254e-13, "two_body": 6.572520305780927e-14},
+        "nmax": 8,
+        "ncsm_energies_mev": [-20.490380467859737, -19.261068706513864, -19.205702863745042],
+        "ncsm_max_abs_vs_previous_mev": 1.7408297026122455e-13
+      },
+      {
+        "nucleus": "Be8",
+        "nrefmax": 0,
+        "slurm_cpp_validation_job": 100387,
+        "cpp_python_max_abs_mev": 3.898388312195202e-08,
+        "vacuum_h_max_abs_vs_previous_mev": {"zero_body": 7.993605777301127e-14, "one_body": 1.3322676295501878e-13, "two_body": 5.3290705182007514e-14},
+        "nmax": 0,
+        "ncsm_energies_mev": [-27.940598864158286, -23.308509007685199, -12.635185398541228],
+        "ncsm_max_abs_vs_previous_mev": 5.3290705182007514e-14
+      },
+      {
+        "nucleus": "C12",
+        "nrefmax": 0,
+        "slurm_cpp_validation_job": 100389,
+        "cpp_python_max_abs_mev": 8.870770784596971e-10,
+        "vacuum_h_max_abs_vs_previous_mev": {"zero_body": 8.384404281969182e-13, "one_body": 1.5276668818842154e-13, "two_body": 4.707345624410664e-14},
+        "nmax": 0,
+        "ncsm_energies_mev": [-43.530789441540229, -38.654833895790588, -27.775535036192689],
+        "ncsm_max_abs_vs_previous_mev": 6.394884621840902e-14
+      },
+      {
+        "nucleus": "O16",
+        "nrefmax": 2,
+        "slurm_cpp_validation_job": 100391,
+        "cpp_python_max_abs_mev": 1.0710934361668478e-09,
+        "vacuum_h_max_abs_vs_previous_mev": {"zero_body": 1.7763568394002505e-15, "one_body": 9.14823772291129e-14, "two_body": 6.838973831690964e-14},
+        "nmax": 2,
+        "ncsm_energies_mev": [-63.800524329407509, -55.634822811505138, -55.214536909283666],
+        "ncsm_max_abs_vs_previous_mev": 5.684341886080802e-14
       }
     ]
   }
