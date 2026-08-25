@@ -266,6 +266,12 @@ C++ 与 Python 各自完成自然变换、MR 正规序、White-NCSM 和总 commu
 `6.51e-11`、`9.98e-13`、`7.06e-11 MeV`。因此当前 J-coupled 公式在真实
 输入上也通过总和门禁；命名项的真实误差表仍单独保留为下一验收边界。
 
+命名项门禁现也已运行：八个公共 `comm...ss` 直接调用现有 C++ routine，
+新增一体项调用 `MR_comm221_lambda2().Total()`，新增零体项独立执行
+`1/4 C2·lambda2`。Python 端使用 `commutator_contributions()` 的十个同名
+项；二体张量经独立 CG 投影后比较 J blocks。四体系全局最坏误差为
+`6.38e-11 MeV`，因此总 RHS 的符合不是不同项之间误差抵消造成的。
+
 随机严格标量张量要求 J/m 转换 `<=1e-12`；真实 RDM 的输入标量投影
 残差单独报告并暂以 `1e-10` 为拒绝阈值。所有能量/RHS contraction 的
 coupled 对 m-scheme 误差仍要求 `<=1e-10 MeV`。

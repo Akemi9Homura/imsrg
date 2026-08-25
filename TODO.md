@@ -91,8 +91,11 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 - [x] 对 `Be8/C12, Nrefmax=0` 与 `He4/O16, Nrefmax=2` 使用同一份
       float64 Hamiltonian/RDM，比较 `E/f/Gamma`、生成元和总 RHS；四体系
       max-abs 上界分别为 `6.51e-11/9.98e-13/7.06e-11 MeV`。
-- [ ] 把上述四个真实点的总 RHS 继续拆为每个命名 SR contraction 与
-      `mr_lambda2_one_body/zero_body`，记录 max-abs/Frobenius/最坏元素。
+- [x] 把上述四个真实点的总 RHS 继续拆为每个命名 SR contraction 与
+      `mr_lambda2_one_body/zero_body`；逐项 J/m 对照的全局 max-abs 为
+      `6.38e-11 MeV`。Frobenius/最坏元素的持久化报告随 checkpoint 表生成。
+- [ ] 为四体系各命名项生成机器可读误差表，补齐相对 Frobenius 与最坏
+      J/m 元素索引；该报告不能只存在于临时测试 stdout。
 - [ ] 比较 `ds=1e-4` Euler 一步与 `s=0.001,0.002,0.003` 共同固定步
       RK4 checkpoints，每点重新比较 `H/eta/RHS`。
 - [ ] 统一生成元/cutoff/停止条件/容差后比较完整流、真空

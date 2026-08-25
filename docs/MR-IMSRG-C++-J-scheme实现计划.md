@@ -215,8 +215,12 @@ denominator/eta/named RHS 的误差表，并扩展到相关 Be8/C12/O16 referenc
 `eta(s=0)`、总 `RHS(s=0)` 的全局 max-abs 上界依次为
 `6.51e-11/9.98e-13/7.06e-11 MeV`，均通过 `1e-10 MeV` 门槛。每个体系的
 主 driver 在 `s=0` 和 `ds=1e-4` RK4 后又分别与直接 C++ 路径逐元素为零。
-尚未勾销的是把这些真实 RHS 进一步拆成每个命名 contraction，以及共同
-`s=0.001,0.002,0.003` checkpoints；不能用当前总 RHS 结果替代这两项。
+这些真实 RHS 随后已进一步拆成八个既有 SR contraction 及
+`mr_lambda2_one_body/zero_body`；各体系最坏 max-abs 为 He4 `3.30e-11`、
+Be8 `1.30e-11`、C12 `2.33e-11`、O16 `6.38e-11 MeV`。对二体命名项先用
+独立 Python CG 投影为 normalized-pair J blocks 再逐 block 比较，生产代码
+仍不展开 m-scheme。尚未勾销的是把 Frobenius/最坏索引持久化到验收报告，
+以及共同 `s=0.001,0.002,0.003` checkpoints。
 
 ## 7. 错误定位原则
 

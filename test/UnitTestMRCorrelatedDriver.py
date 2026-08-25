@@ -21,7 +21,10 @@ from prototype.mrimsrg.basis import (  # noqa: E402
     transform_array,
 )
 from prototype.mrimsrg.densities import compute_densities  # noqa: E402
-from prototype.mrimsrg.commutator import commutator  # noqa: E402
+from prototype.mrimsrg.commutator import (  # noqa: E402
+    commutator,
+    commutator_contributions,
+)
 from prototype.mrimsrg.export_jref import export_reference  # noqa: E402
 from prototype.mrimsrg.generator import (  # noqa: E402
     oscillator_quanta_from_orbits,
@@ -33,7 +36,53 @@ from prototype.mrimsrg.normal_order import (  # noqa: E402
     normal_order,
 )
 from prototype.mrimsrg.reference_io import load_reference  # noqa: E402
+from prototype.mrimsrg.jcoupling import couple_scalar_two_body  # noqa: E402
 from prototype.mrimsrg.sr_imsrgpp_check import operator_to_mscheme  # noqa: E402
+
+
+def coupled_term_errors(operator, expected, data, modelspace):
+    zero_error = abs(float(operator.ZeroBody) - expected.zero_body)
+    one_error = 0.0
+    for p, row_p in enumerate(data.orbits):
+        a, _, lp, jp, mp, tzp = (int(value) for value in row_p)
+        for q, row_q in enumerate(data.orbits):
+            b, _, lq, jq, mq, tzq = (int(value) for value in row_q)
+            actual = 0.0
+            if (lp, jp, mp, tzp) == (lq, jq, mq, tzq):
+                actual = operator.OneBody(a, b)
+            one_error = max(one_error, abs(actual - expected.one_body[p, q]))
+
+    two_error = 0.0
+    expected_blocks = couple_scalar_two_body(expected.two_body, data.orbits)
+    for block in expected_blocks:
+        channel = modelspace.GetTwoBodyChannelIndex(
+            block.J, block.parity, block.Tz
+        )
+        two_body_channel = modelspace.GetTwoBodyChannel(channel)
+        for ibra, (a, b) in enumerate(block.pairs):
+            local_bra = two_body_channel.GetLocalIndex(a, b)
+            for iket, (c, d) in enumerate(block.pairs):
+                local_ket = two_body_channel.GetLocalIndex(c, d)
+                actual = operator.TwoBody.GetTBME_norm_chij(
+                    channel, channel, local_bra, local_ket
+                )
+                two_error = max(
+                    two_error, abs(actual - block.matrix[ibra, iket])
+                )
+    return zero_error, one_error, two_error
+
+
+def one_body_matrix_error(matrix, expected, data):
+    maximum = 0.0
+    for p, row_p in enumerate(data.orbits):
+        a, _, lp, jp, mp, tzp = (int(value) for value in row_p)
+        for q, row_q in enumerate(data.orbits):
+            b, _, lq, jq, mq, tzq = (int(value) for value in row_q)
+            actual = 0.0
+            if (lp, jp, mp, tzp) == (lq, jq, mq, tzq):
+                actual = matrix(a, b)
+            maximum = max(maximum, abs(actual - expected[p, q]))
+    return maximum
 
 
 def main():
@@ -182,6 +231,50 @@ def main():
                 f"one={rhs_errors[1]:.3e} two={rhs_errors[2]:.3e}"
             )
             assert max(rhs_errors) < 1e-10
+
+            expected_terms = commutator_contributions(
+                expected_eta, expected_initial, natural.densities
+            )
+            named_maximum = 0.0
+            for name in (
+                "comm110ss",
+                "comm220ss",
+                "comm111ss",
+                "comm121ss",
+                "comm221ss",
+                "comm122ss",
+                "comm222_pp_hhss",
+                "comm222_phss",
+            ):
+                term = pyIMSRG.Operator(modelspace)
+                term.SetHermitian()
+                getattr(pyIMSRG.Commutator, name)(actual_eta, initial, term)
+                errors = coupled_term_errors(
+                    term, expected_terms[name], data, modelspace
+                )
+                named_maximum = max(named_maximum, *errors)
+
+            mr_one_body = pyIMSRG.MR_comm221_lambda2(
+                actual_eta, initial, reference
+            ).Total()
+            named_maximum = max(
+                named_maximum,
+                one_body_matrix_error(
+                    mr_one_body,
+                    expected_terms["mr_lambda2_one_body"].one_body,
+                    data,
+                ),
+            )
+            sr_rhs = pyIMSRG.Commutator.Commutator(actual_eta, initial)
+            named_maximum = max(
+                named_maximum,
+                abs(
+                    reference.ContractLambda2(sr_rhs.TwoBody)
+                    - expected_terms["mr_lambda2_zero_body"].zero_body
+                ),
+            )
+            print(f"{nucleus} named RHS max={named_maximum:.3e}")
+            assert named_maximum < 1e-10
 
             for label, smax in (("s0", 0.0), ("rk4", 1e-4)):
                 if smax == 0.0:
