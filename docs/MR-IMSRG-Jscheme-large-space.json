@@ -1,5 +1,5 @@
 {
-  "schema": "mrimsrg_jscheme_large_space_acceptance_v6",
+  "schema": "mrimsrg_jscheme_large_space_acceptance_v7",
   "implementation_commit": "6e02676ce00e237efdbf6cb71df9315f7c576143",
   "baseline_profiler_commit": "1f02961a2c8ab9560ece346284ab4dd2d7a25337",
   "shell_model_obs_commit": "4b10afab0218711b0278ef66ad73e88bc7791c34",
@@ -308,6 +308,70 @@
     "dense_mscheme_hamiltonian_constructed": false,
     "full_emax6_flow_claimed": false
   },
+  "direct_flow_restart": {
+    "workflow_commit": "fee05bdf39d1dea355d2b7119ef979aa80cf2722",
+    "nucleus": "He4",
+    "nrefmax": 2,
+    "method": "flow",
+    "generator": "white-ncsm",
+    "continuous_interval": [0.0, 0.02],
+    "split_intervals": [[0.0, 0.01], [0.01, 0.02]],
+    "ds_0": 0.001,
+    "dsmax": 0.01,
+    "ode_tolerance": 1e-10,
+    "eta_criterion": 1e-12,
+    "restart_definition": "materialize vacuum J64 in HO order, then re-enter the same HO-to-NAT, MR normal-ordering and autonomous direct-flow path",
+    "comparison_command": "python3 prototype/mrimsrg/compare_jcoupled64.py <continuous.jcoupled64> <split2.jcoupled64> --absolute-tolerance 1e-10",
+    "emax2": {
+      "input_jcoupled64_sha256": "255bcc0eb27f67daabfa8643cb82d6a634ecf2f04ec83cb765181b4f54089760",
+      "reference_sha256": "1c9934aa92b50cc55122f15434b0093a860d99ae50a745d89848f76f1f608898",
+      "executable_sha256": "bc97059f5730db93fb0c1eadeb9af9ee8acca52d53bf4a753e8c5836c32fd74d",
+      "continuous_output_sha256": "2c86f952ddc6a32bab7f3b7a8f092820cd9601c78ffec32e470936e85f393cc5",
+      "split_output_sha256": "f10e9870f1030c7359f77436e0cb80e802d2ca30a32b60106c3a8b4fb400a539",
+      "continuous_wall_seconds": 0.17,
+      "split_wall_seconds": [0.15, 0.15],
+      "maximum_rss_kib": 14840,
+      "reported_final_status_abs_differences": {
+        "mr_zero_body_mev": 0.0,
+        "h_norm_mev": 0.0,
+        "eta1_norm": 0.0,
+        "eta2_norm": 0.0
+      },
+      "vacuum_jcoupled64_comparison": {
+        "zero_body_max_abs_mev": 3.2862601528904634e-14,
+        "one_body_max_abs_mev": 2.1316282072803006e-14,
+        "two_body_max_abs_mev": 6.150635556423367e-14,
+        "two_body_relative_frobenius": 1.870074219740616e-15,
+        "worst_two_body_record": [0, 1, 2, 3, 1]
+      }
+    },
+    "emax4": {
+      "input_jcoupled64_sha256": "616393b0f3264efc04535568a76ca649fda274298fb3b4bf80a10d947e995e75",
+      "reference_sha256": "331f46dbd8ec2928fbaceda10dff43d6b3f7012e51130d2eb4e388886a96d4b4",
+      "executable_sha256": "e9782ee4a86da04b45be24c11bd46a091a668b8c21f3ffec7778420d88bfb246",
+      "continuous_output_sha256": "26864df93f0fdd06040f175adae7cd0284ae9ae3719a61e2548c58af9bcdf728",
+      "split_output_sha256": "be3958d5f3c0285c57bbc0bf3a67d0d835652220c8d491df73450123aa54ae0d",
+      "continuous_wall_seconds": 1.06,
+      "split_wall_seconds": [0.85, 0.86],
+      "maximum_rss_kib": 89144,
+      "reported_final_status_abs_differences": {
+        "mr_zero_body_mev": 0.0,
+        "h_norm_mev": 0.0,
+        "eta1_norm": 0.0,
+        "eta2_norm": 0.0
+      },
+      "vacuum_jcoupled64_comparison": {
+        "zero_body_max_abs_mev": 2.3092638912203256e-14,
+        "one_body_max_abs_mev": 2.1316282072803006e-14,
+        "two_body_max_abs_mev": 5.917488721252084e-14,
+        "two_body_relative_frobenius": 8.04872432220931e-16,
+        "worst_two_body_record": [0, 1, 2, 3, 1]
+      }
+    },
+    "absolute_tolerance_mev": 1e-10,
+    "passed": true,
+    "interpretation": "J64 is a Hamiltonian-segment restart, not a serialized adaptive-stepper state; the observed difference is only the vacuum/MR normal-ordering and ODE roundoff level"
+  },
   "capacity_claim": {
     "largest_actually_run_emax": 6,
     "largest_analytically_sized_emax": 14,
@@ -316,7 +380,7 @@
     "full_emax6_flow_claimed": false
   },
   "regression": {
-    "ctest": ["MRReference", "MRDriver", "MRSRDriver", "MRCorrelatedDriver", "MRDenominators"],
+    "ctest": ["MRReference", "MRDriver", "MRSRDriver", "MRCorrelatedDriver", "MRDenominators", "MRJobGenerator"],
     "mr_correlated_driver_seconds": 350.49,
     "emax2_python_oracle_rhs_max_abs_mev": 3.105959933691338e-12,
     "emax6_lambda_active_support_thread_reproducibility": {

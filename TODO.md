@@ -239,9 +239,12 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       point7 Slurm 环境。既有 SR/VS 参数路径不得改变。生成器另冻结
       git commit 与 executable SHA-256、拒绝覆盖，并由 `MRJobGenerator`
       CTest 和真实 emax4 input/reference 的 `--generate-only` 检查通过。
-- [ ] 用同一 emax2/4 Hamiltonian 验证 direct flow 的连续运行与 J64
+- [x] 用同一 emax2/4 Hamiltonian 验证 direct flow 的连续运行与 J64
       分段重启：比较终点完整 vacuum 0B/1B/2B、流诊断和输出校验和；只有
       数值等价通过后，J64 才能称为 Hamiltonian checkpoint/restart。
+      `0→0.02` 对 `0→0.01→0.02` 在 emax2/4 的完整 0/1/2B 最坏差为
+      `6.15e-14/5.92e-14 MeV`，终点 `E/||H||/||eta1,2||` 在打印精度相同；
+      可复现比较器和机器记录见 large-space JSON。
 - [ ] 用 `gen_job.py --mr-jscheme` 在 point7 提交 `He4 Nrefmax=2, emax=4`
       完整收敛流；先 `sbatch --test-only`，再检查队列和日志。记录步数、
       终止原因、wall/RSS、`eta`/被选中解耦残差、Hermiticity 和输出哈希。

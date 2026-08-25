@@ -282,6 +282,18 @@ Magnus。执行顺序固定为：
 当成严格的 ODE 内部状态恢复：它是从物化后的 Hamiltonian 开始下一段自主
 流。连续/分段差异必须作为 ODE 误差单独量化并随结果保存。
 
+前 3 步现已完成。commit `fee05bdf` 的 `gen_job.py --mr-jscheme` 只生成
+一个参数点，冻结 commit、executable/input/reference SHA-256、累计流参数、
+point7 环境和 J64/no2bpack 输出，并由 CTest 与真实 emax4 脚本预演覆盖。
+随后以 `rtol=atol=1e-10`、`eta_criterion=1e-12` 比较
+`0→0.02` 和 `0→0.01→0.02`：emax2 的 vacuum 0/1/2B 最坏差为
+`3.29e-14/2.13e-14/6.15e-14 MeV`，emax4 为
+`2.31e-14/2.13e-14/5.92e-14 MeV`；终点 MR `E`、`||H||` 和
+`||eta1,2||` 在 flowfile 打印精度相同。因此 J64 已验收为 Hamiltonian
+分段恢复点，但仍不称为 adaptive stepper 内部状态 checkpoint。完整哈希、
+wall/RSS 和最坏 TBME 见 `MR-IMSRG-Jscheme-large-space.json`；下一项是
+point7 的 emax4 完整收敛流。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；
