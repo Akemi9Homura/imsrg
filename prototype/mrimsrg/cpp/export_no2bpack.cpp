@@ -358,7 +358,9 @@ int main(int argc, char **argv)
     {
         nucleus::log_init(nucleus::LogLevel::Info);
         const Options options = parse_options(argc, argv);
-        mrimsrg::require_fixed_interaction(options.interaction);
+        // This interaction supplies only the verified orbit/channel table;
+        // every matrix element is replaced by the lossless J64 payload.
+        mrimsrg::require_validated_interaction_basis(options.interaction);
         Hamiltonian basis_source;
         basis_source.read_minipack(options.interaction.string(), options.Z + options.N, 0.0);
         basis_source.init_mbasis();
