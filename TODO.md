@@ -233,10 +233,12 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       系数和指标序与 `MRCommutator.cc` 的命名项逐项记录。规范化 LaTeX
       输出 SHA-256 为 `431b893e...1a629a57`，完整环境、项数和映射见
       `docs/MR-IMSRG-J-scheme公式与代码映射.md` Sec. 3.1。
-- [ ] 在根目录生产 `gen_job.py` 增加显式、一次只生成一个参数点的
+- [x] 在根目录生产 `gen_job.py` 增加显式、一次只生成一个参数点的
       `--mr-jscheme` 模式；冻结 C++ direct-flow 参数、输入/reference
       SHA-256、累计 `start_s/target_s`、该段 `smax`、J64/no2bpack 输出和
-      point7 Slurm 环境。既有 SR/VS 参数路径不得改变。
+      point7 Slurm 环境。既有 SR/VS 参数路径不得改变。生成器另冻结
+      git commit 与 executable SHA-256、拒绝覆盖，并由 `MRJobGenerator`
+      CTest 和真实 emax4 input/reference 的 `--generate-only` 检查通过。
 - [ ] 用同一 emax2/4 Hamiltonian 验证 direct flow 的连续运行与 J64
       分段重启：比较终点完整 vacuum 0B/1B/2B、流诊断和输出校验和；只有
       数值等价通过后，J64 才能称为 Hamiltonian checkpoint/restart。

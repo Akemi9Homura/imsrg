@@ -1,7 +1,12 @@
 import argparse
+from dataclasses import asdict, dataclass
+import hashlib
+import json
 import subprocess
 import re
+import shlex
 from pathlib import Path
+from typing import Optional
 
 _RE_HW = re.compile(r'hw(\d+)')
 _RE_E2MAX = re.compile(r'_emax(\d+)_e2max(\d+)\.')
@@ -158,6 +163,206 @@ def add_header(output, partition=partition, qos=qos, cpus=cpus, nodelist=nodelis
     return header
 
 
+@dataclass(frozen=True)
+class MRJschemeSettings:
+    nucleus: str
+    nrefmax: int
+    emax: int
+    interaction: Path
+    reference_file: Path
+    target_s: float
+    start_s: float = 0.0
+    method: str = "flow"
+    ds_0: float = 1e-2
+    dsmax: float = 0.5
+    ode_tolerance: float = 1e-8
+    eta_criterion: float = 1e-6
+    partition: str = "c128m512"
+    qos: str = "low"
+    cpus: int = 64
+    nodelist: Optional[str] = None
+    label: Optional[str] = None
+    result_root: Path = REPO_ROOT / "result" / "mr-jscheme-flow"
+    executable: Path = REPO_ROOT / "build" / "src" / "imsrg++"
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _repository_commit(repository: Path) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    commit = result.stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise RuntimeError("git returned an invalid repository commit")
+    return commit
+
+
+def _validate_mr_jscheme_settings(settings: MRJschemeSettings) -> None:
+    if not re.fullmatch(r"(?:He4|Be8|C12|O16)", settings.nucleus):
+        raise ValueError("MR J-scheme nucleus must be He4, Be8, C12, or O16")
+    allowed_nrefmax = {"He4": (0, 2), "Be8": (0,), "C12": (0,), "O16": (0, 2)}
+    if settings.nrefmax not in allowed_nrefmax[settings.nucleus]:
+        raise ValueError("unsupported nucleus/Nrefmax MR reference")
+    if settings.emax < 2 or settings.emax % 2:
+        raise ValueError("MR J-scheme emax must be an even integer >= 2")
+    if settings.method not in ("flow", "flow_adaptive", "flow_RK4"):
+        raise ValueError("MR J-scheme production currently supports direct flow only")
+    if not settings.start_s >= 0.0 or not settings.target_s > settings.start_s:
+        raise ValueError("MR J-scheme requires 0 <= start_s < target_s")
+    if min(settings.ds_0, settings.dsmax, settings.ode_tolerance,
+           settings.eta_criterion) <= 0.0:
+        raise ValueError("MR flow steps, tolerance, and eta criterion must be positive")
+    if settings.cpus < 1:
+        raise ValueError("MR J-scheme cpus must be positive")
+    if settings.partition not in ("c128m1024", "c128m512", "compute_C", "compute_A"):
+        raise ValueError("unsupported point7 partition")
+    if settings.qos != "low":
+        raise ValueError("MR J-scheme production requires qos=low")
+    for value, field in ((settings.nodelist, "nodelist"), (settings.label, "label")):
+        if value is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+            raise ValueError(f"{field} contains unsupported characters")
+    if not settings.interaction.is_file():
+        raise FileNotFoundError(f"MR J-scheme interaction is unavailable: {settings.interaction}")
+    if not settings.reference_file.is_file():
+        raise FileNotFoundError(f"MR reference is unavailable: {settings.reference_file}")
+    if not settings.executable.is_file():
+        raise FileNotFoundError(f"imsrg++ executable is unavailable: {settings.executable}")
+
+
+def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
+    """Generate one production C++ J-scheme MR direct-flow Slurm script."""
+    _validate_mr_jscheme_settings(settings)
+    interaction = settings.interaction.resolve()
+    reference_file = settings.reference_file.resolve()
+    executable_path = settings.executable.resolve()
+    result_root = settings.result_root.resolve()
+    interaction_sha256 = _sha256(interaction)
+    reference_sha256 = _sha256(reference_file)
+    executable_sha256 = _sha256(executable_path)
+    repository_commit = _repository_commit(REPO_ROOT)
+    segment_smax = settings.target_s - settings.start_s
+    tag = (
+        f"{settings.nucleus}_Nrefmax{settings.nrefmax}_emax{settings.emax}"
+        f"_s{path_token(settings.start_s)}to{path_token(settings.target_s)}"
+        f"_tol{settings.ode_tolerance:.0e}".replace("+", "").replace("-", "m")
+    )
+    if settings.label:
+        tag += f"_{settings.label}"
+    result_dir = result_root / tag
+    if result_dir.exists():
+        raise FileExistsError(f"refusing to overwrite existing MR flow: {result_dir}")
+    result_dir.mkdir(parents=True)
+    script_file = result_dir / f"run_{tag}.sh"
+    flow_file = result_dir / f"flow_{tag}.dat"
+    prefix = result_dir / tag
+    output_j64 = result_dir / f"H_{tag}.jcoupled64"
+    output_no2bpack = result_dir / f"H_{tag}.no2bpack"
+    manifest = result_dir / "metadata.json"
+    nucleus_a = int(re.search(r"\d+", settings.nucleus).group())
+    parameters = [
+        f"2bme={interaction}",
+        "fmt2=jcoupled64",
+        "3bme=none",
+        f"reference={settings.nucleus}",
+        f"valence_space={settings.nucleus}",
+        f"A={nucleus_a}",
+        "hw=20",
+        f"emax={settings.emax}",
+        "basis=oscillator",
+        f"method={settings.method}",
+        "nsteps=1",
+        "core_generator=white-ncsm",
+        "denominator_partitioning=Epstein_Nesbet",
+        "denominator_delta=0",
+        "BetaCM=0",
+        "nucleon_mass_correction=false",
+        f"mr_reference_file={reference_file}",
+        "mr_validation_tolerance=1e-10",
+        f"smax={segment_smax:.17g}",
+        f"ds_0={settings.ds_0:.17g}",
+        f"dsmax={settings.dsmax:.17g}",
+        f"ode_tolerance={settings.ode_tolerance:.17g}",
+        f"eta_criterion={settings.eta_criterion:.17g}",
+        f"flowfile={flow_file}",
+        f"intfile={prefix}",
+        f"write_H_jcoupled64={output_j64}",
+        f"write_H_no2bpack={output_no2bpack}",
+    ]
+    command = shlex.join([str(executable_path), *parameters])
+    nodelist_line = (
+        f"#SBATCH --nodelist={settings.nodelist}\n" if settings.nodelist else ""
+    )
+    library_paths = f"{executable_path.parent}:{executable_path.parent.parent}"
+    contents = f"""#!/bin/bash -l
+#SBATCH --partition={settings.partition}
+#SBATCH --qos={settings.qos}
+#SBATCH -J mr_{settings.nucleus.lower()}_e{settings.emax}
+{nodelist_line}#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task={settings.cpus}
+#SBATCH -o {result_dir}/log_{tag}_%j.txt
+
+set -eo pipefail
+cd {REPO_ROOT}
+source ./sourceme.sh
+export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
+export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{library_paths}"
+
+echo repository_commit={repository_commit}
+echo cumulative_start_s={settings.start_s:.17g}
+echo cumulative_target_s={settings.target_s:.17g}
+test "$(git rev-parse HEAD)" = '{repository_commit}'
+git diff --quiet HEAD --
+echo '{interaction_sha256}  {interaction}' | sha256sum -c -
+echo '{reference_sha256}  {reference_file}' | sha256sum -c -
+echo '{executable_sha256}  {executable_path}' | sha256sum -c -
+if ldd {shlex.quote(str(executable_path))} | grep 'not found'; then
+  exit 1
+fi
+{command}
+test -s {shlex.quote(str(output_j64))}
+test -s {shlex.quote(str(output_no2bpack))}
+sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
+"""
+    script_file.write_text(contents, encoding="utf-8")
+    script_file.chmod(0o755)
+    metadata = {
+        "schema": "mrimsrg_cpp_jscheme_slurm_v1",
+        "repository_commit": repository_commit,
+        "settings": {
+            **asdict(settings),
+            "interaction": str(interaction),
+            "reference_file": str(reference_file),
+            "result_root": str(result_root),
+            "executable": str(executable_path),
+        },
+        "cumulative_start_s": settings.start_s,
+        "cumulative_target_s": settings.target_s,
+        "segment_smax": segment_smax,
+        "interaction_sha256": interaction_sha256,
+        "reference_sha256": reference_sha256,
+        "executable_sha256": executable_sha256,
+        "flow_file": str(flow_file),
+        "output_jcoupled64": str(output_j64),
+        "output_no2bpack": str(output_no2bpack),
+        "script": str(script_file),
+    }
+    manifest.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8")
+    return script_file
+
+
 def generate_slurm(params: dict):
     file = params["2bme"]
     file3 = params["3bme"]
@@ -227,15 +432,108 @@ def parse_args():
     parser.add_argument("--generate-only", action="store_true", help="only generate the Slurm script")
     parser.add_argument("--submit", action="store_true", help="submit the generated script with sbatch")
     parser.add_argument("--smoke-test", action="store_true", help="run a lightweight script that calls imsrg++ help")
+    parser.add_argument(
+        "--mr-jscheme", action="store_true",
+        help="generate one production C++ J-scheme MR direct-flow job",
+    )
+    parser.add_argument("--mr-nucleus", choices=("He4", "Be8", "C12", "O16"))
+    parser.add_argument("--mr-nrefmax", type=int, choices=(0, 2))
+    parser.add_argument("--mr-emax", type=int)
+    parser.add_argument("--mr-interaction", type=Path)
+    parser.add_argument("--mr-reference-file", type=Path)
+    parser.add_argument("--mr-start-s", type=float, default=0.0)
+    parser.add_argument("--mr-target-s", type=float)
+    parser.add_argument(
+        "--mr-method", choices=("flow", "flow_adaptive", "flow_RK4"),
+        default="flow",
+    )
+    parser.add_argument("--mr-ds-0", type=float, default=1e-2)
+    parser.add_argument("--mr-dsmax", type=float, default=0.5)
+    parser.add_argument("--mr-ode-tolerance", type=float, default=1e-8)
+    parser.add_argument("--mr-eta-criterion", type=float, default=1e-6)
+    parser.add_argument(
+        "--mr-partition",
+        choices=("c128m1024", "c128m512", "compute_C", "compute_A"),
+        default="c128m512",
+    )
+    parser.add_argument("--mr-nodelist")
+    parser.add_argument("--mr-cpus", type=int, default=64)
+    parser.add_argument("--mr-label")
+    parser.add_argument("--mr-result-root", type=Path)
+    parser.add_argument("--mr-executable", type=Path)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    if args.generate_only and args.submit:
+        raise SystemExit("--generate-only and --submit are mutually exclusive")
     check_and_make_dir(REPO_ROOT / "result")
 
     if args.smoke_test:
         run_smoke_test()
+        exit(0)
+
+    if args.mr_jscheme:
+        required = {
+            "--mr-nucleus": args.mr_nucleus,
+            "--mr-nrefmax": args.mr_nrefmax,
+            "--mr-emax": args.mr_emax,
+            "--mr-interaction": args.mr_interaction,
+            "--mr-reference-file": args.mr_reference_file,
+            "--mr-target-s": args.mr_target_s,
+        }
+        missing = [name for name, value in required.items() if value is None]
+        if missing:
+            raise SystemExit("--mr-jscheme requires " + ", ".join(missing))
+        default_executable = REPO_ROOT / "build" / "src" / "imsrg++"
+        if not default_executable.is_file():
+            default_executable = REPO_ROOT / "build" / "imsrg++"
+        script_file = generate_mr_jscheme_slurm(
+            MRJschemeSettings(
+                nucleus=args.mr_nucleus,
+                nrefmax=args.mr_nrefmax,
+                emax=args.mr_emax,
+                interaction=args.mr_interaction,
+                reference_file=args.mr_reference_file,
+                start_s=args.mr_start_s,
+                target_s=args.mr_target_s,
+                method=args.mr_method,
+                ds_0=args.mr_ds_0,
+                dsmax=args.mr_dsmax,
+                ode_tolerance=args.mr_ode_tolerance,
+                eta_criterion=args.mr_eta_criterion,
+                partition=args.mr_partition,
+                cpus=args.mr_cpus,
+                nodelist=args.mr_nodelist,
+                label=args.mr_label,
+                result_root=(
+                    args.mr_result_root
+                    if args.mr_result_root is not None
+                    else REPO_ROOT / "result" / "mr-jscheme-flow"
+                ),
+                executable=(
+                    args.mr_executable
+                    if args.mr_executable is not None
+                    else default_executable
+                ),
+            )
+        )
+        print(script_file)
+        if args.generate_only:
+            exit(0)
+        if args.submit:
+            result = subprocess.run(
+                ["sbatch", str(script_file)], capture_output=True, text=True, check=True
+            )
+            if result.stdout.strip():
+                print(result.stdout.strip())
+            exit(0)
+        run_mode = input("submit job: y/n\n")
+        if run_mode.lower()[0] == "y":
+            subprocess.run(["sbatch", str(script_file)], check=True)
+        else:
+            subprocess.run(["bash", str(script_file)], check=True)
         exit(0)
 
     script_file = generate_slurm(params)

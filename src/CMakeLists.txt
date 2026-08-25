@@ -812,3 +812,6 @@ add_test(NAME MRCorrelatedDriver
                  $<TARGET_FILE:imsrg++>)
 add_test(NAME MRDenominators
          COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRDenominators.py)
+add_test(NAME MRJobGenerator
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRJobGenerator.py
+                 $<TARGET_FILE:imsrg++>)
