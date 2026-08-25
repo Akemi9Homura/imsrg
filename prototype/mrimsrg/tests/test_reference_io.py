@@ -11,9 +11,26 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from reference_io import load_reference
+from export_jref import export_reference
 
 
 class ReferenceIOTests(unittest.TestCase):
+    def test_jref_export_forwards_relocated_interaction(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            reference = root / "reference"
+            interaction = root / "relocated.minipack"
+            output = root / "reference.jref"
+            expected = RuntimeError("stop after checking the portable path")
+            with patch("export_jref.load_reference", side_effect=expected) as loader:
+                with self.assertRaisesRegex(RuntimeError, "portable path"):
+                    export_reference(
+                        reference,
+                        output,
+                        interaction_path=interaction,
+                    )
+            loader.assert_called_once_with(reference, interaction_path=interaction)
+
     def test_relocated_interaction_is_still_verified_by_digest(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

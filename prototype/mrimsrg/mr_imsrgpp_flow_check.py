@@ -135,7 +135,7 @@ def run(args):
 
     with tempfile.TemporaryDirectory() as temporary_directory:
         jref = Path(temporary_directory) / f"{args.nucleus}.jref"
-        export_reference(args.reference, jref)
+        export_reference(args.reference, jref, interaction_path=args.interaction)
         modelspace = pyimsrg.ModelSpace(2, args.nucleus, args.nucleus)
         modelspace.SetHbarOmega(20.0)
         modelspace.SetReferenceOcc(pyimsrg.MRReference.ReadOccupationMap(modelspace, str(jref)))

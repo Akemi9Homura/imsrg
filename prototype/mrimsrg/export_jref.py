@@ -83,6 +83,7 @@ def export_reference(
     output_path: str | Path,
     *,
     tolerance: float = 1e-10,
+    interaction_path: str | Path | None = None,
 ) -> dict[str, object]:
     """Build densities from the saved wavefunction and write mrimsrg_jref_v1."""
 
@@ -90,7 +91,7 @@ def export_reference(
     output = Path(output_path)
     if output.exists():
         raise FileExistsError(f"refusing to overwrite existing MR reference: {output}")
-    reference = load_reference(root)
+    reference = load_reference(root, interaction_path=interaction_path)
     densities = compute_densities(reference.determinants, reference.coefficients)
     validate_densities(densities, reference.metadata["A"], tolerance=tolerance)
     natural = prepare_natural_basis(densities, tolerance=tolerance)
@@ -186,9 +187,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--interaction",
+        type=Path,
+        help="relocated byte-identical interaction to verify instead of metadata path",
+    )
     parser.add_argument("--tolerance", type=float, default=1e-10)
     args = parser.parse_args()
-    summary = export_reference(args.reference, args.output, tolerance=args.tolerance)
+    summary = export_reference(
+        args.reference,
+        args.output,
+        tolerance=args.tolerance,
+        interaction_path=args.interaction,
+    )
     for key, value in summary.items():
         print(f"{key}={value}")
 
