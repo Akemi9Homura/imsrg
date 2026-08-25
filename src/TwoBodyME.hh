@@ -167,7 +167,7 @@ class TwoBodyME
   void PrintMatrix(size_t chbra,size_t chket) const;
 //  void PrintMatrix(size_t chbra,size_t chket) const {std::cout.precision(12); MatEl.at({chbra,chket}).raw_print();};
   int Dimension();
-  int size();
+  size_t size();
 
   void WriteBinary(std::ofstream&);
   void ReadBinary(std::ifstream&);
