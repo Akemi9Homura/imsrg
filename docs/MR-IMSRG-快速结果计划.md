@@ -84,6 +84,26 @@ prototype/mrimsrg/
 
 ## 5. 里程碑与退出条件
 
+### 当前阻塞门禁：生产路径严格退化到 `imsrg++`
+
+在继续解释或生产新的 MR 流结果前，必须先完成仓库根目录
+[`TODO.md`](../TODO.md) 的 P0。该核对不允许增加一套测试专用的 SR
+物理算法：`prototype/mrimsrg/` 中生产使用的正规序、生成元、掩码、
+commutator 和 flow 必须在 `He4/O16, Nrefmax=0` 上直接退化到当前
+`src/Generator.cc`、`src/Commutator.cc` 和 `src/IMSRGSolver.cc`。
+
+闭壳 HO 参考中，生产 White-NCSM 分子的占据数因子只留下 `ph/pphh`；
+`He4` 的 holes 位于 `e=0`，`O16` 的 holes 位于 `e=0,1`，而未占据轨道
+分别位于更高 major shell。因此这些非零通道自动满足 `Delta e != 0`，
+生产放松掩码不应比 `imsrg++` 的 SR 非对角块少任何元素。若实际比较不符，
+应判定为实现或约定错误，不能归因于“生成元定义不同”。
+
+核对必须依次通过初始 `E/f/Gamma`、EN 分母、`eta(s=0)`、完整
+`[eta,H]_(0,1,2B)`、固定小步和完整直接流。代数比较使用同一个
+double-precision J-coupled 输入，不使用 float32 `no2bpack`；完整流后才
+做普通 Hamiltonian/NCSM/no2bpack 验收。最终能量相近不能替代逐矩阵元
+核对。
+
 ### M0：冻结普通 Hamiltonian 和基准
 
 任务：
@@ -151,7 +171,8 @@ prototype/mrimsrg/
 
 退出条件：
 
-- 单 Slater 极限逐项退化为仓库现有 SR-IMSRG(2)；
+- 单 Slater 极限按当前 P0 门禁逐项退化为仓库现有 SR-IMSRG(2)，包括
+  `He4/O16` 的真实 N2LOopt 初始张量、生成元和 RHS，而不只通过随机小模型；
 - 随机小模型所有可比较张量元素误差不超过 `1e-10`；
 - 对易子保持预期 Hermitian/anti-Hermitian 类型和二体反对称性。
 

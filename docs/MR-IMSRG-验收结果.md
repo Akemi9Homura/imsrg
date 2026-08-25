@@ -1,5 +1,12 @@
 # NNLOopt emax2 MR-IMSRG 验收结果
 
+> 当前状态（2026-08-25）：下述结果已经通过 RDM、正规序往返、旋转标量、
+> J-coupling、格式读回和 NCSM 管线检查，但尚未完成生产 MR 路径对当前
+> `imsrg++` 的逐矩阵元 SR 退化门禁。该门禁以仓库根目录 `TODO.md` P0
+> 为准；在 `He4/O16, Nrefmax=0` 的 `E/f/Gamma`、EN 分母、`eta`、RHS
+> 和完整流全部通过前，下述流结果不能作为“MR 方程已严格复现 SR-IMSRG(2)”
+> 的证据。
+
 本文记录快速 m-scheme MR-IMSRG(2) 原型的可重复验收证据。大型
 Hamiltonian、RDM 和日志均保留在被 Git 忽略的本机/集群结果目录，
 不提交到仓库。表中能量单位均为 MeV。
@@ -29,6 +36,50 @@ Hamiltonian、RDM 和日志均保留在被 Git 忽略的本机/集群结果目�
   NCSM 基态能。
 
 ## 2. 实现正确性证据
+
+### 2.1 生产路径对 `imsrg++` 的 SR 退化核对（进行中）
+
+新增 `prototype/mrimsrg/sr_imsrgpp_check.py`，它不实现第二套 SR 公式。
+同一个 float64 `jcoupled64` 普通 Hamiltonian 被装入当前构建的
+`pyIMSRG.Operator`；C++ 侧直接调用 `Operator::DoNormalOrdering()`、
+`Generator::Update()` 和 `Commutator::Commutator()`。所得 J-coupled
+算符按已经通过 NCSM 谱验收的相位和 pair normalization 反耦合到完整
+m-scheme，再与生产 `prototype/mrimsrg/` 路径逐元素比较。
+
+本轮 oracle 是本仓库 `build-src/src/pyIMSRG.so`。运行前工具核对实际编译
+所用的 `Generator.cc`、`Commutator.cc`、`IMSRGSolver.cc` 与当前 checkout；
+三个 SHA-256 分别为
+`3fbc8d005792a171684fd4ab48f559e719ea0b198669b33a72b852a63ac50a49`、
+`8bc9c92bdb1fae4fcb709039a3ae698d6fbd130d9a54b127cad4b059f55b0e47`、
+`4c2ee3f198542870b800a0ea41158db93ec361e1216b295f214d5ec90d53b436`。
+
+`He4/O16, Nrefmax=0` 均有 `max|lambda2|=0`。He4 的 288 个 1B、
+41472 个 2B SR m-scheme 元素和 O16 的 768 个 1B、294912 个 2B
+SR 元素中，被生产 `Delta e != 0` 掩码额外删除的元素均为零。
+
+| 核 | 层级 | 0B max-abs | 1B max-abs | 2B max-abs |
+|---|---|---:|---:|---:|
+| He4 | 初始普通 H | 0 | 0 | `2.66e-15` |
+| He4 | 正规序 H | `3.55e-15` | `7.11e-15` | `2.66e-15` |
+| He4 | `eta(s=0)` | 0 | `4.16e-17` | `2.78e-17` |
+| He4 | RHS(s=0) | `1.78e-15` | `1.78e-15` | `2.66e-15` |
+| O16 | 初始普通 H | 0 | 0 | `3.55e-15` |
+| O16 | 正规序 H | 0 | `1.42e-14` | `3.55e-15` |
+| O16 | `eta(s=0)` | 0 | `2.78e-17` | `2.78e-17` |
+| O16 | RHS(s=0) | `1.42e-14` | `2.66e-15` | `1.55e-15` |
+
+EN 分母由新增的只读 pybind 诊断直接调用 C++
+`Generator::Get1bDenominator/Get2bDenominator`。He4 比较 20/26 个
+1B/2B 分母，最大差为 `1.42e-14/2.84e-14 MeV`；O16 比较 36/116
+个，最大差为 `2.13e-14/4.26e-14 MeV`。两核均没有分母触发
+`1e-6 MeV` cutoff。因此当前 C++ 对小分母统一取正 cutoff、Python
+保留原符号的代码差异未进入本轮 N2LOopt 初始点，但仍保留为后续流核查项。
+
+用相同 RHS 做一个 `ds=1e-4` Euler 步并在步后重新生成 `eta/RHS`，He4
+的 `H/eta/RHS` 全 rank 最大差分别为 `7.11e-15/4.16e-17/2.22e-15`
+MeV，O16 分别为 `1.42e-14/2.78e-17/1.07e-14 MeV`。这说明退化不只在
+`s=0` 单点成立。以上已通过 P0 的输入、正规序、分母、生成元、RHS 和单步
+门禁；共同固定步 RK checkpoints 与完整直接流仍待完成。
 
 - Python 回归测试：`42/42` 通过。覆盖 RDM/cumulant、普通与 MR 正规序
   往返、QCombo/显式 Fock-space 对易子、SR 极限、生成元、掩码、

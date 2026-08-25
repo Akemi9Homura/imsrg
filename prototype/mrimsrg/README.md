@@ -36,6 +36,24 @@ Run the dependency-free unit tests with:
 python3 -m unittest discover -s prototype/mrimsrg/tests -v
 ```
 
+For the strict single-reference degeneration gate, build the current
+`pyIMSRG` binding (the extra denominator methods are read-only diagnostics),
+generate a float64 `jcoupled64` file from the `s=0` checkpoint, and run:
+
+```bash
+PYTHONPATH=prototype/mrimsrg python3 prototype/mrimsrg/sr_imsrgpp_check.py \
+  --nucleus He4 \
+  --reference prototype/mrimsrg/data/He4_Nrefmax0_final \
+  --jcoupled64 /tmp/He4_s0.jcoupled64
+```
+
+The checker verifies the compiled oracle's core source hashes, reconstructs
+the complete m-scheme tensors, and compares the production MR path against
+actual calls to `Operator::DoNormalOrdering`, `Generator::Update`, and
+`Commutator::Commutator`.  It checks the relaxed mask, every selected EN
+denominator, `H/eta/RHS` at `s=0`, and the same quantities after a shared
+`ds=1e-4` Euler step.  It exits nonzero if any rank exceeds `1e-10 MeV`.
+
 `commutator.py` implements the natural-orbital MR-IMSRG(2) commutator with
 `lambda3=0`.  Its equations were regenerated independently with QCombo 0.2.0:
 for a random four-orbit correlated reference, direct summation of the QCombo
