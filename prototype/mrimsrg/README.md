@@ -209,6 +209,24 @@ float64 normalized-pair `lambda2` blocks.  The C++ reader maps by
 does not load the full m-scheme density during a production flow. Existing
 output files are never overwritten.
 
+Embed that same fixed `Nrefmax` reference in a larger Hamiltonian space with
+zero density/cumulant on the added orbits and an identity added NAT block:
+
+```bash
+python3 -m prototype.mrimsrg.embed_jref \
+  --source /tmp/He4_Nrefmax2_emax2.jref \
+  --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax4_e2max8.minipack \
+  --output /tmp/He4_Nrefmax2_emax4.jref \
+  --pyimsrg-dir build/src \
+  --json /tmp/He4_Nrefmax2_emax4.json
+```
+
+The command verifies the minipack header and SHA-256, maps all old spherical
+orbits by `(n,l,j2,tz2)`, validates the embedded density in C++, writes the
+complete larger J-scheme channel layout, and reads it back independently. It
+does not claim that the NCSM reference was rediagonalized in a larger
+`Nrefmax` space.
+
 Read a materialized ordinary Hamiltonian back into the existing NCSM solver:
 
 ```bash

@@ -310,8 +310,14 @@ PYBIND11_MODULE(pyIMSRG, m)
                       py::arg("modelspace"), py::arg("filename"),
                       py::arg("validation_tolerance") = 1e-10,
                       py::keep_alive<0, 1>())
+          .def("WriteBinary", &MRReference::WriteBinary,
+               py::arg("filename"))
           .def_static("ReadOccupationMap", &MRReference::ReadOccupationMap,
                       py::arg("modelspace"), py::arg("filename"))
+          .def("EmbedInModelSpace", &MRReference::EmbedInModelSpace,
+               py::arg("target_modelspace"), py::arg("target_interaction_sha256"),
+               py::arg("validation_tolerance") = 1e-10,
+               py::keep_alive<0, 2>())
           .def("OccupationsMatchModelSpace", &MRReference::OccupationsMatchModelSpace,
                py::arg("tolerance") = 1e-12)
           .def("MaximumHermiticityViolation", &MRReference::MaximumHermiticityViolation)

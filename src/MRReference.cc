@@ -28,6 +28,25 @@ T ReadScalar(std::istream &input, const char *description)
   return value;
 }
 
+template <typename T>
+void WriteScalar(std::ostream &output, const T &value, const char *description)
+{
+  static_assert(std::is_trivially_copyable<T>::value,
+                "binary bridge scalars must be trivially copyable");
+  output.write(reinterpret_cast<const char *>(&value), sizeof(value));
+  if (!output)
+    throw std::runtime_error(std::string("failed writing MR reference ") + description);
+}
+
+void ValidateDigest(const std::string &value, const char *description)
+{
+  if (value.size() != 64 ||
+      !std::all_of(value.begin(), value.end(), [](char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+      }))
+    throw std::runtime_error(std::string("invalid lowercase SHA-256 in ") + description);
+}
+
 std::string ReadDigest(std::istream &input, const char *description)
 {
   std::array<char, 64> bytes{};
@@ -181,6 +200,163 @@ MRReference MRReference::ReadBinary(ModelSpace &ms, const std::string &filename,
     throw std::runtime_error("MR reference has trailing bytes");
   result.Validate(validation_tolerance);
   return result;
+}
+
+void MRReference::WriteBinary(const std::string &filename) const
+{
+  Validate();
+  ValidateDigest(interaction_sha256, "interaction digest");
+  ValidateDigest(rdm_sha256, "RDM digest");
+  ValidateDigest(wavefunction_sha256, "wavefunction digest");
+  {
+    std::ifstream existing(filename, std::ios::binary);
+    if (existing.good())
+      throw std::runtime_error("refusing to overwrite existing MR reference: " + filename);
+  }
+  std::ofstream output(filename, std::ios::binary | std::ios::out);
+  if (!output)
+    throw std::runtime_error("cannot create MR reference file: " + filename);
+
+  output.write(kReferenceMagic.data(), kReferenceMagic.size());
+  WriteScalar<std::uint32_t>(output, kEndianMarker, "endian marker");
+  WriteScalar<std::uint32_t>(output, 1u, "schema version");
+  WriteScalar<std::int32_t>(output, A, "A");
+  WriteScalar<std::int32_t>(output, Z, "Z");
+  WriteScalar<std::int32_t>(output, Nrefmax, "Nrefmax");
+  WriteScalar<std::int32_t>(output, J2, "J2");
+  WriteScalar<std::int32_t>(output, parity, "parity");
+  WriteScalar<std::int32_t>(output, emax, "emax");
+  WriteScalar<std::int32_t>(output, e2max, "e2max");
+  WriteScalar<double>(output, hw, "hw");
+  const std::uint64_t norbits = modelspace->GetNumberOrbits();
+  std::uint64_t nchannels = 0;
+  for (size_t ch = 0; ch < modelspace->GetNumberTwoBodyChannels(); ++ch)
+    if (modelspace->GetTwoBodyChannel(ch).GetNumberKets() > 0)
+      ++nchannels;
+  WriteScalar<std::uint64_t>(output, norbits, "orbit count");
+  WriteScalar<std::uint64_t>(output, nchannels, "channel count");
+  output.write(interaction_sha256.data(), interaction_sha256.size());
+  output.write(rdm_sha256.data(), rdm_sha256.size());
+  output.write(wavefunction_sha256.data(), wavefunction_sha256.size());
+  if (!output)
+    throw std::runtime_error("failed writing MR reference digests");
+
+  for (index_t p : modelspace->all_orbits)
+  {
+    const Orbit &orbit = modelspace->GetOrbit(p);
+    WriteScalar<std::int32_t>(output, static_cast<std::int32_t>(p), "orbit index");
+    WriteScalar<std::int32_t>(output, orbit.n, "orbit n");
+    WriteScalar<std::int32_t>(output, orbit.l, "orbit l");
+    WriteScalar<std::int32_t>(output, orbit.j2, "orbit j2");
+    WriteScalar<std::int32_t>(output, orbit.tz2, "orbit tz2");
+    WriteScalar<double>(output, occupations.at(p), "orbit occupation");
+  }
+  for (size_t i = 0; i < norbits; ++i)
+    for (size_t j = 0; j < norbits; ++j)
+      WriteScalar<double>(output, NaturalOrbitTransformation(i, j),
+                          "natural-orbit transformation");
+
+  for (size_t ch = 0; ch < modelspace->GetNumberTwoBodyChannels(); ++ch)
+  {
+    const TwoBodyChannel &channel = modelspace->GetTwoBodyChannel(ch);
+    const std::uint64_t npairs = channel.GetNumberKets();
+    if (npairs == 0)
+      continue;
+    WriteScalar<std::int32_t>(output, channel.J, "channel J");
+    WriteScalar<std::int32_t>(output, channel.parity, "channel parity");
+    WriteScalar<std::int32_t>(output, channel.Tz, "channel Tz");
+    WriteScalar<std::uint32_t>(output, 0u, "channel reserved field");
+    WriteScalar<std::uint64_t>(output, npairs, "channel pair count");
+    for (size_t i = 0; i < npairs; ++i)
+    {
+      const Ket &ket = channel.GetKet(i);
+      WriteScalar<std::uint32_t>(output, static_cast<std::uint32_t>(ket.p),
+                                 "pair first orbit");
+      WriteScalar<std::uint32_t>(output, static_cast<std::uint32_t>(ket.q),
+                                 "pair second orbit");
+    }
+    const arma::mat &matrix = Lambda2.GetMatrix(ch);
+    for (size_t i = 0; i < npairs; ++i)
+      for (size_t j = 0; j < npairs; ++j)
+        WriteScalar<double>(output, matrix(i, j), "lambda2 matrix element");
+  }
+}
+
+MRReference MRReference::EmbedInModelSpace(
+    ModelSpace &target_modelspace,
+    const std::string &target_interaction_sha256,
+    double validation_tolerance) const
+{
+  Validate(validation_tolerance);
+  ValidateDigest(target_interaction_sha256, "target interaction digest");
+  if (target_modelspace.GetEmax() < modelspace->GetEmax() ||
+      target_modelspace.GetE2max() < modelspace->GetE2max())
+    throw std::invalid_argument("MR reference target model space is smaller than its source");
+  if (hw > 0.0 &&
+      std::abs(hw - target_modelspace.GetHbarOmega()) > validation_tolerance)
+    throw std::invalid_argument("MR reference target oscillator frequency differs from its source");
+
+  using OrbitLabel = std::array<int, 4>;
+  std::map<OrbitLabel, index_t> target_orbits;
+  for (index_t p : target_modelspace.all_orbits)
+  {
+    const Orbit &orbit = target_modelspace.GetOrbit(p);
+    if (!target_orbits.emplace(OrbitLabel{orbit.n, orbit.l, orbit.j2, orbit.tz2}, p).second)
+      throw std::runtime_error("target ModelSpace contains duplicate spherical orbit labels");
+  }
+  std::vector<index_t> source_to_target(modelspace->GetNumberOrbits());
+  std::map<index_t, double> target_occupations;
+  for (index_t p : target_modelspace.all_orbits)
+    target_occupations[p] = 0.0;
+  for (index_t p : modelspace->all_orbits)
+  {
+    const Orbit &orbit = modelspace->GetOrbit(p);
+    const auto found = target_orbits.find({orbit.n, orbit.l, orbit.j2, orbit.tz2});
+    if (found == target_orbits.end())
+      throw std::runtime_error("target ModelSpace omits a source reference orbit");
+    source_to_target[p] = found->second;
+    target_occupations[found->second] = occupations[p];
+  }
+  target_modelspace.SetReference(target_occupations);
+
+  std::vector<double> occupation_vector(target_modelspace.GetNumberOrbits(), 0.0);
+  for (const auto &entry : target_occupations)
+    occupation_vector[entry.first] = entry.second;
+  MRReference embedded(target_modelspace, A, Z, Nrefmax, occupation_vector);
+  embedded.J2 = J2;
+  embedded.parity = parity;
+  embedded.emax = target_modelspace.GetEmax();
+  embedded.e2max = target_modelspace.GetE2max();
+  embedded.hw = target_modelspace.GetHbarOmega();
+  embedded.interaction_sha256 = target_interaction_sha256;
+  embedded.rdm_sha256 = rdm_sha256;
+  embedded.wavefunction_sha256 = wavefunction_sha256;
+  embedded.NaturalOrbitTransformation.eye(target_modelspace.GetNumberOrbits(),
+                                           target_modelspace.GetNumberOrbits());
+  for (index_t p : modelspace->all_orbits)
+    for (index_t q : modelspace->all_orbits)
+      embedded.NaturalOrbitTransformation(source_to_target[p], source_to_target[q]) =
+          NaturalOrbitTransformation(p, q);
+
+  for (size_t ch = 0; ch < modelspace->GetNumberTwoBodyChannels(); ++ch)
+  {
+    const TwoBodyChannel &channel = modelspace->GetTwoBodyChannel(ch);
+    for (size_t ibra = 0; ibra < channel.GetNumberKets(); ++ibra)
+    {
+      const Ket &bra = channel.GetKet(ibra);
+      for (size_t iket = 0; iket < channel.GetNumberKets(); ++iket)
+      {
+        const Ket &ket = channel.GetKet(iket);
+        const double value = Lambda2.GetTBME_J_norm(
+            channel.J, bra.p, bra.q, ket.p, ket.q);
+        embedded.Lambda2.SetTBME_J(
+            channel.J, source_to_target[bra.p], source_to_target[bra.q],
+            source_to_target[ket.p], source_to_target[ket.q], value);
+      }
+    }
+  }
+  embedded.Validate(validation_tolerance);
+  return embedded;
 }
 
 std::map<index_t, double> MRReference::ReadOccupationMap(

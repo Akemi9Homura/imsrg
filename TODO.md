@@ -137,12 +137,15 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 解析 channel 尺寸和 scratch 上界只证明数据结构没有退回稠密 m-scheme，
 不能替代真实较大空间运行。完成 emax2 的 G 门禁后，按以下顺序继续：
 
-- [ ] 增加受验证的 reference embedding：把既有 `Nrefmax` 截断 NCSM
+- [x] 增加受验证的 reference embedding：把既有 `Nrefmax` 截断 NCSM
       波函数的自然轨道占据、变换和 `lambda2` 原样嵌入更大的单粒子空间；
       新增轨道必须是零占据、零 cumulant、自然变换单位块。读回后重新检查
       粒子数、质子数、Hermiticity、`lambda2` 收缩及低空间逐元素不变，
       并记录新 interaction SHA-256；不得把 embedding 宣称为重新求解过的
-      较大 `Nrefmax` 参考态。
+      较大 `Nrefmax` 参考态。`MRReference::EmbedInModelSpace/WriteBinary`
+      与 `prototype/mrimsrg/embed_jref.py` 已完成；真实 He4 ref2 从 emax2
+      嵌入 emax4 后收缩误差 `1.85e-15`、Hermiticity 误差为零，并通过
+      完整 J-scheme 文件写读闭环。
 - [ ] 使用本机已存在的 NNLOopt `hw=20, emax=4, e2max=8` 相互作用，
       对 `He4 Nrefmax=2` 的嵌入参考实际运行一次 C++ J-scheme MR RHS 和
       固定短流；记录 wall time、峰值 RSS、各 profiler contraction、输出

@@ -254,6 +254,107 @@ for block in be8_blocks:
             )
             assert abs(actual - block.matrix[ibra, iket]) < 1e-13
 
+# A fixed Nmax-truncated reference can be embedded in a larger Hamiltonian
+# space without manufacturing correlations on the added orbits.  The C++
+# helper must preserve every low-space value, make the added density blocks
+# exactly zero/identity, and survive its own binary writer/reader.
+target_digest = "1" * 64
+be8_ms_emax4 = pyIMSRG.ModelSpace(4, "He4", "He4")
+be8_ms_emax4.SetHbarOmega(20.0)
+embedded_reference = be8_reference.EmbedInModelSpace(
+    be8_ms_emax4, target_digest
+)
+embedded_reference.Validate(1e-10)
+assert embedded_reference.emax == 4
+assert embedded_reference.e2max == 8
+assert embedded_reference.interaction_sha256 == target_digest
+assert embedded_reference.rdm_sha256 == be8_reference.rdm_sha256
+assert embedded_reference.wavefunction_sha256 == be8_reference.wavefunction_sha256
+assert embedded_reference.MaximumContractionViolation() < 1e-12
+
+source_to_target = {}
+for p in range(be8_ms.GetNumberOrbits()):
+    orbit = be8_ms.GetOrbit(p)
+    target = be8_ms_emax4.GetOrbitIndex(orbit.n, orbit.l, orbit.j2, orbit.tz2)
+    source_to_target[p] = target
+    assert abs(
+        embedded_reference.occupations[target] - be8_reference.occupations[p]
+    ) < 1e-15
+for p in range(be8_ms.GetNumberOrbits()):
+    for q in range(be8_ms.GetNumberOrbits()):
+        assert abs(
+            embedded_reference.NaturalOrbitTransformation(
+                source_to_target[p], source_to_target[q]
+            )
+            - be8_reference.NaturalOrbitTransformation(p, q)
+        ) < 1e-15
+for p in range(be8_ms_emax4.GetNumberOrbits()):
+    if p in source_to_target.values():
+        continue
+    assert embedded_reference.occupations[p] == 0.0
+    for q in range(be8_ms_emax4.GetNumberOrbits()):
+        expected = 1.0 if p == q else 0.0
+        assert abs(
+            embedded_reference.NaturalOrbitTransformation(p, q) - expected
+        ) < 1e-15
+        assert abs(
+            embedded_reference.NaturalOrbitTransformation(q, p) - expected
+        ) < 1e-15
+for ch in range(be8_ms.GetNumberTwoBodyChannels()):
+    source_channel = be8_ms.GetTwoBodyChannel(ch)
+    target_channel_index = be8_ms_emax4.GetTwoBodyChannelIndex(
+        source_channel.J, source_channel.parity, source_channel.Tz
+    )
+    target_channel = be8_ms_emax4.GetTwoBodyChannel(target_channel_index)
+    for ibra in range(source_channel.GetNumberKets()):
+        bra = source_channel.GetKet(ibra)
+        target_bra = target_channel.GetLocalIndex(
+            source_to_target[bra.p], source_to_target[bra.q]
+        )
+        for iket in range(source_channel.GetNumberKets()):
+            ket = source_channel.GetKet(iket)
+            target_ket = target_channel.GetLocalIndex(
+                source_to_target[ket.p], source_to_target[ket.q]
+            )
+            source_value = be8_reference.Lambda2.GetTBME_norm_chij(
+                ch, ch, ibra, iket
+            )
+            target_value = embedded_reference.Lambda2.GetTBME_norm_chij(
+                target_channel_index, target_channel_index, target_bra, target_ket
+            )
+            assert abs(source_value - target_value) < 1e-15
+
+with tempfile.TemporaryDirectory() as temporary_directory:
+    embedded_path = Path(temporary_directory) / "Be8_Nrefmax0_emax4.jref"
+    embedded_reference.WriteBinary(str(embedded_path))
+    try:
+        embedded_reference.WriteBinary(str(embedded_path))
+        raise AssertionError("MRReference.WriteBinary overwrote an existing file")
+    except RuntimeError as error:
+        assert "refusing to overwrite" in str(error)
+    roundtrip_ms = pyIMSRG.ModelSpace(4, "He4", "He4")
+    roundtrip_ms.SetHbarOmega(20.0)
+    roundtrip_ms.SetReferenceOcc(
+        pyIMSRG.MRReference.ReadOccupationMap(roundtrip_ms, str(embedded_path))
+    )
+    roundtrip_reference = pyIMSRG.MRReference.ReadBinary(
+        roundtrip_ms, str(embedded_path)
+    )
+assert roundtrip_reference.interaction_sha256 == target_digest
+assert np.max(
+    np.abs(
+        np.asarray(roundtrip_reference.occupations)
+        - np.asarray(embedded_reference.occupations)
+    )
+) == 0.0
+assert (
+    roundtrip_reference.NaturalOrbitTransformation
+    - embedded_reference.NaturalOrbitTransformation
+).Norm() == 0.0
+assert (
+    roundtrip_reference.Lambda2 - embedded_reference.Lambda2
+).Norm() == 0.0
+
 # Compare the complete fractional-occupation White-NCSM generator against the
 # Python m-scheme implementation.  The C++ path uses only spherical monopoles
 # and J blocks; conversion here is solely the independent test oracle.

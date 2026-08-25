@@ -272,6 +272,17 @@ J/parity/Tz 块的 `X/Y/Lambda` scratch；现改为逐块构造、BLAS 收缩后
 He4(ref2) RHS 与 Python oracle 的 max-abs 仍为 `3.11e-12 MeV`。该数字只
 计算这项主要 cross-block scratch，不冒充整个进程的峰值 RSS。
 
+Gate 7 的 reference embedding 已实现为生产 `MRReference` 操作，而不是
+重建 m-scheme RDM。它按 `(n,l,j2,tz2)` 映射旧轨道，保持旧占据、NAT 和
+normalized-pair `lambda2` 逐元素不变；新增轨道严格取零占据、零 cumulant
+与单位 NAT 块。`MRReference::WriteBinary()` 写出全部目标 J-channel 并拒绝
+覆盖文件，随后由新 ModelSpace 独立读回。真实 `He4 Nrefmax=2` 已从
+emax2 嵌入本机 NNLOopt `emax=4,e2max=8`，目标 interaction SHA-256 为
+`d3dff5faa2a58d8c234914170caffa3649d0cd3805a1344818f4f4d3c37fd19e`；
+读回的 cumulant 收缩误差 `1.85e-15`、Hermiticity 误差为零。这里保留原始
+RDM/波函数校验和以标识固定参考态来源，不把 embedding 记作较大参考空间的
+新 NCSM 解。下一步是用该文件实际运行 emax4 RHS 和固定短流。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和

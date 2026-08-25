@@ -43,10 +43,22 @@ class MRReference
   /// occupation weights have been constructed consistently.
   static MRReference ReadBinary(ModelSpace &ms, const std::string &filename,
                                 double validation_tolerance = 1e-10);
+  /// Write the complete self-describing little-endian mrimsrg_jref_v1 bridge.
+  /// Existing files are never overwritten.
+  void WriteBinary(const std::string &filename) const;
   /// Read only the orbit occupations so a caller can explicitly rebuild the
   /// ModelSpace occupation-dependent channel lists before ReadBinary().
   static std::map<index_t, double> ReadOccupationMap(
       ModelSpace &ms, const std::string &filename);
+
+  /// Embed this fixed Nmax-truncated reference in a larger spherical model
+  /// space. Existing orbit density blocks are preserved, while new orbits
+  /// receive zero occupation/cumulant and an identity natural-orbit block.
+  /// The target ModelSpace reference occupations are rebuilt explicitly.
+  MRReference EmbedInModelSpace(
+      ModelSpace &target_modelspace,
+      const std::string &target_interaction_sha256,
+      double validation_tolerance = 1e-10) const;
 
   bool OccupationsMatchModelSpace(double tolerance = 1e-12) const;
   double MaximumHermiticityViolation() const;
