@@ -132,6 +132,28 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 - [ ] 四核完成流和 NCSM/no2bpack 读回通过，命令、commit、环境、
       误差表、最坏元素及性能写入新验收文档。
 
+### H. 实际较大空间门禁
+
+解析 channel 尺寸和 scratch 上界只证明数据结构没有退回稠密 m-scheme，
+不能替代真实较大空间运行。完成 emax2 的 G 门禁后，按以下顺序继续：
+
+- [ ] 增加受验证的 reference embedding：把既有 `Nrefmax` 截断 NCSM
+      波函数的自然轨道占据、变换和 `lambda2` 原样嵌入更大的单粒子空间；
+      新增轨道必须是零占据、零 cumulant、自然变换单位块。读回后重新检查
+      粒子数、质子数、Hermiticity、`lambda2` 收缩及低空间逐元素不变，
+      并记录新 interaction SHA-256；不得把 embedding 宣称为重新求解过的
+      较大 `Nrefmax` 参考态。
+- [ ] 使用本机已存在的 NNLOopt `hw=20, emax=4, e2max=8` 相互作用，
+      对 `He4 Nrefmax=2` 的嵌入参考实际运行一次 C++ J-scheme MR RHS 和
+      固定短流；记录 wall time、峰值 RSS、各 profiler contraction、输出
+      对称性和 1/64 线程数值一致性。生产运行不得构造完整 m-scheme 张量。
+- [ ] 根据 emax4 profiler 优化真实瓶颈；每次优化必须先过 emax2 的 SR、
+      相关参考逐项、完整流和 NCSM 回归，再重跑 emax4 门禁。
+- [ ] 只有验证 emax6 interaction 的来源、header 和校验和后，才重复
+      emax6 RHS/短流；不得使用文件名含 `candidate` 的核力产生验收结果。
+- [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
+      Magnus/重启策略；登录节点禁止重计算，统一由 point7 Slurm 运行。
+
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`
 整条链逐层通过，才能称为 C++ J-scheme 生产 MR 实现完成。

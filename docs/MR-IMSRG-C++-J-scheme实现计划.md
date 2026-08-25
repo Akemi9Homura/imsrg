@@ -150,6 +150,24 @@ existing SR/fractional-occupation J-scheme contractions
 - 在至少 `emax=2` 六个已验收参考态上，C++ 的时间和内存显著优于
   Python m-scheme，且并行执行不改变数值。
 
+### Gate 7：真实较大空间运行
+
+- 先把已经验收的 `Nrefmax` 截断参考态嵌入更大的单粒子空间：旧轨道上的
+  占据、自然变换和 `lambda2` 必须逐元素保持；新增轨道取零占据、零
+  cumulant 和单位自然变换。该操作只扩大 Hamiltonian/流空间，不冒充在
+  更大参考空间重新对角化得到的新 NCSM 波函数。
+- 首个真实门禁固定为本机已有且来源明确的 NNLOopt
+  `hw=20, emax=4, e2max=8` 和 `He4 Nrefmax=2` 嵌入参考。至少执行完整
+  RHS 与固定短流，并记录峰值 RSS、wall time、profiler 分项、Hermiticity、
+  anti-Hermiticity、线程复现误差和 checkpoint 大小。
+- emax4 运行过程中不得创建 m-scheme 四指标张量；若任一 scratch 的实测
+  峰值偏离解析上界，先定位具体 contraction，再改成 channel/block 流式
+  构造。
+- emax6 只在相互作用来源、header 与 SHA-256 验证后进入验收。文件名含
+  `candidate` 的输入只能用于诊断，不能写进正式结果表。
+- `emax=14` 的解析存储表仍是容量规划，不是已运行证据；计划和验收文档
+  必须始终分别报告“解析外推”与“实际运行”的最大空间。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；
@@ -159,6 +177,7 @@ existing SR/fractional-occupation J-scheme contractions
 5. White-NCSM generator 与 `Delta e` 掩码；
 6. solver/driver 集成和真实体系 `s=0`/short-flow 验收；
 7. 完整流、物化、NCSM 与性能验收。
+8. reference embedding、真实 emax4/6 RHS/短流和 profiler 驱动优化。
 
 每个边界在自身测试通过后立即独立 commit。任何一个未通过 Gate 1--4
 的中间实现都不能用于新物理结果。
