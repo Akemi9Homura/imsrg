@@ -189,6 +189,25 @@ A=4 reader 转为 467032 条 TBME 的 lossless J64 并零误差读回。固定
 加速。Gate 7 因此已覆盖真实 emax4 和 emax6 RHS/短流，但仍不等于 emax6
 完整收敛流。
 
+根据 emax6 profiler，下一轮只对 V 项固定不变的 `lambda2` 支撑做精确
+降维。定义活跃轨道集合为所有非零标准耦合 cumulant 元素实际出现的轨道；
+Pandya 变换后的 `Lambda[(a,b),(c,d)]` 若任一轨道不在该集合中必为零，故
+
+```text
+X Lambda Y = X(:,A) Lambda(A,A) Y(A,:)
+```
+
+是恒等变换而不是 density threshold。一般全空间相关参考态令 `A` 等于完整
+有序 pair 集，自动恢复原实现；固定 emax2 参考嵌入 emax4/6 时才获得降维。
+实现 commit `cef4fce6` 已通过随机全活跃参考、SR 精确退化、emax2 Python
+m-scheme (`3.106e-12 MeV`) 及 emax4/6 短流。两份短流 J64 均与优化前
+逐字节相同；emax4 墙钟 `0.602 -> 0.408 s`，emax6
+`11.70 -> 6.81 s`，后者 V/build/BLAS 分别为
+`2.851/2.765/0.072 s`，峰值 RSS `280880 KiB`。emax6 1/64 线程的
+0B/1B 差为零、2B 最坏 `8.88e-16 MeV`。下一门禁是在 point7 对该 commit
+重新跑四核 `s=100, rtol=atol=1e-10` 与 NCSM 谱；上一轮 jobs 只验收到
+前一版 Pandya 复用，不能代替本轮回归。通过前仍只称“本地短流优化通过”。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；

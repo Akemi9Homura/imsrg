@@ -171,6 +171,17 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `100377/100379/100381/100383` 已通过；新旧真空 Hamiltonian 全局最坏
       `7.44e-13 MeV`，四核各三条 NCSM 低能谱全局最坏变化
       `2.13e-13 MeV`，本项验收完成。
+- [x] 进一步把 V 的 Pandya `lambda2` 中间指标限制到 cumulant 的精确轨道
+      支撑域。若参考态在全空间活跃，该实现自动回到原全矩阵乘法；若固定
+      emax2 参考嵌入较大流空间，则只形成
+      `X(:,A) Lambda(A,A) Y(A,:)`，不引入阈值或近似。emax4/emax6 单线程
+      短流均与优化前 J64 逐字节相同；emax4 总时由 `0.602 s` 降至
+      `0.408 s`，emax6 由 `11.70 s` 降至 `6.81 s`，其中 emax6 V 从
+      `7.751 s` 降至 `2.851 s`、BLAS 从 `1.873 s` 降至 `0.072 s`。
+      emax6 的 1/64 线程两体最坏差仍为 `8.88e-16 MeV`，emax2 Python
+      oracle 仍为 `3.106e-12 MeV`；随机全活跃参考及四核 checkpoint 的
+      `MRCorrelatedDriver` 用时 `350.49 s` 并通过。实现 commit
+      `cef4fce6`。
 - [x] 只有验证 emax6 interaction 的来源、header 和校验和后，才重复
       emax6 RHS/短流；不得使用文件名含 `candidate` 的核力产生验收结果。
       输入前置现已通过：从冻结 emax14 母文件
@@ -178,9 +189,13 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       emax6 文件 SHA-256 `199d5a7a...b913b`；emax4→emax2 校准逐字节相同，
       emax14→emax6 在 A=4/16 下逐 J-channel 严格零差。旧 candidate 最坏
       差 `3.8147e-6 MeV`，继续禁用。He4 Nrefmax=2 嵌入参考的真实 emax6
-      固定 RK4 一步已完成：56 个 J-orbit、467032 条 TBME，单线程
-      `11.70 s`、峰值 RSS `281132 KiB`，1/64 线程两体最坏差
+      固定 RK4 一步已完成：56 个 J-orbit、467032 条 TBME；活跃支撑域优化后
+      单线程 `6.81 s`、峰值 RSS `280880 KiB`，1/64 线程两体最坏差
       `8.88e-16 MeV`，且未构造 dense m-scheme Hamiltonian。
+- [ ] 对 `cef4fce6` 的活跃支撑域优化重新执行 point7 四核
+      `s=100, rtol=atol=1e-10` 完整流和 NCSM 谱回归；上一轮 jobs
+      `100377/100379/100381/100383` 只验收到了前一版 Pandya 复用实现，
+      不能替代本轮远端回归。
 - [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
       Magnus/重启策略；登录节点禁止重计算，统一由 point7 Slurm 运行。
 

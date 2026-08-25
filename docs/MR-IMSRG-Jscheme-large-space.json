@@ -1,6 +1,6 @@
 {
-  "schema": "mrimsrg_jscheme_large_space_acceptance_v3",
-  "implementation_commit": "2458d48c0365976a3bb11fb8dc12e4f99d0dd7a4",
+  "schema": "mrimsrg_jscheme_large_space_acceptance_v4",
+  "implementation_commit": "cef4fce6d94132c20d0dce939297b45041f7645a",
   "baseline_profiler_commit": "1f02961a2c8ab9560ece346284ab4dd2d7a25337",
   "shell_model_obs_commit": "4b10afab0218711b0278ef66ad73e88bc7791c34",
   "host": "DESKTOP-EIV63LR",
@@ -102,6 +102,32 @@
     "v_speedup_vs_after_vi": 1.856738409597878,
     "whole_short_flow_speedup_vs_baseline": 2.275872226664017
   },
+  "single_thread_after_lambda_active_support": {
+    "implementation_commit": "cef4fce6d94132c20d0dce939297b45041f7645a",
+    "omp_num_threads": 1,
+    "openblas_num_threads": 1,
+    "wall_seconds": 0.40846,
+    "maximum_rss_kib": 54532,
+    "support_definition": "exact union of spherical orbits present in nonzero standard-coupled lambda2 elements; no numerical threshold",
+    "output_bitwise_equal_to_previous": true,
+    "profiler_seconds": {
+      "mr_comm221_lambda2_setup": 0.00618,
+      "mr_comm221_lambda2_iv": 0.00827,
+      "mr_comm221_lambda2_v": 0.14725,
+      "mr_comm221_lambda2_v_build": 0.13835,
+      "mr_comm221_lambda2_v_blas": 0.00656,
+      "mr_comm221_lambda2_v_partial_trace": 0.00179,
+      "mr_comm221_lambda2_vi": 0.02237,
+      "mr_comm221_lambda2_vi_trace": 0.00291,
+      "mr_comm221_lambda2_total": 0.18413,
+      "mr_lambda2_commutator_addons": 0.18446,
+      "existing_sr_commutator": 0.04488,
+      "generator_update": 0.10467
+    },
+    "v_speedup_vs_pandya_reuse": 2.253718166383701,
+    "whole_short_flow_speedup_vs_pandya_reuse": 1.474611957107183,
+    "whole_short_flow_speedup_vs_baseline": 3.3557753513195907
+  },
   "thread_reproducibility": {
     "compared_threads": [1, 64],
     "thread64_wall_seconds": 1.10230,
@@ -165,6 +191,30 @@
         "generator_update": 2.18994
       }
     },
+    "single_thread_after_lambda_active_support": {
+      "implementation_commit": "cef4fce6d94132c20d0dce939297b45041f7645a",
+      "wall_seconds": 6.81,
+      "maximum_rss_kib": 280880,
+      "output_bitwise_equal_to_previous": true,
+      "profiler_seconds": {
+        "mr_comm221_lambda2_setup": 0.25213,
+        "mr_comm221_lambda2_iv": 0.05507,
+        "mr_comm221_lambda2_v": 2.85127,
+        "mr_comm221_lambda2_v_build": 2.76455,
+        "mr_comm221_lambda2_v_blas": 0.07208,
+        "mr_comm221_lambda2_v_partial_trace": 0.00744,
+        "mr_comm221_lambda2_vi": 0.23404,
+        "mr_comm221_lambda2_vi_trace": 0.02272,
+        "mr_comm221_lambda2_total": 3.39270,
+        "mr_lambda2_commutator_addons": 3.39644,
+        "existing_sr_commutator": 0.60095,
+        "generator_update": 2.19426
+      },
+      "v_speedup": 2.718300967638982,
+      "v_build_speedup": 2.117910690709157,
+      "v_blas_speedup": 25.984045504994448,
+      "whole_short_flow_speedup": 1.7180616740088106
+    },
     "thread_reproducibility": {
       "compared_threads": [1, 64],
       "thread64_wall_seconds": 14.20,
@@ -186,11 +236,24 @@
     "full_emax6_flow_claimed": false
   },
   "regression": {
-    "ctest": ["MRReference", "MRDriver", "MRSRDriver", "MRCorrelatedDriver"],
-    "mr_correlated_driver_seconds": 351.93,
+    "ctest": ["MRReference", "MRDriver", "MRSRDriver", "MRCorrelatedDriver", "MRDenominators"],
+    "mr_correlated_driver_seconds": 350.49,
+    "emax2_python_oracle_rhs_max_abs_mev": 3.105959933691338e-12,
+    "emax6_lambda_active_support_thread_reproducibility": {
+      "compared_threads": [1, 64],
+      "thread64_wall_seconds": 8.71,
+      "thread64_maximum_rss_kib": 432260,
+      "zero_body_max_abs_mev": 0.0,
+      "one_body_max_abs_mev": 0.0,
+      "two_body_max_abs_mev": 8.881784197001252e-16,
+      "passed": true
+    },
     "point7_full_flow_jobs": [100377, 100379, 100381, 100383],
+    "point7_full_flow_jobs_validate_through_commit": "2458d48c0365976a3bb11fb8dc12e4f99d0dd7a4",
+    "lambda_active_support_point7_full_flow_pending": true,
     "point7_maximum_vacuum_h_abs_vs_preoptimization_mev": 7.442935157087049e-13,
     "maximum_ncsm_spectral_abs_vs_preoptimization_mev": 2.1316282072803006e-13,
-    "passed": true
+    "local_regression_passed": true,
+    "passed": false
   }
 }
