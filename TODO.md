@@ -283,9 +283,31 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       的方法依据。可复现选择器和 CTest 为
       `select_downstream_flow_window.py`/`MRDownstreamWindow`，当前唯一通过点
       是 `s=0.02`。严格 `Rgen/Rgen0<=1e-6` 继续作为独立失败门禁。
-- [ ] 只在上述 finite-s rule 冻结后运行 emax6 短流窗。Magnus 只能改善
-      积分/重启成本，不能被当作修复 IMSRG(2) 长流谱漂移的办法；若确需
-      接入，仍须从同一 RHS、短流、真空物化和后 NCSM 谱重新验收。
+- [x] 只在上述 finite-s rule 冻结后运行 emax6 短流窗。canonical
+      NNLOopt `emax=6,e2max=12` 输入 SHA-256 为
+      `199d5a7a...b913b`；嵌入的 He4 `Nrefmax=2` 参考保持原 emax2
+      占据/`lambda2`，新增轨道严格为空。point7 job `100432` 已完成
+      `s=0->0.02` direct flow（`10.48 s`, `886.6 MB`），实际
+      `||eta||/||eta(0)||=0.96099`；它是 finite-s pilot，不是严格脱耦。
+- [x] emax6 的 lossless J64、独立 no2bpack exporter 和生产 no2bpack
+      已通过 `Nmax=8` 三态谱闭环；两条 no2b 写路径的三态能量在
+      double 数值噪声内相同。job `100434` 把 ODE 容差从 `1e-9`
+      收紧到 `1e-10`，J64 0/1/2B 最坏变化
+      `1.18e-13/1.13e-13/4.16e-13 MeV`，三态最坏变化约
+      `1.2e-10 keV`，通过 `<1 keV` 门禁。
+- [ ] 完成 emax6 最大可行 NCSM 代理门禁。裸 Hamiltonian 与
+      `s=0.02` 的 `Nmax=2,4,6,8` 已完成；流后相邻 Nmax gap 均小于
+      裸值，但 `Nmax=8` 的流/裸基态差为 `-102.717 keV`，恰高于
+      100 keV 原型预算。point7 Nmax10 重试 jobs `100441/100442`
+      正在运行；只有流后 `Nmax8->10` gap 不变差且 Nmax10 流/裸差
+      `<=100 keV` 才把 `s=0.02` 记为 emax6 的最大可算空间 pilot。
+      这不是 emax6 全空间 (`Nmax=24`) 漂移门禁，不能冒充
+      `prototype_downstream_stability_v1` 的严格通过。
+- [ ] 根据上述实测作出下一步决定：若代理门禁通过，冻结 emax6
+      finite-s 下游 Hamiltonian 与资源/误差记录，再评估 emax8；若失败，
+      拒绝该点并缩短流窗。Magnus 只能改善积分/重启成本，不能被当作修复
+      IMSRG(2) 长流谱漂移的办法；若确需接入，仍须从同一 RHS、短流、
+      真空物化和后 NCSM 谱重新验收。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

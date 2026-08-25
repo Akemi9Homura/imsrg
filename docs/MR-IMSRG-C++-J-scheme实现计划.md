@@ -354,6 +354,43 @@ Vobig 给出的阈值；文献依据仅是 Sec. 6.5.5 用后 NCSM 平台区分�
 与诱导高体项失控。`select_downstream_flow_window.py` 从机器 JSON 重算
 每项判据，当前选择 `s=0.02`，而严格脱耦仍独立返回失败。
 
+### 5.2 当前执行边界：emax6 finite-s pilot
+
+emax4 已证明长流会放大 IMSRG(2) 截断误差，因此 emax6 不再先追逐
+`eta/eta(0)<=1e-6`。执行对象冻结为同一个 He4 `Nrefmax=2` emax2 NCSM
+参考态的严格 embedding、canonical NNLOopt `emax=6,e2max=12` 输入和
+`s=0.02` 短流。该 embedding 只是隔离 C++ J-scheme 容量与有限流行为，
+不是在 emax6 参考空间重新求解 NCSM。
+
+当前步骤和判定顺序如下：
+
+1. 输入必须追溯到已冻结的 emax14 母文件并逐 channel 校验；当前使用文件
+   SHA-256 为 `199d5a7a...b913b`。旧 candidate 与母文件相差
+   `3.8147e-6 MeV`，不得用于结果。
+2. point7 只通过根目录 `gen_job.py --mr-jscheme` 运行 direct flow。
+   job `100432` 已完成 `s=0->0.02`（`10.48 s`, `886.6 MB`）；终点
+   `||eta||/||eta(0)||=0.96099`，所以只进入 downstream pilot，不称为
+   严格脱耦。job `100434` 已完成十倍更严 ODE 容差复算。
+3. J64 与两条独立 no2bpack 写路径必须由同一 NCSM reader 对角化。
+   当前 `Nmax=8` 三态谱在两条 no2b 写路径间为 double 数值噪声；
+   `1e-9` 对 `1e-10` 的 J64 0/1/2B 最坏差为
+   `1.18e-13/1.13e-13/4.16e-13 MeV`，谱差约 `1.2e-10 keV`。
+4. 裸与流后 Hamiltonian 使用完全相同的 NCSM 截断序列。`Nmax=2,4,6,8`
+   的相邻 gap 均得到改善，但 Nmax8 流/裸基态差为 `-102.717 keV`，尚不能
+   在 100 keV 预算内作出代理判定。Nmax10 jobs `100441/100442` 用带输入、
+   executable 和环境哈希的 `--mr-ncsm-readback` 单点脚本运行；计算节点
+   不提供 `/usr/bin/time`，生成器已改用 `/proc/<pid>/status` 采样 VmHWM。
+5. 若 Nmax10 的流后 `Nmax8->10` gap 不大于裸 gap，且 Nmax10 流/裸差
+   `<=100 keV`，则只记为“emax6 最大可算 Nmax 代理通过”；若任一项失败，
+   拒绝 `s=0.02` 并缩短流窗。由于 emax6 的全空间是 Nmax24，任何一种
+   结果都不能写成 emax6 完整 `prototype_downstream_stability_v1` 通过。
+6. 只有上述物理/格式/ODE 门都通过后才评估 emax8。Magnus 不是谱漂移
+   修正项；是否实现只由 direct-flow 内存、checkpoint 和 wall 实测决定，
+   并仍需重复 RHS、物化与后 NCSM 验收。
+
+这一阶段继续保留两个独立结论：C++ J-scheme 公式与实现门禁已经通过；
+有限流能否作为更大空间下游 Hamiltonian，则由后 NCSM 数据单独决定。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；
