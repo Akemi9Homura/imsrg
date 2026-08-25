@@ -1,5 +1,5 @@
 {
-  "schema": "mrimsrg_jscheme_large_space_acceptance_v8",
+  "schema": "mrimsrg_jscheme_large_space_acceptance_v9",
   "implementation_commit": "6e02676ce00e237efdbf6cb71df9315f7c576143",
   "baseline_profiler_commit": "1f02961a2c8ab9560ece346284ab4dd2d7a25337",
   "shell_model_obs_commit": "4b10afab0218711b0278ef66ad73e88bc7791c34",
@@ -541,6 +541,34 @@
       "maximum_ncsm_energy_abs_kev": 3e-11,
       "target_kev": 1.0,
       "passed": true
+    },
+    "finite_s_operational_gate": {
+      "name": "prototype_downstream_stability_v1",
+      "literature_basis": "Vobig 2020 Sec. 6.5.5 uses post-NCSM flow plateaus to identify useful intermediate evolution and diagnoses renewed energy drift as omitted induced interactions",
+      "thresholds_are_literature_values": false,
+      "threshold_rationale": "an explicit prototype accuracy budget chosen before emax6 production; it must not be reported as a theorem or a published IM-NCSM threshold",
+      "thresholds": {
+        "maximum_full_space_drift_kev": 100.0,
+        "minimum_each_nmax_improvement_kev": 0.0,
+        "maximum_packing_error_kev": 1.0,
+        "maximum_ode_error_kev": 1.0,
+        "maximum_eta_norm_ratio_to_initial": 1.0
+      },
+      "point_diagnostics": {
+        "s0.02": {
+          "maximum_packing_error_kev": 0.00072584513,
+          "maximum_ode_error_kev": 3e-11,
+          "eta_norm_ratio_to_initial": 0.9658922184380784
+        }
+      },
+      "selection": "largest tested s passing every threshold",
+      "expected_selected_candidate": "s0.02"
+    },
+    "strict_decoupling_gate": {
+      "maximum_eta_norm_ratio_to_initial": 1e-6,
+      "best_eta_norm_ratio_to_initial": 0.0013101882162910403,
+      "best_tested_s": 1000.0,
+      "passed": false
     },
     "interpretation": {
       "strict_decoupling_result_obtained": false,

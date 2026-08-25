@@ -413,6 +413,15 @@ NCSM reader。每核比较三条最低能级，12 个差值中的最大值为 Be
 主要瓶颈，详见
 [`MR-IMSRG-Jscheme-large-space.json`](MR-IMSRG-Jscheme-large-space.json)。
 
+为了让这个判断可自动复现，`prototype_downstream_stability_v1` 在已测流点中
+选择满足所有条件的最大 `s`：全空间基态漂移不超过 `100 keV`，所有已测
+Nmax 的同终点截断误差都不变差，packing 与十倍 ODE 容差误差各小于
+`1 keV`，并要求生成元 norm 确实下降。100 keV 是本快速原型的工程预算，
+不是文献阈值；文献只支持使用后 NCSM 平台监测诱导高体项失控这一方法。
+`prototype/mrimsrg/select_downstream_flow_window.py` 从机器记录重算该决定，
+CTest `MRDownstreamWindow` 同时验证当前选中 `s=0.02`、`s=0.1` 因漂移
+被拒绝，以及严格脱耦门禁仍为失败。
+
 随后先对 VI 做严格等价的有限求和重排：预计算其 `(J2,w)` 迹后，emax4
 VI 用时由 `0.492 s` 降至 `0.022 s`，整个短流由 `1.37 s` 降至 `0.88 s`；
 优化前后 J64 逐元素无差，emax2 Python oracle 和完整相关参考 CTest 均

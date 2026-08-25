@@ -345,6 +345,15 @@ rule：同时约束最大可算 Nmax/全空间谱漂移、Nmax 收敛改善以�
 误差。只有这条规则写清后才把同一短流窗扩到 emax6；严格门槛继续单列为
 失败，若两种目标在 MR-IMSRG(2) 下不兼容就如实报告不兼容。
 
+该 operational rule 现冻结为 `prototype_downstream_stability_v1`：在已测点
+中选择通过全部条件的最大 `s`，要求全空间基态相对裸 Hamiltonian 漂移
+`<=100 keV`、每个已测 Nmax 相对同一流后全空间的截断误差均改善或不变、
+J64/no2bpack packing 与十倍 ODE 容差误差各 `<1 keV`，且生成元 norm
+必须下降。100 keV 是本快速原型在进入 emax6 前显式选定的工程预算，不是
+Vobig 给出的阈值；文献依据仅是 Sec. 6.5.5 用后 NCSM 平台区分有效预演化
+与诱导高体项失控。`select_downstream_flow_window.py` 从机器 JSON 重算
+每项判据，当前选择 `s=0.02`，而严格脱耦仍独立返回失败。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；

@@ -817,3 +817,5 @@ add_test(NAME MRJobGenerator
                  $<TARGET_FILE:imsrg++>)
 add_test(NAME MRTailDiagnostic
          COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRTailDiagnostic.py)
+add_test(NAME MRDownstreamWindow
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRDownstreamWindow.py)

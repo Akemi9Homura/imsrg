@@ -275,10 +275,14 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `412.148/147.117/39.306/9.869 keV`，但
       `Rgen/Rgen0=0.9659`，远未通过严格 `1e-6` 脱耦门槛。严格脱耦结果
       仍记为未获得，不得用短流候选替代。
-- [ ] 在进入 emax6 生产流前，给有限流窗增加明确的 downstream stopping
-      rule：联合限制全空间/最大可算 Nmax 谱漂移、相邻 Nmax 收敛改善和
-      ODE/格式误差。严格 `Rgen/Rgen0<=1e-6` 继续作为独立失败门禁，不得
-      静默改写；若二者在 MR-IMSRG(2) 下不兼容，报告不兼容而不是追流。
+- [x] 在进入 emax6 生产流前冻结 `prototype_downstream_stability_v1`：选择
+      通过全部门槛的最大已测 `s`，要求全空间基态漂移 `<=100 keV`、每个
+      已测 Nmax 的同终点截断误差均不得变差、packing/ODE 误差各 `<1 keV`
+      且生成元 norm 必须下降。100 keV 是快速原型的显式工程预算，不冒充
+      文献阈值；Vobig Sec. 6.5.5 只提供用后 NCSM 平台识别诱导高体项失控
+      的方法依据。可复现选择器和 CTest 为
+      `select_downstream_flow_window.py`/`MRDownstreamWindow`，当前唯一通过点
+      是 `s=0.02`。严格 `Rgen/Rgen0<=1e-6` 继续作为独立失败门禁。
 - [ ] 只在上述 finite-s rule 冻结后运行 emax6 短流窗。Magnus 只能改善
       积分/重启成本，不能被当作修复 IMSRG(2) 长流谱漂移的办法；若确需
       接入，仍须从同一 RHS、短流、真空物化和后 NCSM 谱重新验收。
