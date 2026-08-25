@@ -65,6 +65,27 @@ compares final ``H``, ``eta``, RHS, every selected denominator, and the two
 explicitly different norm conventions.  Point7 scripts for this mode must be
 created by ``gen_flow_job.py --sr-check-flow ...`` just like production flows.
 
+For a correlated-reference fixed-``s`` flow, use the production J-scheme
+validator instead. It exports the same NCSM reference to ``jref``, performs
+HO→NAT, MR normal ordering, the C++ adaptive direct flow, MR de-normal
+ordering, and NAT→HO, then compares final ``H/eta/RHS`` and the ordinary
+vacuum Hamiltonian against the Python m-scheme flow:
+
+```bash
+PYTHONPATH=prototype/mrimsrg python3 \
+  prototype/mrimsrg/mr_imsrgpp_flow_check.py \
+  --nucleus He4 --reference prototype/mrimsrg/data/He4_Nrefmax2 \
+  --interaction /path/to/fixed.minipack --production-flow /path/to/flow \
+  --pyimsrg-dir build/src --ode-tolerance 1e-9 \
+  --output-jcoupled64 /path/to/cpp_vacuum.jcoupled64 --json /path/to/report.json
+```
+
+The production and C++ tolerances must match and the Python flow must reach
+its fixed target ``s`` without an early residual stop. The checker evaluates
+the correlated generator and RHS in the temporary NAT basis and transforms
+them back to HO for comparison; attempting to evaluate them directly with a
+non-diagonal HO-basis ``gamma1`` remains an error.
+
 `commutator.py` implements the natural-orbital MR-IMSRG(2) commutator with
 `lambda3=0`.  Its equations were regenerated independently with QCombo 0.2.0:
 for a random four-orbit correlated reference, direct summation of the QCombo

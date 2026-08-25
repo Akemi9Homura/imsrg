@@ -108,6 +108,9 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `docs/MR-IMSRG-Jscheme-checkpoints.json`。四体系显式
       `H_1=H_0+10^-4 RHS(H_0)` Euler J/m 对照也通过，全局最坏
       `1.776e-15 MeV`；不使用历史上实际调用 RK4 的 `flow_euler` 名称冒充。
+- [x] 增加相关参考固定-s 完整流验收器：按生产顺序执行
+      HO→NAT→MR flow→反正规序→HO，并比较终点 `H/eta/RHS/vacuum H`；
+      He4 Nrefmax=2 本地 `s=0.01` 烟雾流最坏 `4.24e-11 MeV`。
 - [ ] 统一生成元/cutoff/停止条件/容差后比较完整流、真空
       `E0+t+V` 与 NCSM 谱；float32 `no2bpack` 只做下游格式验收。
 
