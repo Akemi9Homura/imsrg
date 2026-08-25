@@ -253,8 +253,11 @@ Frobenius 为 `1.380e-15`；最坏索引已持久化。共同
 完整流、真空物化和谱闭环已经通过。SR 逐项证据也已汇总为
 `docs/MR-IMSRG-SR-degeneration.json`：He4/O16 的输入、分母、eta、十个
 命名 RHS 项、总 RHS、Euler/RK4 和 `s=100` 完整流全部通过，代数层最坏
-为 `4.26e-14 MeV`（分母）和 `1.15e-14 MeV`（命名 RHS）。剩余严格门禁
-是做 ODE 容差收紧的后 NCSM 检查。
+为 `4.26e-14 MeV`（分母）和 `1.15e-14 MeV`（命名 RHS）。ODE 容差从
+`1e-9` 收紧到 `1e-10` 后，四核各三条最低 NCSM 能级的全局最坏变化为
+`1.683e-11 MeV = 1.683e-8 keV`，远低于 `1 keV`。因此 Gate 5 全部通过；
+逐核 Slurm job、两套谱和差值已追加到
+`docs/MR-IMSRG-Jscheme-full-flow.json`。
 
 Gate 6 的首个可复现基准也已完成。真实 `He4 Nrefmax=2`、单线程、三次
 中位数下，C++ J-scheme MR RHS 为 `6.88e-3 s`，Python dense m-scheme 为
@@ -281,7 +284,16 @@ emax2 嵌入本机 NNLOopt `emax=4,e2max=8`，目标 interaction SHA-256 为
 `d3dff5faa2a58d8c234914170caffa3649d0cd3805a1344818f4f4d3c37fd19e`；
 读回的 cumulant 收缩误差 `1.85e-15`、Hermiticity 误差为零。这里保留原始
 RDM/波函数校验和以标识固定参考态来源，不把 embedding 记作较大参考空间的
-新 NCSM 解。下一步是用该文件实际运行 emax4 RHS 和固定短流。
+新 NCSM 解。
+
+该 emax4 实测也已完成。普通 minipack 先通过不构造 m-scheme 张量的
+`mrimsrg_minipack_to_j64` 转为 A-dependent float64 J64，并逐矩阵元零误差
+读回；生产 driver 随后对 30 个 J-orbit、34320 条 TBME 做一个固定
+`ds=1e-4` RK4 步。单线程 wall time `1.37 s`、峰值 RSS `54,360 KiB`；
+1/64 线程输出的 0B/1B 差为零，2B 最坏 `4.44e-16 MeV`。新 profiler
+显示 MR `lambda2` 的 V/VI 收缩分别用时 `0.628/0.492 s`，是下一轮明确的
+优化对象。机器记录见 `docs/MR-IMSRG-Jscheme-large-space.json`；这仍是
+RHS/短流门禁，不冒充 emax4 完整收敛流。
 
 ## 7. 错误定位原则
 

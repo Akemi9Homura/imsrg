@@ -1,5 +1,5 @@
 {
-  "schema": "mrimsrg_jscheme_full_flow_acceptance_v1",
+  "schema": "mrimsrg_jscheme_full_flow_acceptance_v2",
   "flow_commit": "d5cf2877594a856387f1179204ffad090867b54c",
   "validation": {
     "cpp_ode": "boost::odeint runge_kutta_dopri5",
@@ -101,5 +101,61 @@
         "ground_state_no2bpack_minus_j64_mev": -7.55837611e-07
       }
     }
-  ]
+  ],
+  "tolerance_stability": {
+    "tightened_validation_commit": "f1949c8a252599987a5bd20c441a64868130fac5",
+    "baseline_ode_tolerance": 1e-09,
+    "tightened_ode_tolerance": 1e-10,
+    "target_s": 100.0,
+    "criterion_maximum_spectral_change_mev": 0.001,
+    "maximum_observed_spectral_change_mev": 1.6829204696477973e-11,
+    "maximum_observed_spectral_change_kev": 1.6829204696477973e-08,
+    "passed": true,
+    "cases": [
+      {
+        "nucleus": "He4",
+        "nrefmax": 2,
+        "slurm_flow_job": 100345,
+        "slurm_cpp_validation_job": 100369,
+        "tightened_cpp_python_max_abs_mev": 2.2121837122379197e-08,
+        "nmax": 8,
+        "baseline_energies_mev": [-20.490380467852031, -19.261068706505831, -19.205702863730771],
+        "tightened_energies_mev": [-20.490380467859687, -19.261068706513871, -19.20570286374495],
+        "tightened_minus_baseline_mev": [-7.65609797781508e-12, -8.039791055125534e-12, -1.41788802920928e-11]
+      },
+      {
+        "nucleus": "Be8",
+        "nrefmax": 0,
+        "slurm_flow_job": 100349,
+        "slurm_cpp_validation_job": 100373,
+        "tightened_cpp_python_max_abs_mev": 3.8983883121180874e-08,
+        "nmax": 0,
+        "baseline_energies_mev": [-27.940598864175207, -23.308509007699715, -12.635185398550094],
+        "tightened_energies_mev": [-27.940598864158378, -23.308509007685341, -12.635185398541283],
+        "tightened_minus_baseline_mev": [1.6829204696477973e-11, 1.4374279544426827e-11, 8.810729923425242e-12]
+      },
+      {
+        "nucleus": "C12",
+        "nrefmax": 0,
+        "slurm_flow_job": 100351,
+        "slurm_cpp_validation_job": 100375,
+        "tightened_cpp_python_max_abs_mev": 8.870841838870547e-10,
+        "nmax": 0,
+        "baseline_energies_mev": [-43.530789441545586, -38.65483389579547, -27.77553503619864],
+        "tightened_energies_mev": [-43.530789441540229, -38.654833895790517, -27.775535036192593],
+        "tightened_minus_baseline_mev": [5.357492227631155e-12, 4.952482868247898e-12, 6.0467186813184526e-12]
+      },
+      {
+        "nucleus": "O16",
+        "nrefmax": 2,
+        "slurm_flow_job": 100347,
+        "slurm_cpp_validation_job": 100371,
+        "tightened_cpp_python_max_abs_mev": 1.0712284392866422e-09,
+        "nmax": 2,
+        "baseline_energies_mev": [-63.80052432941001, -55.634822811507618, -55.214536909286252],
+        "tightened_energies_mev": [-63.80052432940726, -55.634822811504939, -55.214536909283545],
+        "tightened_minus_baseline_mev": [2.7498003873915877e-12, 2.6787461138155777e-12, 2.7071678232459817e-12]
+      }
+    ]
+  }
 }

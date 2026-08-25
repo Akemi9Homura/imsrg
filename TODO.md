@@ -129,8 +129,11 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `docs/MR-IMSRG-Jscheme-performance.json`。
 - [x] `He4/O16 Nrefmax=0`、`Be8/C12 Nrefmax=0` 和 `He4/O16 Nrefmax=2`
       按 E--F 门禁通过。
-- [ ] 四核完成流和 NCSM/no2bpack 读回通过，命令、commit、环境、
-      误差表、最坏元素及性能写入新验收文档。
+- [x] 四核完成流和 NCSM/no2bpack 读回通过，命令、commit、环境、
+      误差表、最坏元素及性能写入新验收文档。ODE 容差从 `1e-9` 收紧到
+      `1e-10` 后，四核各三条最低 NCSM 能级的最坏变化为
+      `1.683e-11 MeV = 1.683e-8 keV`，通过 `<1 keV` 门禁；见
+      `docs/MR-IMSRG-Jscheme-full-flow.json`。
 
 ### H. 实际较大空间门禁
 
@@ -146,10 +149,13 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       与 `prototype/mrimsrg/embed_jref.py` 已完成；真实 He4 ref2 从 emax2
       嵌入 emax4 后收缩误差 `1.85e-15`、Hermiticity 误差为零，并通过
       完整 J-scheme 文件写读闭环。
-- [ ] 使用本机已存在的 NNLOopt `hw=20, emax=4, e2max=8` 相互作用，
+- [x] 使用本机已存在的 NNLOopt `hw=20, emax=4, e2max=8` 相互作用，
       对 `He4 Nrefmax=2` 的嵌入参考实际运行一次 C++ J-scheme MR RHS 和
       固定短流；记录 wall time、峰值 RSS、各 profiler contraction、输出
       对称性和 1/64 线程数值一致性。生产运行不得构造完整 m-scheme 张量。
+      实测 30 个 J-orbit、34320 条 TBME，单线程 RK4 短流 `1.37 s`、峰值
+      RSS `54,360 KiB`；1/64 线程两体最坏差 `4.44e-16 MeV`。V/VI 收缩
+      分别占 `0.628/0.492 s`，见 `docs/MR-IMSRG-Jscheme-large-space.json`。
 - [ ] 根据 emax4 profiler 优化真实瓶颈；每次优化必须先过 emax2 的 SR、
       相关参考逐项、完整流和 NCSM 回归，再重跑 emax4 门禁。
 - [ ] 只有验证 emax6 interaction 的来源、header 和校验和后，才重复

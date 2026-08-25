@@ -398,3 +398,17 @@ Hamiltonian。四核全局 max-abs 依次为
 同一解析还发现 ordered particle-hole 收缩不应同时保留全部 J/parity/Tz
 块；改成逐块构造和释放后，该项 `emax=14` scratch 估算由 `48.46 GB`
 降到 `2.87 GB`，公式与数值结果不变。
+
+十倍 ODE 容差门禁随后在 point7 完成：四核固定在同一 `s=100`，把
+`rtol=atol=1e-9` 收紧到 `1e-10`，再用 C++ 物化的 float64 J64 交给独立
+NCSM reader。每核比较三条最低能级，12 个差值中的最大值为 Be8 基态的
+`1.683e-11 MeV = 1.683e-8 keV`，远低于 `1 keV`；完整 job、谱和误差见
+[`MR-IMSRG-Jscheme-full-flow.json`](MR-IMSRG-Jscheme-full-flow.json)。
+
+较大空间的第一个真实运行门禁也已接通：`He4 Nrefmax=2` 的固定参考态
+嵌入 NNLOopt `hw=20, emax=4, e2max=8`，新轨道零占据/零 cumulant、NAT
+单位块。生产 J-scheme driver 的一个 `ds=1e-4` RK4 步单线程用时
+`1.37 s`、峰值 RSS `54,360 KiB`，1/64 线程输出最坏差
+`4.44e-16 MeV`；运行未构造稠密 m-scheme Hamiltonian。V/VI 两项是实测
+主要瓶颈，详见
+[`MR-IMSRG-Jscheme-large-space.json`](MR-IMSRG-Jscheme-large-space.json)。
