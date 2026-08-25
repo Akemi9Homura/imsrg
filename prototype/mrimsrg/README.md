@@ -178,6 +178,11 @@ projected J-coupled data with maximum errors `3.55e-15 MeV`.  At `Nmax=8`,
 the direct double-precision dense path gives `-20.3396323958 MeV` and the
 packed reader gives `-20.3396333376 MeV`; their `0.942 keV` difference is the
 measured float32 OBME/TBME packing effect.
+The independent `/home/mengziyan/fciqmc/fciqmc-mpi` production reader also
+completed a one-step He4 FCIQMC initialization from this exact file with
+`int_format=no2bpack`.  Its native NCSM executable reproduced the same three
+levels as `-20.3396333376`, `-16.6810264996`, and `-16.6581354522 MeV`
+(`2J=0,0,4`).
 
 Read the exported file through the independent native `no2bpack` reader and
 the same NCSM solver with:

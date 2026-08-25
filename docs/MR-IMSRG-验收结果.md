@@ -51,6 +51,11 @@ Hamiltonian、RDM 和日志均保留在被 Git 忽略的本机/集群结果目�
 - 新短流的 He4 `Nmax=8` dense NCSM 基态为 `-20.3396323958 MeV`，
   `no2bpack` 原生 reader 得到 `-20.3396333376 MeV`，相差 `0.942 keV`；
   这是既有格式用 float32 保存 OBME/TBME 的量化舍入误差。
+- 同一文件已直接交给 `/home/mengziyan/fciqmc/fciqmc-mpi`：生产
+  FCIQMC 可执行文件用 `int_format=no2bpack` 完成 Hamiltonian 初始化和一步
+  演化；该仓库的独立 NCSM 可执行文件在 3060 维 `Nmax=8` 空间得到前三态
+  `-20.3396333376,-16.6810264996,-16.6581354522 MeV`，对应
+  `2J=0,0,4`，与本仓库 no2bpack 验证器逐态一致。
 
 ## 3. 旧流撤销与更正
 
