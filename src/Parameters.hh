@@ -66,7 +66,9 @@ std::map<std::string,std::string> Parameters::string_par = {
   {"flowfile",			"default"},	// name of output flow file
   {"intfile",			"default"},	// name of output interaction fille
   {"write_H_no2bpack",		"none"},	// write final IMSRG(2) H(s), vacuum normal ordered in the active basis
-  {"fmt2",			"me2j"},	// can also be navratil/Navratil, oslo, oakridge, takayuki, nushellx, no2bpack
+  {"write_H_jcoupled64",		"none"},	// lossless float64 J-coupled final Hamiltonian for strict validation
+  {"mr_reference_file",		"none"},	// explicit mrimsrg_jref_v1 reference for direct J-scheme MR-IMSRG
+  {"fmt2",			"me2j"},	// can also be navratil/Navratil, oslo, oakridge, takayuki, nushellx, no2bpack, jcoupled64
   {"fmt3",			"me3j"},	// can also be navratil or Navratil to read Petr's TBME format
   {"input_op_fmt",		"navratil"},	// navratil means read Petr Navratil's format for 2b currents. miyagi means Takayuki Miyagi's format.
   {"reference",			"default"},	// nucleus used for HF and normal ordering.
@@ -123,6 +125,7 @@ std::map<std::string,double> Parameters::double_par = {
   {"dE3max",		  99},  // cut on energies which limits the 3-body states considered in IMSRG(3) commutators
   {"OccNat3Cut",	  -1},  // cut on natural orbital occupations which limits the 3-body states considered in IMSRG(3) commutators
   {"threebody_threshold",  0},   // when the norm of A or B is below threebody_threshold, don't use IMSRG(3) in evaluating [A,B].
+  {"mr_validation_tolerance", 1e-10}, // validation tolerance for explicit MR reference input
 
 };
 

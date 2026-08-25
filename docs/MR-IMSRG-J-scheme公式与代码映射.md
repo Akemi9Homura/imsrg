@@ -238,6 +238,21 @@ Gamma'^J = (D^J)^T Gamma^J D^J.
 完整 m-scheme 张量，与 Python 对每个二体指标依次作用同一正交矩阵的结果
 逐元素符合到 `3e-11`。生产流中不建立 m-scheme 张量。
 
+## 10. `imsrg++` 显式 MR driver 顺序
+
+`mr_reference_file` 先只读占据并调用 `ModelSpace::SetReference()` 重建
+occupation-dependent ket lists，再读完整自然变换和 `lambda2`。由于分数
+trace 在旧 `ModelSpace` 整数 `Aref/Zref` 路径中可能向下取整，driver 随后
+用 jref 中已验证的整数 `A/Z` 恢复 `target_mass/target_Z`，保证后续普通
+me2j 路径的 A-dependent 内禀动能正确。
+
+Hamiltonian 在同一 ModelSpace 中完成 HO→NAT 与 MR 正规序；solver 通过
+`SetMRReference()` 显式取得 density context。结束后先在 NAT 基调用
+`UndoNormalOrder()`，再以 `U^T` 变回 HO。float64 `jcoupled64` 保存严格
+检查点，既有 float32 `no2bpack` 保存 NCSM/FCIQMC 生产文件。端到端测试
+使用真实 `He4 Nrefmax=2` 波函数和 NNLOopt Hamiltonian，同时覆盖 `s=0`
+和 `ds=1e-4` 的完整 RK4 driver。
+
 随机严格标量张量要求 J/m 转换 `<=1e-12`；真实 RDM 的输入标量投影
 残差单独报告并暂以 `1e-10` 为拒绝阈值。所有能量/RHS contraction 的
 coupled 对 m-scheme 误差仍要求 `<=1e-10 MeV`。

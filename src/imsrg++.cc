@@ -51,6 +51,7 @@
 #include <iomanip>
 #include <sstream>
 #include <fstream>
+#include <memory>
 #include <stdio.h>
 #include <string>
 #include <omp.h>
@@ -84,6 +85,8 @@ int main(int argc, char** argv)
   std::string flowfile = parameters.s("flowfile");
   std::string intfile = parameters.s("intfile");
   std::string write_H_no2bpack = parameters.s("write_H_no2bpack");
+  std::string write_H_jcoupled64 = parameters.s("write_H_jcoupled64");
+  std::string mr_reference_file = parameters.s("mr_reference_file");
   std::string core_generator = parameters.s("core_generator");
   std::string valence_generator = parameters.s("valence_generator");
   std::string fmt2 = parameters.s("fmt2");
@@ -164,6 +167,10 @@ int main(int argc, char** argv)
   double dE3max = parameters.d("dE3max");
   double OccNat3Cut = parameters.d("OccNat3Cut");
   double threebody_threshold = parameters.d("threebody_threshold");
+  double mr_validation_tolerance = parameters.d("mr_validation_tolerance");
+
+  const bool use_mr_reference = mr_reference_file != "none" &&
+                                mr_reference_file != "";
 
   std::vector<std::string> opnames = parameters.v("Operators");
   std::vector<std::string> opsfromfile = parameters.v("OperatorsFromFile");
@@ -213,6 +220,12 @@ int main(int argc, char** argv)
       std::cout << "trouble reading " << input3bme << " exiting. " << std::endl;
       return 1;
     }
+  }
+  if (use_mr_reference and not std::ifstream(mr_reference_file).good())
+  {
+    std::cerr << "trouble reading MR reference " << mr_reference_file
+              << " exiting." << std::endl;
+    return 1;
   }
 
   // unpack the awkward input format for reading an operator from file, and put it into a struct.
@@ -384,6 +397,70 @@ int main(int argc, char** argv)
   if (lmax3>0)
      modelspace.SetLmax3(lmax3);
 
+  std::unique_ptr<MRReference> mr_reference_context;
+  if (use_mr_reference)
+  {
+    const int requested_target_mass = modelspace.GetTargetMass();
+    const int requested_target_Z = modelspace.GetTargetZ();
+    const bool direct_method = method == "flow" || method == "flow_adaptive" ||
+                               method == "flow_euler" || method == "flow_RK4";
+    if (physical_system != "nuclear" || basis != "oscillator" ||
+        !direct_method || nsteps != 1 || input3bme != "none" || IMSRG3 ||
+        perturbative_triples || goose_tank || std::abs(BetaCM) > 1e-12 ||
+        core_generator != "white-ncsm" || !modelspace.valence.empty() ||
+        eMax_imsrg != -1 || e2Max_imsrg != -1 || e3Max_imsrg != -1 ||
+        eMax_3body_imsrg != -1 ||
+        !opnames.empty() || !opsfromfile.empty() || !opnamesPT1.empty() ||
+        !opnamesRPA.empty() || !opnamesTDA.empty())
+    {
+      std::cerr << "Explicit MR-IMSRG currently requires nuclear basis=oscillator, "
+                << "a one-step direct flow, 3bme=none, IMSRG(2), BetaCM=0, "
+                << "core_generator=white-ncsm, no secondary IMSRG-space "
+                << "truncation, no valence space, and no flowing extra operators."
+                << std::endl;
+      return EXIT_FAILURE;
+    }
+    if (fmt2 == "jcoupled64" and nucleon_mass_correction)
+    {
+      std::cerr << "jcoupled64 already contains the complete A-dependent vacuum "
+                << "Hamiltonian; nucleon_mass_correction must be false." << std::endl;
+      return EXIT_FAILURE;
+    }
+    try
+    {
+      modelspace.SetReference(
+          MRReference::ReadOccupationMap(modelspace, mr_reference_file));
+      mr_reference_context.reset(new MRReference(
+          MRReference::ReadBinary(modelspace, mr_reference_file,
+                                  mr_validation_tolerance)));
+    }
+    catch (const std::exception& error)
+    {
+      std::cerr << "MR reference setup failed: " << error.what() << std::endl;
+      return EXIT_FAILURE;
+    }
+    if (mr_reference_context->A != requested_target_mass ||
+        mr_reference_context->Z != requested_target_Z)
+    {
+      std::cerr << "MR reference A/Z does not match the driver target: reference A="
+                << mr_reference_context->A << " Z=" << mr_reference_context->Z
+                << " target A=" << requested_target_mass << " Z="
+                << requested_target_Z << std::endl;
+      return EXIT_FAILURE;
+    }
+    // SetReference() rebuilds occupation-dependent channels and derives an
+    // integer Aref/Zref from floating traces.  Restore the exact validated
+    // target for the A-dependent intrinsic kinetic energy.
+    modelspace.SetTargetMass(mr_reference_context->A);
+    modelspace.SetTargetZ(mr_reference_context->Z);
+    std::cout << "Enabled explicit J-scheme MR-IMSRG: reference="
+              << mr_reference_file << " A=" << mr_reference_context->A
+              << " Z=" << mr_reference_context->Z
+              << " Nrefmax=" << mr_reference_context->Nrefmax
+              << " lambda3=0 interaction_sha256="
+              << mr_reference_context->interaction_sha256 << std::endl;
+  }
+
 
 
 // For both dagger operators and single particle wave functions, it's convenient to
@@ -467,6 +544,8 @@ int main(int argc, char** argv)
       rw.ReadTBME_Oslo(inputtbme, Hbare);
     else if (fmt2 == "no2bpack" )
       rw.Read_no2bpack(inputtbme, Hbare);
+    else if (fmt2 == "jcoupled64" )
+      rw.Read_jcoupled64(inputtbme, Hbare);
     else if (fmt2.find("oakridge") != std::string::npos )
     { // input format should be: singleparticle.dat,vnn.dat
       size_t comma_pos = inputtbme.find_first_of(",");
@@ -487,6 +566,8 @@ int main(int argc, char** argv)
 
     std::cout << "done reading 2N" << std::endl;
   }
+  if (use_mr_reference && !rw.goodstate)
+    return EXIT_FAILURE;
 
   // Read in the 3-body file
   if (Hbare.particle_rank >=3)
@@ -534,7 +615,7 @@ int main(int argc, char** argv)
     Hbare /= PhysConst::HARTREE; // Convert to Hartree
   }
 
-  if (fmt2 != "nushellx" and fmt2 != "no2bpack" and physical_system != "atomic" and hw_trap < 0)  // Don't need to add kinetic energy if it is already in the input interaction
+  if (fmt2 != "nushellx" and fmt2 != "no2bpack" and fmt2 != "jcoupled64" and physical_system != "atomic" and hw_trap < 0)  // Don't need to add kinetic energy if it is already in the input interaction
   {
     Hbare += imsrg_util::Trel_Op(modelspace);
     if (Hbare.OneBody.has_nan())
@@ -674,7 +755,33 @@ int main(int argc, char** argv)
   if (input3bme_type=="no2b") hno_particle_rank = 2;
 
   Operator& HNO = Hbare; // The reference & means we overwrite Hbare and save some memory
-  if (basis == "HF" and method !="HF")
+  if (use_mr_reference)
+  {
+    if (hno_particle_rank != 2 || Hbare.GetParticleRank() != 2)
+    {
+      std::cerr << "Explicit MR-IMSRG currently supports NN/NO2B operators only."
+                << std::endl;
+      return EXIT_FAILURE;
+    }
+    try
+    {
+      Operator Hvac_nat = Hbare.TransformOneAndTwoBody(
+          mr_reference_context->NaturalOrbitTransformation,
+          mr_validation_tolerance);
+      HNO = mr_reference_context->NormalOrder(Hvac_nat);
+    }
+    catch (const std::exception& error)
+    {
+      std::cerr << "MR natural-basis normal ordering failed: " << error.what()
+                << std::endl;
+      return EXIT_FAILURE;
+    }
+    std::cout << std::setprecision(12)
+              << "MR initial natural-basis Hamiltonian: E=" << HNO.ZeroBody
+              << " ||f||=" << HNO.OneBodyNorm()
+              << " ||Gamma||=" << HNO.TwoBodyNorm() << std::endl;
+  }
+  else if (basis == "HF" and method !="HF")
   {
     HNO = hf.GetNormalOrderedH( hno_particle_rank );
 //    if ((IMSRG3 or perturbative_triples) and OccNat3Cut>0 ) hf.GetNaturalOrbitals();
@@ -754,7 +861,7 @@ int main(int argc, char** argv)
   HNO -= BetaCM * 1.5*hwBetaCM; // This is just the zero-body piece. The other stuff was added earlier.
   std::cout << "Hbare 0b = " << std::setprecision(8) << HNO.ZeroBody << std::endl;
 
-  if (method != "HF")
+  if (method != "HF" && !use_mr_reference)
   {
     std::cout << "Perturbative estimates of gs energy:" << std::endl;
     double EMP2 = HNO.GetMP2_Energy();
@@ -1011,7 +1118,12 @@ int main(int argc, char** argv)
   else
   {
     std::cout << "Im here " << __LINE__ << " particle rank is " << HNO.GetParticleRank() << " IMSRG3 is " << IMSRG3 << std::endl;
-    HNO.SetModelSpace(modelspace_imsrg);
+    // The explicit MR reference and all of its TwoBodyME storage are tied to
+    // the original ModelSpace.  MR mode rejects a secondary truncation above,
+    // so keep that single shared context instead of repointing only the
+    // Operator wrapper at an equivalent ModelSpace copy.
+    if (!use_mr_reference)
+      HNO.SetModelSpace(modelspace_imsrg);
     if (HNO.GetParticleRank()<3 and IMSRG3) {
         HNO.ThreeBody.SetMode("pn");
         HNO.SetParticleRank(3);
@@ -1021,7 +1133,7 @@ int main(int argc, char** argv)
   }
 
  // After truncating, get the perturbative energies again to see how much things changed.
-  if (eMax_imsrg != eMax)
+  if (eMax_imsrg != eMax && !use_mr_reference)
   {
     std::cout << "Perturbative estimates of gs energy:" << std::endl;
     double EMP2 = HNO.GetMP2_Energy();
@@ -1045,6 +1157,8 @@ int main(int argc, char** argv)
 //// Now we're ready do to the IMSRG calculation.
 
   IMSRGSolver imsrgsolver(HNO);
+  if (use_mr_reference)
+    imsrgsolver.SetMRReference(*mr_reference_context);
 //  imsrgsolver.SetHin(HNO); // necessary?
   imsrgsolver.SetReadWrite(rw);
   imsrgsolver.SetMethod(method);
@@ -1208,37 +1322,57 @@ int main(int argc, char** argv)
 
   }
 
-  // Diagnostic export for IM-FCIQMC.  Keep the active HF single-particle basis,
-  // but undo normal ordering with respect to the reference determinant so the
-  // resulting 0B/1B/2B operator can be consumed as an ordinary Hamiltonian.
+  // Materialize an ordinary vacuum 0B/1B/2B Hamiltonian.  SR keeps the active
+  // HF basis; explicit MR first undoes correlated normal ordering in the
+  // natural basis and then rotates the result back to the original HO basis.
   // This must happen before any targeted/ensemble re-normal-ordering below.
-  if (write_H_no2bpack != "none")
+  if (write_H_no2bpack != "none" || write_H_jcoupled64 != "none")
   {
-    if (basis != "HF")
+    if (!use_mr_reference && basis != "HF")
     {
-      std::cerr << "write_H_no2bpack requires basis=HF; got basis=" << basis << std::endl;
+      std::cerr << "vacuum Hamiltonian export requires basis=HF unless an "
+                << "explicit MR reference supplies the HO/NAT transformation; got basis="
+                << basis << std::endl;
       return EXIT_FAILURE;
     }
     if (IMSRG3 or imsrg3_at_end or imsrgsolver.GetH_s().GetParticleRank() > 2)
     {
-      std::cerr << "write_H_no2bpack currently supports IMSRG(2) only." << std::endl;
+      std::cerr << "vacuum Hamiltonian export currently supports IMSRG(2) only."
+                << std::endl;
       return EXIT_FAILURE;
     }
 
     const double imsrg_energy = imsrgsolver.GetH_s().ZeroBody;
-    Operator Hvac = imsrgsolver.GetH_s().UndoNormalOrdering();
-    const double reference_energy = Hvac.DoNormalOrdering().ZeroBody;
+    Operator Hvac;
+    double reference_energy = 0.0;
+    if (use_mr_reference)
+    {
+      Operator Hvac_nat = mr_reference_context->UndoNormalOrder(
+          imsrgsolver.GetH_s());
+      reference_energy = mr_reference_context->NormalOrder(Hvac_nat).ZeroBody;
+      Hvac = Hvac_nat.TransformOneAndTwoBody(
+          mr_reference_context->NaturalOrbitTransformation.t(),
+          mr_validation_tolerance);
+    }
+    else
+    {
+      Hvac = imsrgsolver.GetH_s().UndoNormalOrdering();
+      reference_energy = Hvac.DoNormalOrdering().ZeroBody;
+    }
     if (not std::isfinite(imsrg_energy) or not std::isfinite(reference_energy))
     {
-      std::cerr << "write_H_no2bpack: the IMSRG flow produced a non-finite "
-                << "Hamiltonian; refusing to export " << write_H_no2bpack << std::endl;
+      std::cerr << "vacuum Hamiltonian export: the IMSRG flow produced a "
+                << "non-finite Hamiltonian; refusing output." << std::endl;
       return EXIT_FAILURE;
     }
     std::cout << std::setprecision(12)
               << "IM-FCIQMC export check: H(s).ZeroBody = " << imsrg_energy
               << "  reference diagonal after UndoNormalOrdering = " << reference_energy
               << "  difference = " << reference_energy-imsrg_energy << std::endl;
-    rw.Write_no2bpack(write_H_no2bpack, Hvac);
+    if (write_H_jcoupled64 != "none")
+      rw.Write_jcoupled64(write_H_jcoupled64, Hvac);
+    if (write_H_no2bpack != "none")
+      rw.Write_no2bpack(write_H_no2bpack, Hvac);
     if (not rw.goodstate) return EXIT_FAILURE;
   }
 

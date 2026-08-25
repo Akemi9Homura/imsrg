@@ -167,16 +167,15 @@ existing SR/fractional-occupation J-scheme contractions
 J-coupled 恒等式检查、正规序往返及 `mrimsrg_jref_v1` 文件 reader 已完成；步骤 3--4
 的慢速参考、块矩阵生产收缩、完整 0B/1B/2B MR commutator 及精确 SR
 退化门禁已完成。步骤 5 的 White-NCSM 方向分子、MR EN 分母和
-`Delta e != 0` 掩码也已完成并对 Python m-scheme 验证。当前不得跳到
-完整流出数；步骤 6 的 solver 显式 MR context 和直接 RK4/ODE RHS 接线
-已完成，剩余边界是 `imsrg++` driver 参数、自然基 Hamiltonian 变换及真实
-体系 `s=0`/short-flow 验收。随后已把 HF/HFMBPT 原有 normalized-pair
+`Delta e != 0` 掩码也已完成并对 Python m-scheme 验证。步骤 6 的 solver
+显式 MR context、直接 RK4/ODE RHS、`imsrg++` driver 与 He4 真实
+`s=0`/short-flow 首项验收均已接通。HF/HFMBPT 原有 normalized-pair
 变换抽成 `Operator::TransformOneAndTwoBody()`：它验证正交性与球形 block，
 拒绝 3B/非粒子数守恒输入，并由 HF、HFMBPT 与 MR 共用。真实
 `He4 Nrefmax=2` 自然轨道下，随机标量 NN/NO2B 算符的 HO→NAT→HO 总误差
 `<2e-11`，NAT 一体和完整 m-scheme 二体张量分别以 `2e-11`、`3e-11`
-绝对容差通过独立四指标协变对照。当前步骤 6 只剩 driver 参数接线与真实
-NNLOopt 的 `E/f/Gamma`、`s=0`/short-flow 门禁。
+绝对容差通过独立四指标协变对照。当前不得把 He4 首项通过外推成全部体系；
+步骤 6 剩余边界是 He4/O16 SR 退化与 Be8/C12/O16 的同层真实门禁。
 
 严格门禁不能以 float32 `no2bpack` 作为内部真值，因此步骤 6 同时复用
 原型验收的 `mrimsrg_j64_v1`，在 `ReadWrite` 增加 float64 scalar J-coupled
@@ -185,6 +184,24 @@ reader/writer。它按 `(n,l,2j,2tz)` 映射轨道并验证完整 channel/pair �
 `He4_s0_srcheck.jcoupled64` 与 Python reader 构造的 `Operator` 逐元素误差
 为零。该格式只作无损生产输入和验收检查点，最终 NCSM/FCIQMC 文件仍由
 既有 `no2bpack` writer 产生。
+
+`imsrg++` 的显式 `mr_reference_file=<...jref>` driver 现已接通。入口强制
+`basis=oscillator`、单步 direct flow、`white-ncsm`、NN/NO2B、`BetaCM=0`、
+无额外 flowing operators，并拒绝 Magnus、3B、二次 model-space truncation
+与 valence-space 重正规序。执行序列为
+
+```text
+vacuum H(HO) -> H(NAT) -> MR normal order -> direct flow
+             -> undo MR normal order -> vacuum H(NAT) -> vacuum H(HO).
+```
+
+真实 NNLOopt `He4 Nrefmax=2` 的自然基 `E/f/Gamma` 对 Python m-scheme
+max-abs 为 `2.95e-13/3.36e-11/9.95e-12 MeV`。端到端 driver 在 `s=0`
+和 `ds=1e-4` 单步 RK4 后的 float64 0/1/2B 输出，均与直接调用同一 C++
+reference/generator/solver 路径逐元素为零；`s=0` 对原 HO vacuum Hamiltonian
+的最坏往返误差为 `1.15e-14/1.07e-14/8.88e-15 MeV`。回归测试同时确认
+两点都能生成非空下游 `no2bpack`。当前步骤 6 剩余工作转为 He4/O16 SR
+退化与 Be8/C12/O16 真实参考的共同 checkpoints，而不再是 driver 接线。
 
 ## 7. 错误定位原则
 

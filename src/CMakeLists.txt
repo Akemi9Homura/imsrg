@@ -803,3 +803,5 @@ add_test(NAME Triples      COMMAND  python3 ../test/UnitTestTriples.py )
 add_test(NAME Tensor       COMMAND  python3 ../test/UnitTestTensor.py )
 add_test(NAME NormalOrdering    COMMAND  python3 ../test/UnitTestNormalOrdering.py )
 add_test(NAME MRReference COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRReference.py)
+add_test(NAME MRDriver COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRDriver.py
+                               --imsrg-executable $<TARGET_FILE:imsrg++>)

@@ -42,8 +42,9 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       格式纳入 `ReadWrite`，作为 driver 的无损输入/检查点；随机写读误差
       `<1e-13`，既有真实 He4 文件读入误差为零。下游 `no2bpack` 仍保持
       既有 float32 布局。
-- [ ] 对真实 NNLOopt Hamiltonian 与 Python 比较自然基 `E/f/Gamma`，并
-      比较最终真空反变换的全部矩阵元。
+- [x] 对真实 NNLOopt `He4 Nrefmax=2` Hamiltonian 与 Python 比较自然基
+      `E/f/Gamma`，max-abs 分别为 `2.95e-13/3.36e-11/9.95e-12 MeV`；
+      `s=0` 最终真空反变换的 0/1/2B 无损输出相对直接 C++ 路径逐元素为零。
 
 ### C. J-scheme MR-IMSRG(2) commutator
 
@@ -68,6 +69,9 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       HO 量子数参考空间内部耦合。
 - [x] 复用 `IMSRGSolver` 直接 flow/ODE 和停止诊断；默认 SR/VS-IMSRG
       不得因 MR 参数或状态而改变。
+- [x] 在 `imsrg++` 增加显式 `mr_reference_file` driver：重建分数占据
+      ModelSpace、HO→NAT、MR 正规序、直接流、MR 反正规序、NAT→HO，
+      并输出 float64 J64 与下游 float32 `no2bpack`；未给参数时不进入 MR。
 
 ### E. 单参考生产退化门禁
 
