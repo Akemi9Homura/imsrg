@@ -2,6 +2,7 @@
 #include "Commutator.hh"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <stdexcept>
 #include <vector>
@@ -231,9 +232,11 @@ namespace
     return products;
   }
 
-  double PandyaElement(const TwoBodyME &two_body, ModelSpace &modelspace, int J,
-                       index_t a, index_t b, index_t c, index_t d)
+  std::array<double, 3> PandyaElements(
+      const Operator &X, const Operator &Y, const MRReference &reference,
+      int J, index_t a, index_t b, index_t c, index_t d)
   {
+    ModelSpace &modelspace = *X.modelspace;
     const Orbit &oa = modelspace.GetOrbit(a);
     const Orbit &ob = modelspace.GetOrbit(b);
     const Orbit &oc = modelspace.GetOrbit(c);
@@ -242,15 +245,23 @@ namespace
                                 std::abs(oc.j2 - ob.j2)) /
                        2;
     const int Jp_max = std::min(oa.j2 + od.j2, oc.j2 + ob.j2) / 2;
-    double value = 0.0;
+    std::array<double, 3> values{0.0, 0.0, 0.0};
     for (int Jp = Jp_min; Jp <= Jp_max; ++Jp)
     {
-      const double six_j = modelspace.GetSixJ(oa.j2 * 0.5, ob.j2 * 0.5, J,
-                                              oc.j2 * 0.5, od.j2 * 0.5, Jp);
-      value -= (2 * Jp + 1.0) * six_j *
-               two_body.GetTBME_J(Jp, Jp, a, d, c, b);
+      // All three tensors have exactly the same recoupling coefficient.  The
+      // dense imsrg++ cache avoids three hash lookups per standard-coupled
+      // matrix element while preserving the Pandya sum and its term order.
+      const double weight = (2 * Jp + 1.0) *
+                            modelspace.GetCachedSixJ(oa.j2, ob.j2, J,
+                                                     oc.j2, od.j2, Jp);
+      double x = 0.0;
+      double y = 0.0;
+      X.TwoBody.GetTBME_J_twoOps(Y.TwoBody, Jp, Jp, a, d, c, b, x, y);
+      values[0] -= weight * x;
+      values[1] -= weight * y;
+      values[2] -= weight * reference.Lambda2.GetTBME_J(Jp, Jp, a, d, c, b);
     }
-    return value;
+    return values;
   }
 
   struct OrderedCrossBlock
@@ -301,12 +312,11 @@ namespace
       {
         const auto bra = block.pairs[i];
         const auto ket = block.pairs[j];
-        block.X(i, j) = PandyaElement(X.TwoBody, modelspace, J,
-                                      bra[0], bra[1], ket[0], ket[1]);
-        block.Y(i, j) = PandyaElement(Y.TwoBody, modelspace, J,
-                                      bra[0], bra[1], ket[0], ket[1]);
-        block.Lambda(i, j) = PandyaElement(reference.Lambda2, modelspace, J,
-                                           bra[0], bra[1], ket[0], ket[1]);
+        const std::array<double, 3> values = PandyaElements(
+            X, Y, reference, J, bra[0], bra[1], ket[0], ket[1]);
+        block.X(i, j) = values[0];
+        block.Y(i, j) = values[1];
+        block.Lambda(i, j) = values[2];
       }
     return block;
   }
@@ -396,17 +406,25 @@ namespace MRCommutator
 
     // V: full ordered particle-hole pairs keep the sign of tz_a-tz_b.
     section_start = omp_get_wtime();
+    double v_build_seconds = 0.0;
+    double v_blas_seconds = 0.0;
+    double v_trace_seconds = 0.0;
     for (int J = 0; J <= max_J; ++J)
       for (int parity = 0; parity <= 1; ++parity)
         for (int delta_tz = -1; delta_tz <= 1; ++delta_tz)
         {
+          double v_part_start = omp_get_wtime();
           const OrderedCrossBlock block = BuildOrderedCrossBlock(
               X, Y, reference, J, parity, delta_tz);
+          v_build_seconds += omp_get_wtime() - v_part_start;
           if (block.pairs.empty())
             continue;
+          v_part_start = omp_get_wtime();
           const arma::mat xly = block.X * block.Lambda * block.Y;
           const arma::mat ylx = block.Y * block.Lambda * block.X;
+          v_blas_seconds += omp_get_wtime() - v_part_start;
           const double angular_weight = 2 * block.J + 1.0;
+          v_part_start = omp_get_wtime();
           for (index_t one : modelspace.all_orbits)
             for (index_t two : modelspace.all_orbits)
             {
@@ -424,7 +442,11 @@ namespace MRCommutator
                                     (xly(ibra, iket) - ylx(ibra, iket));
               }
             }
+          v_trace_seconds += omp_get_wtime() - v_part_start;
         }
+    X.profiler.timer["MR comm221 lambda2 V build"] += v_build_seconds;
+    X.profiler.timer["MR comm221 lambda2 V BLAS"] += v_blas_seconds;
+    X.profiler.timer["MR comm221 lambda2 V partial trace"] += v_trace_seconds;
     X.profiler.timer["MR comm221 lambda2 V"] += omp_get_wtime() - section_start;
 
     // VI: lambda*Y and lambda*X remove the innermost (r,v) sum by BLAS.
