@@ -177,7 +177,7 @@ sr_commutator = pyIMSRG.Commutator.Commutator(x_operator, y_operator)
 mr_slater_commutator = pyIMSRG.MR_Commutator(
     x_operator, y_operator, slater_reference
 )
-assert max_operator_difference(sr_commutator, mr_slater_commutator) == 0.0
+assert max_operator_difference(sr_commutator, mr_slater_commutator) < 1e-11
 
 # For nonzero lambda2, the full entry adds the verified 1B term and contracts
 # lambda2 with the already completed SR two-body commutator for the 0B term.
@@ -193,6 +193,13 @@ assert math.isclose(
     rel_tol=0.0,
     abs_tol=2e-11,
 )
+
+# The solver owns no hidden density state: without a reference it dispatches
+# to the original SR commutator, and after explicit attachment it dispatches
+# to the same verified MR entry.
+dispatcher_solver = pyIMSRG.IMSRGSolver(y_operator)
+dispatcher_sr = dispatcher_solver.EvaluateCommutator(x_operator, y_operator)
+assert max_operator_difference(dispatcher_sr, sr_commutator) < 1e-11
 
 # Exercise the complete saved-wavefunction -> natural density -> compact
 # J-scheme bridge -> C++ reader path with the physical correlated Be8 Nrefmax=0
@@ -310,6 +317,15 @@ be8_cpp_eta.SetAntiHermitian()
 be8_generator = pyIMSRG.Generator()
 be8_generator.SetType("white-ncsm")
 be8_generator.Update(be8_hamiltonian, be8_cpp_eta)
+be8_dispatcher = pyIMSRG.IMSRGSolver(be8_hamiltonian)
+be8_dispatcher.SetMRReference(be8_reference)
+be8_dispatched_rhs = be8_dispatcher.EvaluateCommutator(
+    be8_cpp_eta, be8_hamiltonian
+)
+be8_direct_rhs = pyIMSRG.MR_Commutator(
+    be8_cpp_eta, be8_hamiltonian, be8_reference
+)
+assert max_operator_difference(be8_dispatched_rhs, be8_direct_rhs) < 1e-11
 for a in be8_orbits:
     for b in be8_orbits:
         if (a.l, a.j2, a.tz2) != (b.l, b.j2, b.tz2):
@@ -335,6 +351,50 @@ for block in be8_python_eta_blocks:
                 channel, channel, local_bra, local_ket
             )
             assert abs(actual - block.matrix[ibra, iket]) < 2e-11
+
+# One complete fixed-step RK4 update must use the MR commutator at all four
+# stages.  Reconstruct the same step explicitly and compare every operator
+# rank, rather than accepting agreement of the scalar energy alone.
+rk4_step = 1e-4
+
+
+def be8_eta_at(hamiltonian):
+    eta = pyIMSRG.Operator(be8_ms)
+    eta.SetAntiHermitian()
+    generator = pyIMSRG.Generator()
+    generator.SetType("white-ncsm")
+    generator.Update(hamiltonian, eta)
+    return eta
+
+
+rk4_initial = pyIMSRG.Operator(be8_hamiltonian)
+rk4_k1 = pyIMSRG.MR_Commutator(
+    be8_eta_at(rk4_initial), rk4_initial, be8_reference
+)
+rk4_stage2 = rk4_initial + 0.5 * rk4_step * rk4_k1
+rk4_k2 = pyIMSRG.MR_Commutator(
+    be8_eta_at(rk4_stage2), rk4_stage2, be8_reference
+)
+rk4_stage3 = rk4_initial + 0.5 * rk4_step * rk4_k2
+rk4_k3 = pyIMSRG.MR_Commutator(
+    be8_eta_at(rk4_stage3), rk4_stage3, be8_reference
+)
+rk4_stage4 = rk4_initial + rk4_step * rk4_k3
+rk4_k4 = pyIMSRG.MR_Commutator(
+    be8_eta_at(rk4_stage4), rk4_stage4, be8_reference
+)
+rk4_expected = rk4_initial + rk4_step / 6.0 * (
+    rk4_k1 + 2.0 * rk4_k2 + 2.0 * rk4_k3 + rk4_k4
+)
+rk4_solver = pyIMSRG.IMSRGSolver(rk4_initial)
+rk4_solver.SetMRReference(be8_reference)
+rk4_solver.SetGenerator("white-ncsm")
+rk4_solver.SetMethod("flow_RK4")
+rk4_solver.SetEtaCriterion(0.0)
+rk4_solver.SetDsmax(rk4_step)
+rk4_solver.SetSmax(rk4_step)
+rk4_solver.Solve()
+assert max_operator_difference(rk4_solver.GetH_s(), rk4_expected) < 3e-11
 
 # A correlated closed-shell Nrefmax=2 reference exercises the non-identity
 # temporary natural-orbit rotation, including radial mixing in fixed (l,j,tz)

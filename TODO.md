@@ -57,7 +57,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       的 White-NCSM 分子/分母，MR commutator 本身仍保留 `lambda2`。
 - [x] 在球形自然基中实施 `Delta e != 0` 的 1B/2B 掩码，保留同
       HO 量子数参考空间内部耦合。
-- [ ] 复用 `IMSRGSolver` 直接 flow/ODE 和停止诊断；默认 SR/VS-IMSRG
+- [x] 复用 `IMSRGSolver` 直接 flow/ODE 和停止诊断；默认 SR/VS-IMSRG
       不得因 MR 参数或状态而改变。
 
 ### E. 单参考生产退化门禁

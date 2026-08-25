@@ -168,7 +168,9 @@ J-coupled 恒等式检查、正规序往返及 `mrimsrg_jref_v1` 文件 reader �
 的慢速参考、块矩阵生产收缩、完整 0B/1B/2B MR commutator 及精确 SR
 退化门禁已完成。步骤 5 的 White-NCSM 方向分子、MR EN 分母和
 `Delta e != 0` 掩码也已完成并对 Python m-scheme 验证。当前不得跳到
-完整流出数；下一实施边界是步骤 6 的 solver/driver 接线。
+完整流出数；步骤 6 的 solver 显式 MR context 和直接 RK4/ODE RHS 接线
+已完成，剩余边界是 `imsrg++` driver 参数、自然基 Hamiltonian 变换及真实
+体系 `s=0`/short-flow 验收。
 
 ## 7. 错误定位原则
 

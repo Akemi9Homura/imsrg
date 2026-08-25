@@ -115,7 +115,10 @@ normalized-pair block 形成 `X*lambda*Y`，其中对中间相同粒子 pair 的
 完整入口 `MRCommutator::Commutator()` 先调用原
 `Commutator::Commutator()`，只加入上述 1B 项及完整 2B 输出与
 `lambda2` 的 0B 收缩。`lambda2.Norm()==0` 有显式直接返回门禁，随机
-算符测试中 MR 与原 SR 输出的 0B/1B/2B 差为逐位 `0`。
+算符在 `OMP_NUM_THREADS=1` 时 MR 与原 SR 输出的 0B/1B/2B 差为逐位
+`0`。多线程下两个独立 commutator 调用可能因原 SR OpenMP 归约顺序在末位
+不同，因此重复调用比较使用 `1e-11` 门槛；MR 入口本身仍没有执行或加回
+任何零值修正。
 
 ## 4. 现有代码可直接复用的边界
 
@@ -200,6 +203,20 @@ cutoff，再作 `eta=D/Delta-(D/Delta)^dagger`；不能先反厄米化分子再�
 `e_i+e_j != e_k+e_l`。Slater He4 随机算符对原 `white` 入口的完整差
 `<1e-12`；分数占据 Be8 随机算符对 Python m-scheme 的全部 1B/J-coupled
 2B block 误差 `<2e-11`。
+
+## 8. 直接流 solver 接线
+
+`IMSRGSolver::SetMRReference()` 显式保存调用方拥有的 reference context；
+未设置时 `EvaluateCommutator()` 原样调用现有 SR dispatcher，设置后调用
+`MRCommutator::Commutator()`。MR 模式只准入当前计划内的 `flow_RK4`、
+fixed/adaptive direct ODE，明确拒绝尚未验收的 Magnus、restored flow 和
+附加 flowing operators，避免静默混用 SR BCH commutator。
+
+固定步 RK4 的 K1--K4 和 adaptive ODE 的 Hamiltonian RHS 均走该统一入口。
+真实 `Be8 Nrefmax=0` reference、随机 J-scheme Hamiltonian、`ds=1e-4` 的
+solver 一步与手工逐 stage 的 White-NCSM/MR commutator 结果在完整
+0B/1B/2B 上相差 `<3e-11`。这一测试只验收 solver 路由；物理 NNLOopt 的
+共同 Euler/RK checkpoints 仍属于后续 driver 门禁。
 
 随机严格标量张量要求 J/m 转换 `<=1e-12`；真实 RDM 的输入标量投影
 残差单独报告并暂以 `1e-10` 为拒绝阈值。所有能量/RHS contraction 的

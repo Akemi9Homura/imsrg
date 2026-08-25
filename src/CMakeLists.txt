@@ -351,6 +351,8 @@ target_link_libraries(
     PRIVATE
     BCH
     Commutator
+    MRCommutator
+    MRReference
     Boost::boost
 )
 

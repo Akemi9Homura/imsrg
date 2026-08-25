@@ -27,6 +27,7 @@
 #include "Operator.hh"
 #include "Generator.hh"
 #include "IMSRGProfiler.hh"
+#include "MRReference.hh"
 #include "ReadWrite.hh"
 
 //using namespace std;
@@ -38,9 +39,9 @@ class IMSRGSolver
   public:
 
 //  private:
-  ModelSpace* modelspace;
+  ModelSpace* modelspace = nullptr;
 //  ReadWrite* rw;
-  Operator* H_0; 
+  Operator* H_0 = nullptr;
   std::deque<Operator> FlowingOps;
   Operator H_saved;
   Operator Eta;
@@ -63,6 +64,7 @@ class IMSRGSolver
   bool magnus_adaptive;
   bool hunter_gatherer;
   bool perturbative_triples;
+  const MRReference* mr_reference = nullptr;
 
   double Elast;
   double cumulative_error;
@@ -126,6 +128,10 @@ class IMSRGSolver
   void SetMagnusAdaptive(bool b=true){magnus_adaptive = b;};
   void SetHunterGatherer(bool b=true){hunter_gatherer = b;};
   void SetPerturbativeTriples(bool b=true){perturbative_triples = b;};
+  void SetMRReference(const MRReference& reference);
+  void ClearMRReference(){mr_reference = nullptr;};
+  bool HasMRReference() const {return mr_reference != nullptr;};
+  Operator EvaluateCommutator(const Operator& X, const Operator& Y) const;
 
   int GetSystemDimension();
   double GetS(){return s;};
@@ -213,4 +219,3 @@ class IMSRGSolver
 
 
 #endif
-

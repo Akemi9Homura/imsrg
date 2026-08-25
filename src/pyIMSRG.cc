@@ -650,6 +650,12 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("SetODETolerance", &IMSRGSolver::SetODETolerance)
           .def("Reset", &IMSRGSolver::Reset)
           .def("SetGenerator", &IMSRGSolver::SetGenerator)
+          .def("SetMRReference", &IMSRGSolver::SetMRReference,
+               py::arg("reference"), py::keep_alive<1, 2>())
+          .def("ClearMRReference", &IMSRGSolver::ClearMRReference)
+          .def("HasMRReference", &IMSRGSolver::HasMRReference)
+          .def("EvaluateCommutator", &IMSRGSolver::EvaluateCommutator,
+               py::arg("X"), py::arg("Y"))
           .def("SetOnly2bEta", [](IMSRGSolver &self, bool tf)
                { self.GetGenerator().SetOnly2bEta(tf); })
           .def("SetDenominatorCutoff", &IMSRGSolver::SetDenominatorCutoff)

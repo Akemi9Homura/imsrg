@@ -1,11 +1,13 @@
 #include "IMSRGSolver.hh"
 #include "Commutator.hh"
+#include "MRCommutator.hh"
 #include "BCH.hh"
 #include "Operator.hh"
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <sstream>
 
@@ -121,6 +123,8 @@ void IMSRGSolver::GatherOmega()
 
 void IMSRGSolver::SetHin(Operator &H_in)
 {
+  if (mr_reference != nullptr && mr_reference->modelspace != H_in.GetModelSpace())
+    throw std::invalid_argument("new Hamiltonian does not match IMSRGSolver MR reference");
   modelspace = H_in.GetModelSpace();
   H_0 = &H_in;
   FlowingOps[0] = H_in;
@@ -135,6 +139,22 @@ void IMSRGSolver::SetHin(Operator &H_in)
   {
     Omega.back() = Eta;
   }
+}
+
+void IMSRGSolver::SetMRReference(const MRReference& reference)
+{
+  if (modelspace == nullptr || reference.modelspace != modelspace)
+    throw std::invalid_argument("IMSRGSolver and MRReference use different ModelSpace objects");
+  reference.Validate();
+  mr_reference = &reference;
+}
+
+Operator IMSRGSolver::EvaluateCommutator(const Operator& X,
+                                         const Operator& Y) const
+{
+  if (mr_reference == nullptr)
+    return Commutator::Commutator(X, Y);
+  return MRCommutator::Commutator(X, Y, *mr_reference);
 }
 
 void IMSRGSolver::SetOmega(size_t i, Operator &om)
@@ -200,6 +220,17 @@ void IMSRGSolver::SetFlowFile(std::string str)
 
 void IMSRGSolver::Solve()
 {
+
+  if (mr_reference != nullptr)
+  {
+    if (method != "flow" && method != "flow_adaptive" &&
+        method != "flow_euler" && method != "flow_RK4")
+      throw std::invalid_argument("MR-IMSRG currently supports direct-flow solvers only");
+    if (FlowingOps.size() != 1)
+      throw std::invalid_argument("MR-IMSRG direct flow currently evolves only the Hamiltonian");
+    if (BCH::use_goose_tank_correction)
+      throw std::invalid_argument("MR-IMSRG direct flow does not support goose-tank corrections");
+  }
 
   if (s < 1e-4)
     WriteFlowStatusHeader(std::cout);
@@ -549,9 +580,9 @@ void IMSRGSolver::Solve_flow_RK4()
     for (int i = 0; i < nops; i++)
     {
       if (i == 0)
-        K1[i] = Commutator::Commutator(Eta, FlowingOps[i] + goosetank_chi);
+        K1[i] = EvaluateCommutator(Eta, FlowingOps[i] + goosetank_chi);
       else
-        K1[i] = Commutator::Commutator(Eta, FlowingOps[i]);
+        K1[i] = EvaluateCommutator(Eta, FlowingOps[i]);
       Ktmp[i] = FlowingOps[i] + 0.5 * ds * K1[i];
     }
     //      Operator K1 = Commutator::Commutator( Eta, Hs );
@@ -563,9 +594,9 @@ void IMSRGSolver::Solve_flow_RK4()
     {
       //        K2[i] = Commutator::Commutator( Eta, FlowingOps[i]+Ktmp[i]);
       if (i == 0)
-        K2[i] = Commutator::Commutator(Eta, Ktmp[i] + goosetank_chi);
+        K2[i] = EvaluateCommutator(Eta, Ktmp[i] + goosetank_chi);
       else
-        K2[i] = Commutator::Commutator(Eta, Ktmp[i]);
+        K2[i] = EvaluateCommutator(Eta, Ktmp[i]);
       Ktmp[i] = FlowingOps[i] + 0.5 * ds * K2[i];
     }
     //      Operator K2 = Commutator::Commutator( Eta, Hs+Htmp );
@@ -577,9 +608,9 @@ void IMSRGSolver::Solve_flow_RK4()
     {
       //        K3[i] = Commutator::Commutator( Eta, FlowingOps[i]+Ktmp[i]);
       if (i == 0)
-        K3[i] = Commutator::Commutator(Eta, Ktmp[i] + goosetank_chi);
+        K3[i] = EvaluateCommutator(Eta, Ktmp[i] + goosetank_chi);
       else
-        K3[i] = Commutator::Commutator(Eta, Ktmp[i]);
+        K3[i] = EvaluateCommutator(Eta, Ktmp[i]);
       Ktmp[i] = FlowingOps[i] + 1.0 * ds * K3[i];
     }
     //      Operator K3 = Commutator::Commutator( Eta, Hs+Htmp );
@@ -591,9 +622,9 @@ void IMSRGSolver::Solve_flow_RK4()
     {
       //        K4[i] = Commutator::Commutator( Eta, FlowingOps[i]+Ktmp[i]);
       if (i == 0)
-        K4[i] = Commutator::Commutator(Eta, Ktmp[i] + goosetank_chi);
+        K4[i] = EvaluateCommutator(Eta, Ktmp[i] + goosetank_chi);
       else
-        K4[i] = Commutator::Commutator(Eta, Ktmp[i]);
+        K4[i] = EvaluateCommutator(Eta, Ktmp[i]);
       //        Ktmp[i] = FlowingOps[i] + 1.0*ds*K2[i];
       FlowingOps[i] += ds / 6.0 * (K1[i] + 2 * K2[i] + 2 * K3[i] + K4[i]);
     }
@@ -835,7 +866,7 @@ void IMSRGSolver::operator()(const std::deque<Operator> &x, std::deque<Operator>
     {
       for (size_t i = 0; i < x.size(); ++i)
       {
-        dxdt[i] = Commutator::Commutator(Eta, x[i]);
+        dxdt[i] = EvaluateCommutator(Eta, x[i]);
       }
     }
   }
