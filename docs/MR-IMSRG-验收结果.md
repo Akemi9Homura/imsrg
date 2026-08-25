@@ -49,8 +49,10 @@ Hamiltonian、RDM 和日志均保留在被 Git 忽略的本机/集群结果目�
   的最大二体误差为 `2.66e-15 MeV`；采用修正生成元的新 He4 短流
   `s=0.001` 的一体、二体误差均为 `3.55e-15 MeV`。
 - 新短流的 He4 `Nmax=8` dense NCSM 基态为 `-20.3396323958 MeV`，
-  `no2bpack` 原生 reader 得到 `-20.3396333376 MeV`，相差 `0.942 keV`；
-  这是既有格式用 float32 保存 OBME/TBME 的量化舍入误差。
+  `no2bpack` 原生 reader 得到 `-20.3396333376 MeV`，相差
+  `9.42e-7 MeV = 0.000942 keV = 0.942 eV`；这是既有格式用 float32
+  保存 OBME/TBME 的量化舍入误差。先前把该差值写成 `0.942 keV` 是单位
+  换算错误，现已更正。
 - 同一组 J-coupled OBME/TBME 另以验收专用的 float64 `jcoupled64` 写出、
   独立读回并反耦合到 m-scheme 后，He4 `Nmax=8` 的前三态与 dense 路径在
   能量上的最大差为 `1.8e-14 MeV`，属于 double 数值噪声。这把角动量投影/
@@ -85,7 +87,58 @@ He4 从同一标量 `s=0` Hamiltonian 仅流到 `s=0.001` 就出现旧实现
 作问题复现。正式四核结果必须由 `white_ncsm_spherical_monopole_v1`
 重新产生，并逐点通过默认 `1e-9 MeV` J-重构门槛。
 
-## 4. `Nrefmax=2` 相关闭壳参考态
+## 4. 修正后的四核 `Nrefmax=0` 最终文件
+
+2026-08-25 在 point7 从 `s=0` 重新运行四核。He4/O16 的单参考极限在
+`rtol=1e-6, atol=1e-8` 下保持旋转标量到约 `1e-14 MeV`。Be8/C12 的
+baseline 虽达到 generator 停止条件，但 m-scheme 独立积分产生与 ODE 容差
+同阶的非标量数值漂移，默认 `1e-9 MeV` J-重构门禁分别以
+`4.90e-7 MeV` 和 `6.25e-8 MeV` 拒绝导出。两核随后用
+`rtol=1e-9, atol=1e-11` 从头重跑；正式文件只取通过门禁的 tight 结果，
+没有放宽 exporter 容差或使用被拒绝的 baseline 文件。
+
+| 核 | job | ODE `rtol/atol` | `s_final` | `Rgen/Rgen0` | MR 0B | 最大 J 重构误差 1B/2B |
+|---|---:|---:|---:|---:|---:|---:|
+| He4 | 100096 | `1e-6/1e-8` | 93.395214 | 6.822e-7 | -20.2446468544 | `7.11e-15 / 5.00e-15` |
+| Be8 | 100104 | `1e-9/1e-11` | 331.558295 | 8.778e-7 | -27.6482167218 | `3.15e-10 / 4.96e-10` |
+| C12 | 100106 | `1e-9/1e-11` | 233.828911 | 9.246e-7 | -43.3077100404 | `1.13e-11 / 1.03e-11` |
+| O16 | 100102 | `1e-6/1e-8` | 81.532065 | 9.148e-7 | -63.7214966519 | `1.07e-14 / 1.86e-14` |
+
+最终文件是现有 NCSM/FCIQMC reader 直接读取的普通真空正规序
+`no2bpack`，zero body 用 float64，OBME/TBME 按既有格式用 float32。
+Be8/C12 的普通真空 zero body 分别为 `15.1396526724` 和
+`17.6301797320 MeV`，reader 日志确认均计入总 Hamiltonian；它们不能被
+遗漏，也不能用上表的 MR 0B 代替后 NCSM 对角化结果。
+
+| 核 | NCSM 验证空间 | 维数 | dense 基态 | float32 `no2bpack` 基态 | packing 差值 |
+|---|---:|---:|---:|---:|---:|
+| He4 | Nmax=8 | 3060 | -20.244646854393 | -20.244646072414 | 0.000782 keV |
+| Be8 | Nmax=0 | 51 | -27.942508359012 | -27.942505918504 | 0.002441 keV |
+| C12 | Nmax=0 | 51 | -43.530828159008 | -43.530831415028 | 0.003256 keV |
+| O16 | Nmax=2 | 1201 | -63.721496651949 | -63.721497668049 | 0.001016 keV |
+
+Be8/C12 另用验收专用 float64 `jcoupled64` 独立写出、读回和反耦合；
+Nmax=0 基态与 dense 路径分别相差 `2.8e-14 MeV` 和打印精度内的零，
+确认上表剩余差异来自正式格式的 float32 量化。四个 packed reader 的基态
+均为 `2J=0`。
+
+集中交付目录在 point7 和本机相同仓库相对位置：
+
+```text
+result/mrimsrg-final-nref0/
+```
+
+| 文件 | SHA-256 |
+|---|---|
+| `He4_N2LOopt_hw20_emax2_e2max4_Nrefmax0_MRIMSRG.no2bpack` | `ac69e114b9208036aff8720fd55918d9c6d75ebbf72adda6f35d5c72a6100111` |
+| `Be8_N2LOopt_hw20_emax2_e2max4_Nrefmax0_MRIMSRG.no2bpack` | `31a33f6598f58325139ddf7cee892ba176e6cc5290112f6086bd256b9f7a9be9` |
+| `C12_N2LOopt_hw20_emax2_e2max4_Nrefmax0_MRIMSRG.no2bpack` | `f0c322e1f4faa348920afcad0319de64d2b079d479f712b22638da20db01da51` |
+| `O16_N2LOopt_hw20_emax2_e2max4_Nrefmax0_MRIMSRG.no2bpack` | `031f815bd00cf47086f5f710c3ca57ecd802e02dca473469fe53c17a00da0d13` |
+
+四个文件均为 25392 bytes；它们是按目标质量数读取 bare minipack 后得到的
+四份 A-dependent Hamiltonian，不得跨核复用。
+
+## 5. `Nrefmax=2` 相关闭壳参考态
 
 `He4/O16, Nrefmax=2` 均有非零 `lambda2`，且 HO 基中 `gamma1`
 非对角。按照 Vobig Sec. 6.5.3，公式和 `Delta e` 掩码均在临时连通块
@@ -101,12 +154,16 @@ He4 从同一标量 `s=0` Hamiltonian 仅流到 `s=0.001` 就出现旧实现
 取消，不读取其结果。修正实现提交后从 `s=0` 重新提交；不能从旧流继续，
 runner 通过 `generator_implementation` metadata 明确拒绝这种 continuation。
 
-## 5. 文件与来源标识
+## 6. 文件与来源标识
 
-第一批四核流位于 point7：
+修正后的第一批四核正式流位于 point7；He4/O16 使用 baseline 容差，
+Be8/C12 使用 tight 容差：
 
 ```text
-/tns/mengziyan/mr-imsrg/result/mrimsrg-flow/<Nucleus>_Nrefmax0_rtol1em06_atol1em08_white_ncsm_strict/flow
+/tns/mengziyan/mr-imsrg/result/mrimsrg-flow/He4_Nrefmax0_rtol1em06_atol1em08_sphmon_v1/flow
+/tns/mengziyan/mr-imsrg/result/mrimsrg-flow/O16_Nrefmax0_rtol1em06_atol1em08_sphmon_v1/flow
+/tns/mengziyan/mr-imsrg/result/mrimsrg-flow/Be8_Nrefmax0_rtol1em09_atol1em11_sphmon_v1_final/flow
+/tns/mengziyan/mr-imsrg/result/mrimsrg-flow/C12_Nrefmax0_rtol1em09_atol1em11_sphmon_v1_final/flow
 ```
 
 相关参考态流位于：
@@ -130,4 +187,4 @@ little-endian float64 C-order `gamma1`, `gamma2`, `lambda2` 原始数据字节�
 
 旧 `Nrefmax=0` 与已取消的 `Nrefmax=2` 作业均早于
 `white_ncsm_spherical_monopole_v1`，不得作为正式结果或 continuation
-起点。新生产作业的 commit、job id 与能量将在完成后补入本文。
+起点。正式 `Nrefmax=0` job、能量、门禁和文件摘要已记录在第 4 节。

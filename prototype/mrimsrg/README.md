@@ -190,8 +190,8 @@ As an end-to-end rotational-symmetry regression, a fresh He4 flow to
 `s=0.001` reconstructs both the one- and two-body m-scheme tensors from the
 projected J-coupled data with maximum errors `3.55e-15 MeV`.  At `Nmax=8`,
 the direct double-precision dense path gives `-20.3396323958 MeV` and the
-packed reader gives `-20.3396333376 MeV`; their `0.942 keV` difference is the
-measured float32 OBME/TBME packing effect.
+packed reader gives `-20.3396333376 MeV`; their `9.42e-7 MeV` difference is
+`0.000942 keV` (`0.942 eV`), the measured float32 OBME/TBME packing effect.
 The float64 J-coupled readback differs from the direct dense energies by at
 most `1.8e-14 MeV` across the three printed states. Thus the
 Clebsch--Gordan phases, identical-pair normalization, channel ordering and
