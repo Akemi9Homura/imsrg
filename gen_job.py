@@ -438,7 +438,7 @@ def generate_mr_ncsm_readback_slurm(settings: MRNCSMReadbackSettings) -> Path:
     log_file = result_dir / f"log_{tag}_%j.txt"
     manifest = result_dir / "metadata.json"
     command = shlex.join([
-        "/usr/bin/time", "-v", str(executable),
+        str(executable),
         "--no2bpack", str(no2bpack),
         "--Z", str(settings.proton_number),
         "--N", str(settings.neutron_number),
@@ -471,7 +471,24 @@ echo '{environment_script_sha256}  {environment_script}' | sha256sum -c -
 if ldd {shlex.quote(str(executable))} | grep 'not found'; then
   exit 1
 fi
-{command}
+start_seconds=$SECONDS
+{command} &
+ncsm_pid=$!
+maximum_rss_kib=0
+while kill -0 "$ncsm_pid" 2>/dev/null; do
+  current_rss_kib=$(awk '/^VmHWM:/ {{print $2}}' "/proc/$ncsm_pid/status" 2>/dev/null || true)
+  if [[ "$current_rss_kib" =~ ^[0-9]+$ ]] && (( current_rss_kib > maximum_rss_kib )); then
+    maximum_rss_kib=$current_rss_kib
+  fi
+  sleep 1
+done
+set +e
+wait "$ncsm_pid"
+ncsm_status=$?
+set -e
+echo wall_seconds=$((SECONDS - start_seconds))
+echo maximum_rss_kib=$maximum_rss_kib
+exit "$ncsm_status"
 """
     script_file.write_text(contents, encoding="utf-8")
     script_file.chmod(0o755)

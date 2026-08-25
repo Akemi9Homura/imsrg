@@ -140,7 +140,11 @@ def main():
         for token in (
             "#SBATCH --partition=compute_C",
             "#SBATCH --cpus-per-task=64",
-            "/usr/bin/time -v",
+            "start_seconds=$SECONDS",
+            "maximum_rss_kib=0",
+            "/proc/$ncsm_pid/status",
+            "echo wall_seconds=",
+            "echo maximum_rss_kib=",
             "--no2bpack",
             "--Z 2",
             "--N 2",
