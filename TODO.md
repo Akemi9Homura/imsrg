@@ -47,7 +47,8 @@ max-abs `<=1e-10 MeV`，且相对 Frobenius 误差 `<=1e-10`。接近零的张�
 
 - [x] 在完全相同的初始算符上比较一个 `ds=1e-4` Euler 固定步，并在步后
       重新比较 `H/eta/RHS`。
-- [ ] 用共同的固定步 RK 方法比较多个 checkpoint；这一步继续隔离 ODE
+- [x] 用共同的固定步 RK4 比较 `s=0.001,0.002,0.003` 三个 checkpoint；
+      这一步继续隔离 ODE
       driver 差异。
 - [ ] 统一直接 flow、生成元、cutoff、停止条件和 ODE 容差后，比较完整流的
       `E/f/Gamma`、`eta` 范数及停止点。

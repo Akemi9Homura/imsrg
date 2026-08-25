@@ -78,8 +78,15 @@ EN 分母由新增的只读 pybind 诊断直接调用 C++
 用相同 RHS 做一个 `ds=1e-4` Euler 步并在步后重新生成 `eta/RHS`，He4
 的 `H/eta/RHS` 全 rank 最大差分别为 `7.11e-15/4.16e-17/2.22e-15`
 MeV，O16 分别为 `1.42e-14/2.78e-17/1.07e-14 MeV`。这说明退化不只在
-`s=0` 单点成立。以上已通过 P0 的输入、正规序、分母、生成元、RHS 和单步
-门禁；共同固定步 RK checkpoints 与完整直接流仍待完成。
+`s=0` 单点成立。
+
+进一步让两边运行完全相同的固定步 RK4，`ds=1e-3`，在
+`s=0.001,0.002,0.003` 比较完整 Hamiltonian。He4 三点的全 rank 最大差
+均为 `7.11e-15 MeV`，终点 `eta/RHS` 最大差为
+`4.86e-17/3.55e-15 MeV`；O16 三点的 Hamiltonian 最大差均为
+`1.42e-14 MeV`，终点 `eta/RHS` 最大差为
+`4.16e-17/1.07e-14 MeV`。以上已通过 P0 的输入、正规序、分母、生成元、
+RHS、Euler 单步和共同 RK4 checkpoints 门禁；完整直接流仍待完成。
 
 - Python 回归测试：`42/42` 通过。覆盖 RDM/cumulant、普通与 MR 正规序
   往返、QCombo/显式 Fock-space 对易子、SR 极限、生成元、掩码、

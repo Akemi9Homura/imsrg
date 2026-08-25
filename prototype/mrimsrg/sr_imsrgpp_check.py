@@ -330,6 +330,41 @@ def _mask_report(densities: Any, oscillator_quanta: np.ndarray) -> dict[str, int
     }
 
 
+def _mr_add_scaled(
+    base: MRHamiltonian, increment: MRHamiltonian, coefficient: float
+) -> MRHamiltonian:
+    return MRHamiltonian(
+        base.zero_body + coefficient * increment.zero_body,
+        base.one_body + coefficient * increment.one_body,
+        base.two_body + coefficient * increment.two_body,
+    )
+
+
+def _mr_rk4_step(
+    hamiltonian: MRHamiltonian, step: float, rhs: Any
+) -> MRHamiltonian:
+    k1 = rhs(hamiltonian)
+    k2 = rhs(_mr_add_scaled(hamiltonian, k1, 0.5 * step))
+    k3 = rhs(_mr_add_scaled(hamiltonian, k2, 0.5 * step))
+    k4 = rhs(_mr_add_scaled(hamiltonian, k3, step))
+    return MRHamiltonian(
+        hamiltonian.zero_body
+        + step * (k1.zero_body + 2 * k2.zero_body + 2 * k3.zero_body + k4.zero_body) / 6,
+        hamiltonian.one_body
+        + step * (k1.one_body + 2 * k2.one_body + 2 * k3.one_body + k4.one_body) / 6,
+        hamiltonian.two_body
+        + step * (k1.two_body + 2 * k2.two_body + 2 * k3.two_body + k4.two_body) / 6,
+    )
+
+
+def _imsrg_rk4_step(hamiltonian: Any, step: float, rhs: Any) -> Any:
+    k1 = rhs(hamiltonian)
+    k2 = rhs(hamiltonian + (0.5 * step) * k1)
+    k3 = rhs(hamiltonian + (0.5 * step) * k2)
+    k4 = rhs(hamiltonian + step * k3)
+    return hamiltonian + (step / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+
+
 def _denominator_report(
     generator: Any,
     modelspace: Any,
@@ -487,6 +522,28 @@ def run_check(args: argparse.Namespace) -> dict[str, Any]:
         imsrg_eta_euler_j, imsrg_h_euler_j
     )
 
+    def production_rhs_at(hamiltonian: MRHamiltonian) -> MRHamiltonian:
+        eta = white_generator(
+            hamiltonian, densities, quanta, spherical_orbit_groups=groups
+        )
+        return commutator(eta, hamiltonian, densities)
+
+    def imsrg_rhs_at(hamiltonian: Any) -> Any:
+        eta = pyimsrg.Operator(modelspace, 0, 0, 0, 2)
+        eta.SetAntiHermitian()
+        generator.Update(hamiltonian, eta)
+        return pyimsrg.Commutator.Commutator(eta, hamiltonian)
+
+    production_rk = production_h
+    imsrg_rk_j = imsrg_h_j
+    rk_pairs = []
+    for step_index in range(1, args.rk4_steps + 1):
+        production_rk = _mr_rk4_step(
+            production_rk, args.rk4_step, production_rhs_at
+        )
+        imsrg_rk_j = _imsrg_rk4_step(imsrg_rk_j, args.rk4_step, imsrg_rhs_at)
+        rk_pairs.append((step_index * args.rk4_step, production_rk, imsrg_rk_j))
+
     imsrg_vacuum_m = operator_to_mscheme(imsrg_vacuum, reference.orbits)
     imsrg_h_m = operator_to_mscheme(imsrg_h_j, reference.orbits)
     imsrg_eta_m = operator_to_mscheme(imsrg_eta_j, reference.orbits)
@@ -494,6 +551,24 @@ def run_check(args: argparse.Namespace) -> dict[str, Any]:
     imsrg_h_euler_m = operator_to_mscheme(imsrg_h_euler_j, reference.orbits)
     imsrg_eta_euler_m = operator_to_mscheme(imsrg_eta_euler_j, reference.orbits)
     imsrg_rhs_euler_m = operator_to_mscheme(imsrg_rhs_euler_j, reference.orbits)
+    rk4_checkpoints = [
+        {
+            "s": s,
+            "h": _operator_comparison(
+                operator_to_mscheme(imsrg_h_checkpoint, reference.orbits),
+                production_h_checkpoint,
+            ),
+        }
+        for s, production_h_checkpoint, imsrg_h_checkpoint in rk_pairs
+    ]
+    production_eta_rk = white_generator(
+        production_rk, densities, quanta, spherical_orbit_groups=groups
+    )
+    production_rhs_rk = commutator(production_eta_rk, production_rk, densities)
+    imsrg_eta_rk_j = pyimsrg.Operator(modelspace, 0, 0, 0, 2)
+    imsrg_eta_rk_j.SetAntiHermitian()
+    generator.Update(imsrg_rk_j, imsrg_eta_rk_j)
+    imsrg_rhs_rk_j = pyimsrg.Commutator.Commutator(imsrg_eta_rk_j, imsrg_rk_j)
 
     result = {
         "schema": "mrimsrg_sr_imsrgpp_check_v1",
@@ -521,6 +596,16 @@ def run_check(args: argparse.Namespace) -> dict[str, Any]:
         "rhs_after_euler": _operator_comparison(
             imsrg_rhs_euler_m, production_rhs_euler
         ),
+        "rk4_step": args.rk4_step,
+        "rk4_checkpoints": rk4_checkpoints,
+        "eta_after_rk4": _operator_comparison(
+            operator_to_mscheme(imsrg_eta_rk_j, reference.orbits),
+            production_eta_rk,
+        ),
+        "rhs_after_rk4": _operator_comparison(
+            operator_to_mscheme(imsrg_rhs_rk_j, reference.orbits),
+            production_rhs_rk,
+        ),
     }
     return result
 
@@ -540,10 +625,16 @@ def _passes(report: dict[str, Any], algebra_tolerance: float) -> bool:
         "h_after_euler",
         "eta_after_euler",
         "rhs_after_euler",
+        "eta_after_rk4",
+        "rhs_after_rk4",
     ):
         comparison = report[name]
         for rank in ("zero_body", "one_body", "two_body"):
             if comparison[rank]["max_abs"] > algebra_tolerance:
+                return False
+    for checkpoint in report["rk4_checkpoints"]:
+        for rank in ("zero_body", "one_body", "two_body"):
+            if checkpoint["h"][rank]["max_abs"] > algebra_tolerance:
                 return False
     return True
 
@@ -571,6 +662,8 @@ def main() -> None:
     )
     parser.add_argument("--algebra-tolerance", type=float, default=1e-10)
     parser.add_argument("--euler-step", type=float, default=1e-4)
+    parser.add_argument("--rk4-step", type=float, default=1e-3)
+    parser.add_argument("--rk4-steps", type=int, default=3)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
     report = run_check(args)
