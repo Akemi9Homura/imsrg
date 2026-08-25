@@ -118,6 +118,22 @@ def read_jcoupled64(path: Path) -> JCoupled64:
     return JCoupled64(hw, emax, orbits, zero_body, one_body, tuple(records))
 
 
+def write_jcoupled64(path: Path, payload: JCoupled64, operator: Any) -> None:
+    """Materialize an imsrg++ scalar operator in the acceptance-only format."""
+    with path.open("xb") as stream:
+        stream.write(J64_MAGIC)
+        stream.write(struct.pack("<diQQQ", payload.hw, payload.emax, len(payload.orbits), len(payload.orbits) * (len(payload.orbits) + 1) // 2, len(payload.records)))
+        for orbit in payload.orbits:
+            stream.write(struct.pack("<iiii", *(int(value) for value in orbit)))
+        stream.write(struct.pack("<d", float(operator.ZeroBody)))
+        for a in range(len(payload.orbits)):
+            for b in range(a, len(payload.orbits)):
+                stream.write(struct.pack("<d", float(operator.GetOneBody(a, b))))
+        for a, b, c, d, j, _ in payload.records:
+            value = float(operator.TwoBody.GetTBME_J_norm(j, j, a, b, c, d))
+            stream.write(struct.pack("<iiiiid", a, b, c, d, j, value))
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -552,6 +568,8 @@ def _full_flow_report(
     nucleus: str,
     ode_tolerance: float,
     initial_step: float,
+    payload: JCoupled64,
+    imsrgpp_jcoupled64: Path | None,
 ) -> dict[str, Any]:
     production_final, target_s, metadata = _load_production_flow(
         production_flow, nucleus, reference
@@ -590,6 +608,8 @@ def _full_flow_report(
     generator.Update(imsrg_final_j, imsrg_eta_j)
     imsrg_rhs_j = pyimsrg.Commutator.Commutator(imsrg_eta_j, imsrg_final_j)
     imsrg_vacuum_j = imsrg_final_j.UndoNormalOrdering()
+    if imsrgpp_jcoupled64 is not None:
+        write_jcoupled64(imsrgpp_jcoupled64, payload, imsrg_vacuum_j)
     imsrg_final = operator_to_mscheme(imsrg_final_j, reference.orbits)
     imsrg_eta = operator_to_mscheme(imsrg_eta_j, reference.orbits)
     imsrg_rhs = operator_to_mscheme(imsrg_rhs_j, reference.orbits)
@@ -603,6 +623,11 @@ def _full_flow_report(
         "production_ode_tolerance": ode_tolerance,
         "imsrgpp_ode_method": "boost::odeint runge_kutta_dopri5",
         "imsrgpp_initial_step": initial_step,
+        "imsrgpp_vacuum_jcoupled64": (
+            None
+            if imsrgpp_jcoupled64 is None
+            else str(imsrgpp_jcoupled64.resolve())
+        ),
         "h": _operator_comparison(imsrg_final, production_final),
         "eta": _operator_comparison(imsrg_eta, production_eta),
         "rhs": _operator_comparison(imsrg_rhs, production_rhs),
@@ -817,6 +842,8 @@ def run_check(args: argparse.Namespace) -> dict[str, Any]:
             args.nucleus,
             args.full_flow_ode_tolerance,
             args.full_flow_initial_step,
+            payload,
+            args.full_flow_imsrgpp_jcoupled64,
         )
     return result
 
@@ -891,6 +918,7 @@ def main() -> None:
     parser.add_argument("--full-flow-ode-tolerance", type=float, default=1e-8)
     parser.add_argument("--full-flow-initial-step", type=float, default=1e-2)
     parser.add_argument("--full-flow-tolerance", type=float, default=1e-5)
+    parser.add_argument("--full-flow-imsrgpp-jcoupled64", type=Path)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
     report = run_check(args)

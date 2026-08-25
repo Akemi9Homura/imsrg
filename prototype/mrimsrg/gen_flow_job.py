@@ -250,6 +250,7 @@ def generate_sr_check_job(
         f"--full-flow-ode-tolerance {settings.ode_tolerance:.17g} "
         f"--full-flow-initial-step {settings.initial_step:.17g} "
         f"--full-flow-tolerance {settings.flow_tolerance:.17g} "
+        f"--full-flow-imsrgpp-jcoupled64 {case_root / 'imsrgpp_vacuum.jcoupled64'} "
         f"--json {report}"
     )
     contents = f"""#!/bin/bash
