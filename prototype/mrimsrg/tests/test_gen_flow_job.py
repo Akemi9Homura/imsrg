@@ -5,10 +5,57 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from gen_flow_job import JobSettings, generate_job
+from gen_flow_job import (
+    JobSettings,
+    SRCheckSettings,
+    generate_job,
+    generate_sr_check_job,
+)
 
 
 class FlowJobTests(unittest.TestCase):
+    def test_generates_one_strict_sr_full_flow_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            reference = (
+                root
+                / "prototype"
+                / "mrimsrg"
+                / "data"
+                / "He4_Nrefmax0_final"
+            )
+            reference.mkdir(parents=True)
+            (reference / "metadata.json").write_text("{}\n", encoding="utf-8")
+            interaction = root / "interaction.minipack"
+            interaction.write_bytes(b"test")
+            flow = root / "flow"
+            flow.mkdir()
+            (flow / "metadata.json").write_text("{}\n", encoding="utf-8")
+            jcoupled64 = root / "He4.jcoupled64"
+            jcoupled64.write_bytes(b"test")
+            pyimsrg = root / "pyimsrg"
+            pyimsrg.mkdir()
+            (pyimsrg / "pyIMSRG.so").write_bytes(b"test")
+            script = generate_sr_check_job(
+                root,
+                root / "result",
+                SRCheckSettings(
+                    nucleus="He4",
+                    interaction=interaction,
+                    production_flow=flow,
+                    jcoupled64=jcoupled64,
+                    pyimsrg_dir=pyimsrg,
+                    ode_tolerance=1e-9,
+                ),
+            )
+            contents = script.read_text(encoding="utf-8")
+            self.assertIn("sr_imsrgpp_check.py", contents)
+            self.assertIn(f"--production-flow {flow}", contents)
+            self.assertIn("--full-flow-ode-tolerance 1.0000000000000001e-09", contents)
+            self.assertIn("git rev-parse HEAD", contents)
+            self.assertIn(f"ldd {pyimsrg / 'pyIMSRG.so'}", contents)
+            self.assertNotIn("%N", contents)
+
     def test_generates_one_checked_point7_job(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

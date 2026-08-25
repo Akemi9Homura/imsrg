@@ -58,6 +58,13 @@ checkpoints at `s=0.001,0.002,0.003`.  It exits nonzero if any rank exceeds
 contractions to the corresponding current C++ routine, so cancellation
 between independently wrong terms cannot pass the gate.
 
+For a completed fixed-``s`` production flow, add ``--production-flow`` and
+set ``--full-flow-ode-tolerance`` to the common production ``rtol=atol``.
+The checker then runs the current C++ direct-flow solver to the same ``s`` and
+compares final ``H``, ``eta``, RHS, every selected denominator, and the two
+explicitly different norm conventions.  Point7 scripts for this mode must be
+created by ``gen_flow_job.py --sr-check-flow ...`` just like production flows.
+
 `commutator.py` implements the natural-orbital MR-IMSRG(2) commutator with
 `lambda3=0`.  Its equations were regenerated independently with QCombo 0.2.0:
 for a random four-orbit correlated reference, direct summation of the QCombo

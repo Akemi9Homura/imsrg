@@ -104,7 +104,7 @@ MeV，O16 分别为 `1.42e-14/2.78e-17/1.07e-14 MeV`。这说明退化不只在
 `4.16e-17/1.07e-14 MeV`。以上已通过 P0 的输入、正规序、分母、生成元、
 RHS、Euler 单步和共同 RK4 checkpoints 门禁；完整直接流仍待完成。
 
-- Python 回归测试：`43/43` 通过。覆盖 RDM/cumulant、普通与 MR 正规序
+- Python 回归测试：`44/44` 通过。覆盖 RDM/cumulant、普通与 MR 正规序
   往返、QCombo/显式 Fock-space 对易子、SR 极限、生成元、掩码、
   Hermiticity/anti-Hermiticity、自然基协变及输出；其中专门的回归测试
   区分了自然基和 HO 基掩码，并确认正式验收使用实际 `eta`

@@ -31,6 +31,7 @@ try:
     from .commutator import commutator, commutator_contributions
     from .densities import compute_densities, validate_densities
     from .generator import (
+        GENERATOR_IMPLEMENTATION,
         WHITE_DENOMINATOR_CUTOFF,
         _safe_denominator,
         decoupling_masks,
@@ -45,6 +46,7 @@ except ImportError:
     from commutator import commutator, commutator_contributions
     from densities import compute_densities, validate_densities
     from generator import (
+        GENERATOR_IMPLEMENTATION,
         WHITE_DENOMINATOR_CUTOFF,
         _safe_denominator,
         decoupling_masks,
@@ -493,6 +495,135 @@ def _denominator_report(
     }
 
 
+def _load_production_flow(
+    path: Path, nucleus: str, reference: Any
+) -> tuple[MRHamiltonian, float, dict[str, Any]]:
+    metadata_path = path / "metadata.json"
+    if not metadata_path.is_file():
+        raise ValueError(f"production flow metadata is unavailable: {metadata_path}")
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if metadata.get("schema") != "mrimsrg_flow_v1":
+        raise ValueError("production flow has an unsupported schema")
+    if metadata.get("generator_implementation") != GENERATOR_IMPLEMENTATION:
+        raise ValueError("production flow was not made by the current generator")
+    denominator = metadata.get("generator_denominator", {})
+    if denominator.get("cutoff_behavior") != (
+        "absolute values below cutoff replaced by positive cutoff"
+    ):
+        raise ValueError("production flow does not record the current cutoff behavior")
+    reference_metadata = metadata.get("reference_metadata", {})
+    for key in ("A", "Z", "Nrefmax"):
+        if reference_metadata.get(key) != reference.metadata.get(key):
+            raise ValueError(f"production flow reference differs in {key}")
+    if metadata.get("formula_basis", {}).get("equation_evaluation") != (
+        "original basis already diagonal in gamma1"
+    ):
+        raise ValueError("strict SR flow comparison requires the identity natural basis")
+    trajectory = metadata.get("trajectory")
+    if not isinstance(trajectory, list) or not trajectory:
+        raise ValueError("production flow has no trajectory")
+    target_s = float(trajectory[-1]["s"])
+    settings = metadata.get("flow_settings", {})
+    if not np.isclose(target_s, float(settings.get("smax", np.nan)), rtol=0, atol=1e-10):
+        raise ValueError("production flow stopped before the fixed comparison s")
+    if metadata.get("flow_converged"):
+        raise ValueError("production flow used an early residual stop")
+    one_body = np.load(path / "final_mr_one_body.npy", allow_pickle=False)
+    two_body = np.load(path / "final_mr_two_body.npy", allow_pickle=False)
+    hamiltonian = MRHamiltonian(
+        float(metadata["final_mr_zero_body"]), one_body, two_body
+    )
+    expected_shape = reference.one_body.shape
+    if one_body.shape != expected_shape or two_body.shape != reference.two_body.shape:
+        raise ValueError("production flow tensor shapes differ from the reference")
+    return hamiltonian, target_s, metadata
+
+
+def _full_flow_report(
+    pyimsrg: Any,
+    modelspace: Any,
+    initial_h_j: Any,
+    production_flow: Path,
+    production_h_initial: MRHamiltonian,
+    densities: Any,
+    quanta: np.ndarray,
+    groups: np.ndarray,
+    reference: Any,
+    nucleus: str,
+    ode_tolerance: float,
+    initial_step: float,
+) -> dict[str, Any]:
+    production_final, target_s, metadata = _load_production_flow(
+        production_flow, nucleus, reference
+    )
+    settings = metadata["flow_settings"]
+    if not np.isclose(float(settings["relative_tolerance"]), ode_tolerance):
+        raise ValueError("production rtol differs from the requested C++ tolerance")
+    if not np.isclose(float(settings["absolute_tolerance"]), ode_tolerance):
+        raise ValueError("production atol differs from the requested C++ tolerance")
+
+    solver = pyimsrg.IMSRGSolver(initial_h_j)
+    solver.SetMethod("flow")
+    solver.SetGenerator("white")
+    solver.SetDenominatorPartitioning("Epstein_Nesbet")
+    solver.SetDenominatorCutoff(WHITE_DENOMINATOR_CUTOFF)
+    solver.SetEtaCriterion(0.0)
+    solver.SetODETolerance(ode_tolerance)
+    solver.SetDs(initial_step)
+    solver.SetSmax(target_s)
+    solver.Solve()
+    imsrg_final_j = solver.GetH_s()
+
+    production_eta = white_generator(
+        production_final,
+        densities,
+        quanta,
+        spherical_orbit_groups=groups,
+    )
+    production_rhs = commutator(production_eta, production_final, densities)
+    imsrg_eta_j = pyimsrg.Operator(modelspace, 0, 0, 0, 2)
+    imsrg_eta_j.SetAntiHermitian()
+    generator = pyimsrg.Generator()
+    generator.SetType("white")
+    generator.SetDenominatorPartitioning("Epstein_Nesbet")
+    generator.SetDenominatorCutoff(WHITE_DENOMINATOR_CUTOFF)
+    generator.Update(imsrg_final_j, imsrg_eta_j)
+    imsrg_rhs_j = pyimsrg.Commutator.Commutator(imsrg_eta_j, imsrg_final_j)
+    imsrg_final = operator_to_mscheme(imsrg_final_j, reference.orbits)
+    imsrg_eta = operator_to_mscheme(imsrg_eta_j, reference.orbits)
+    imsrg_rhs = operator_to_mscheme(imsrg_rhs_j, reference.orbits)
+
+    return {
+        "production_flow": str(production_flow.resolve()),
+        "target_s": target_s,
+        "production_ode_method": metadata["ode_method"],
+        "production_ode_tolerance": ode_tolerance,
+        "imsrgpp_ode_method": "boost::odeint runge_kutta_dopri5",
+        "imsrgpp_initial_step": initial_step,
+        "h": _operator_comparison(imsrg_final, production_final),
+        "eta": _operator_comparison(imsrg_eta, production_eta),
+        "rhs": _operator_comparison(imsrg_rhs, production_rhs),
+        "denominators": _denominator_report(
+            generator, modelspace, production_final, densities, reference.orbits
+        ),
+        "eta_norm": {
+            "production_mscheme": float(
+                np.sqrt(
+                    np.vdot(production_eta.one_body, production_eta.one_body).real
+                    + 0.25
+                    * np.vdot(production_eta.two_body, production_eta.two_body).real
+                )
+            ),
+            "imsrgpp_operator_norm": float(imsrg_eta_j.Norm()),
+            "imsrgpp_one_body_norm": float(imsrg_eta_j.OneBodyNorm()),
+            "imsrgpp_two_body_norm": float(imsrg_eta_j.TwoBodyNorm()),
+        },
+        "production_initial_zero_body": production_h_initial.zero_body,
+        "production_final_zero_body": production_final.zero_body,
+        "imsrgpp_final_zero_body": imsrg_final.zero_body,
+    }
+
+
 def run_check(args: argparse.Namespace) -> dict[str, Any]:
     repository = Path(__file__).resolve().parents[2]
     source_hashes = verify_oracle_sources(repository, args.imsrg_source)
@@ -668,10 +799,27 @@ def run_check(args: argparse.Namespace) -> dict[str, Any]:
             production_rhs_rk,
         ),
     }
+    if args.production_flow is not None:
+        result["full_flow"] = _full_flow_report(
+            pyimsrg,
+            modelspace,
+            imsrg_h_j,
+            args.production_flow,
+            production_h,
+            densities,
+            quanta,
+            groups,
+            reference,
+            args.nucleus,
+            args.full_flow_ode_tolerance,
+            args.full_flow_initial_step,
+        )
     return result
 
 
-def _passes(report: dict[str, Any], algebra_tolerance: float) -> bool:
+def _passes(
+    report: dict[str, Any], algebra_tolerance: float, full_flow_tolerance: float
+) -> bool:
     mask = report["mask"]
     if mask["sr_one_body_removed_by_delta_e"] or mask["sr_two_body_removed_by_delta_e"]:
         return False
@@ -701,6 +849,12 @@ def _passes(report: dict[str, Any], algebra_tolerance: float) -> bool:
         for rank in ("zero_body", "one_body", "two_body"):
             if comparison[rank]["max_abs"] > algebra_tolerance:
                 return False
+    if "full_flow" in report:
+        for name in ("h", "eta", "rhs"):
+            comparison = report["full_flow"][name]
+            for rank in ("zero_body", "one_body", "two_body"):
+                if comparison[rank]["max_abs"] > full_flow_tolerance:
+                    return False
     return True
 
 
@@ -729,6 +883,10 @@ def main() -> None:
     parser.add_argument("--euler-step", type=float, default=1e-4)
     parser.add_argument("--rk4-step", type=float, default=1e-3)
     parser.add_argument("--rk4-steps", type=int, default=3)
+    parser.add_argument("--production-flow", type=Path)
+    parser.add_argument("--full-flow-ode-tolerance", type=float, default=1e-8)
+    parser.add_argument("--full-flow-initial-step", type=float, default=1e-2)
+    parser.add_argument("--full-flow-tolerance", type=float, default=1e-5)
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
     report = run_check(args)
@@ -738,7 +896,7 @@ def main() -> None:
         if args.json.exists():
             raise FileExistsError(f"refusing to overwrite existing report: {args.json}")
         args.json.write_text(rendered + "\n", encoding="utf-8")
-    if not _passes(report, args.algebra_tolerance):
+    if not _passes(report, args.algebra_tolerance, args.full_flow_tolerance):
         raise SystemExit(1)
 
 

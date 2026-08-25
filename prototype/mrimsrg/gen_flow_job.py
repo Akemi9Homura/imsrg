@@ -47,6 +47,22 @@ class JobSettings:
     resume_from: Path | None = None
 
 
+@dataclass(frozen=True)
+class SRCheckSettings:
+    nucleus: str
+    production_flow: Path
+    jcoupled64: Path
+    pyimsrg_dir: Path
+    nrefmax: int = 0
+    interaction: Path = _POINT7_INTERACTION
+    label: str | None = None
+    partition: str = "c128m512"
+    nodelist: str | None = None
+    ode_tolerance: float = 1e-8
+    initial_step: float = 1e-2
+    flow_tolerance: float = 1e-5
+
+
 def _number_tag(value: float) -> str:
     return format(value, ".0e").replace("+", "").replace("-", "m")
 
@@ -155,6 +171,99 @@ export MKL_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
     return script
 
 
+def generate_sr_check_job(
+    repo_root: Path, result_root: Path, settings: SRCheckSettings
+) -> Path:
+    """Generate one full-flow SR degeneration comparison job."""
+    common = JobSettings(
+        nucleus=settings.nucleus,
+        nrefmax=settings.nrefmax,
+        interaction=settings.interaction,
+        label=settings.label,
+        partition=settings.partition,
+        nodelist=settings.nodelist,
+    )
+    _validate(common)
+    if settings.nrefmax != 0 or settings.nucleus not in ("He4", "O16"):
+        raise ValueError("strict full-flow SR checks support He4/O16 Nrefmax=0")
+    if not (settings.production_flow / "metadata.json").is_file():
+        raise FileNotFoundError(
+            f"production flow is unavailable: {settings.production_flow}"
+        )
+    if not settings.jcoupled64.is_file():
+        raise FileNotFoundError(f"jcoupled64 is unavailable: {settings.jcoupled64}")
+    if not (settings.pyimsrg_dir / "pyIMSRG.so").is_file():
+        raise FileNotFoundError(f"pyIMSRG module is unavailable: {settings.pyimsrg_dir}")
+    if min(settings.ode_tolerance, settings.initial_step, settings.flow_tolerance) <= 0:
+        raise ValueError("SR check tolerances and initial step must be positive")
+
+    repo_root = repo_root.resolve()
+    result_root = result_root.resolve()
+    reference = (
+        repo_root
+        / "prototype"
+        / "mrimsrg"
+        / "data"
+        / _REFERENCE_NAMES[(settings.nucleus, settings.nrefmax)]
+    )
+    if not (reference / "metadata.json").is_file():
+        raise FileNotFoundError(f"reference bundle is unavailable: {reference}")
+    tag = (
+        f"{settings.nucleus}_Nrefmax0_srcheck_"
+        f"tol{_number_tag(settings.ode_tolerance)}"
+    )
+    if settings.label:
+        tag += f"_{settings.label}"
+    case_root = result_root / tag
+    report = case_root / "report.json"
+    if case_root.exists():
+        raise FileExistsError(f"refusing to overwrite an existing check: {case_root}")
+    case_root.mkdir(parents=True)
+    script = case_root / f"job_{tag}.sh"
+    nodelist_line = (
+        f"#SBATCH --nodelist={settings.nodelist}\n" if settings.nodelist else ""
+    )
+    command = (
+        f"PYTHONPATH={repo_root / 'prototype' / 'mrimsrg'} {_POINT7_PYTHON} -u "
+        f"{repo_root / 'prototype' / 'mrimsrg' / 'sr_imsrgpp_check.py'} "
+        f"--nucleus {settings.nucleus} --reference {reference} "
+        f"--jcoupled64 {settings.jcoupled64.resolve()} "
+        f"--interaction {settings.interaction.resolve()} "
+        f"--pyimsrg-dir {settings.pyimsrg_dir.resolve()} "
+        f"--imsrg-source {repo_root} "
+        f"--production-flow {settings.production_flow.resolve()} "
+        f"--full-flow-ode-tolerance {settings.ode_tolerance:.17g} "
+        f"--full-flow-initial-step {settings.initial_step:.17g} "
+        f"--full-flow-tolerance {settings.flow_tolerance:.17g} "
+        f"--json {report}"
+    )
+    contents = f"""#!/bin/bash
+#SBATCH --job-name=sr_{settings.nucleus.lower()}
+#SBATCH --partition={settings.partition}
+#SBATCH --qos=low
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=64
+{nodelist_line}#SBATCH -o {case_root}/log_{tag}_%j.txt
+
+set -eo pipefail
+cd {repo_root}
+source /opt/modules/init/bash
+source ./sourceme.sh
+export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
+export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
+
+git rev-parse HEAD
+c++ --version | head -1
+ldd {settings.pyimsrg_dir.resolve() / 'pyIMSRG.so'} | grep -E 'openblas|blas|lapack|gsl|boost|not found' || true
+{_POINT7_PYTHON} -c 'import sys, numpy, scipy, sympy; print("python", sys.version.split()[0], "numpy", numpy.__version__, "scipy", scipy.__version__, "sympy", sympy.__version__, flush=True)'
+{command}
+"""
+    script.write_text(contents, encoding="utf-8")
+    script.chmod(0o755)
+    return script
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -177,6 +286,16 @@ def main() -> int:
     parser.add_argument("--max-step", type=float, default=10.0)
     parser.add_argument("--residual-ratio", type=float, default=1e-6)
     parser.add_argument("--resume-from", type=Path)
+    parser.add_argument(
+        "--sr-check-flow",
+        type=Path,
+        help="generate a strict C++/production comparison for this flow instead",
+    )
+    parser.add_argument("--jcoupled64", type=Path)
+    parser.add_argument("--pyimsrg-dir", type=Path)
+    parser.add_argument("--sr-check-ode-tolerance", type=float)
+    parser.add_argument("--sr-check-initial-step", type=float, default=1e-2)
+    parser.add_argument("--sr-check-flow-tolerance", type=float, default=1e-5)
     parser.add_argument("--submit", action="store_true")
     parser.add_argument(
         "--repo-root",
@@ -208,7 +327,34 @@ def main() -> int:
         residual_ratio=args.residual_ratio,
         resume_from=args.resume_from,
     )
-    script = generate_job(repo_root, result_root, settings)
+    if args.sr_check_flow is None:
+        script = generate_job(repo_root, result_root, settings)
+    else:
+        if args.jcoupled64 is None or args.pyimsrg_dir is None:
+            parser.error("--sr-check-flow requires --jcoupled64 and --pyimsrg-dir")
+        ode_tolerance = (
+            args.sr_check_ode_tolerance
+            if args.sr_check_ode_tolerance is not None
+            else args.rtol
+        )
+        script = generate_sr_check_job(
+            repo_root,
+            result_root,
+            SRCheckSettings(
+                nucleus=args.nucleus,
+                nrefmax=args.nrefmax,
+                interaction=args.interaction,
+                label=args.label,
+                partition=args.partition,
+                nodelist=args.nodelist,
+                production_flow=args.sr_check_flow,
+                jcoupled64=args.jcoupled64,
+                pyimsrg_dir=args.pyimsrg_dir,
+                ode_tolerance=ode_tolerance,
+                initial_step=args.sr_check_initial_step,
+                flow_tolerance=args.sr_check_flow_tolerance,
+            ),
+        )
     print(f"generated {script}")
     print(script.read_text(encoding="utf-8"), end="")
     if args.submit:

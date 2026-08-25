@@ -156,7 +156,7 @@ def save_flow_output(
             "formula": "Mongelli Eqs. (5.213)-(5.214), leading terms",
             "lambda2_terms": "omitted as O(lambda2)",
             "cutoff_mev": WHITE_DENOMINATOR_CUTOFF,
-            "cutoff_sign": "preserved",
+            "cutoff_behavior": "absolute values below cutoff replaced by positive cutoff",
             "spherical_diagonal_interpretation": (
                 "m-averaged unnormalized J-orbit monopoles matching "
                 "TwoBodyME::GetTBMEmonopole"
