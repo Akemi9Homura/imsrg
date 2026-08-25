@@ -5,7 +5,6 @@ import json
 import subprocess
 import re
 import shlex
-import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -238,6 +237,10 @@ def _validate_mr_jscheme_settings(settings: MRJschemeSettings) -> None:
         raise FileNotFoundError(f"MR reference is unavailable: {settings.reference_file}")
     if not settings.executable.is_file():
         raise FileNotFoundError(f"imsrg++ executable is unavailable: {settings.executable}")
+    if not (settings.executable.parent / "libIMSRG.so").is_file():
+        raise FileNotFoundError("libIMSRG.so is unavailable beside imsrg++")
+    if not (REPO_ROOT / "sourceme.sh").is_file():
+        raise FileNotFoundError("repository sourceme.sh is unavailable")
 
 
 def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
@@ -246,15 +249,15 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
     interaction = settings.interaction.resolve()
     reference_file = settings.reference_file.resolve()
     executable_path = settings.executable.resolve()
+    shared_library = (settings.executable.parent / "libIMSRG.so").resolve()
+    environment_script = (REPO_ROOT / "sourceme.sh").resolve()
     result_root = settings.result_root.resolve()
     interaction_sha256 = _sha256(interaction)
     reference_sha256 = _sha256(reference_file)
     executable_sha256 = _sha256(executable_path)
+    shared_library_sha256 = _sha256(shared_library)
+    environment_script_sha256 = _sha256(environment_script)
     repository_commit = _repository_commit(REPO_ROOT)
-    git_executable = shutil.which("git")
-    if git_executable is None:
-        raise RuntimeError("git is unavailable while generating MR flow job")
-    git_executable = str(Path(git_executable).resolve())
     segment_smax = settings.target_s - settings.start_s
     tag = (
         f"{settings.nucleus}_Nrefmax{settings.nrefmax}_emax{settings.emax}"
@@ -327,11 +330,11 @@ export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{library_paths}"
 echo repository_commit={repository_commit}
 echo cumulative_start_s={settings.start_s:.17g}
 echo cumulative_target_s={settings.target_s:.17g}
-test "$({shlex.quote(git_executable)} rev-parse HEAD)" = '{repository_commit}'
-{shlex.quote(git_executable)} diff --quiet HEAD --
 echo '{interaction_sha256}  {interaction}' | sha256sum -c -
 echo '{reference_sha256}  {reference_file}' | sha256sum -c -
 echo '{executable_sha256}  {executable_path}' | sha256sum -c -
+echo '{shared_library_sha256}  {shared_library}' | sha256sum -c -
+echo '{environment_script_sha256}  {environment_script}' | sha256sum -c -
 if ldd {shlex.quote(str(executable_path))} | grep 'not found'; then
   exit 1
 fi
@@ -345,7 +348,6 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
     metadata = {
         "schema": "mrimsrg_cpp_jscheme_slurm_v1",
         "repository_commit": repository_commit,
-        "git_executable": git_executable,
         "settings": {
             **asdict(settings),
             "interaction": str(interaction),
@@ -359,6 +361,10 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
         "interaction_sha256": interaction_sha256,
         "reference_sha256": reference_sha256,
         "executable_sha256": executable_sha256,
+        "shared_library": str(shared_library),
+        "shared_library_sha256": shared_library_sha256,
+        "environment_script": str(environment_script),
+        "environment_script_sha256": environment_script_sha256,
         "flow_file": str(flow_file),
         "output_jcoupled64": str(output_j64),
         "output_no2bpack": str(output_no2bpack),

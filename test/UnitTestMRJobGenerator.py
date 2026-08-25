@@ -79,15 +79,20 @@ def main():
             "write_H_jcoupled64=",
             "write_H_no2bpack=",
             "sha256sum -c -",
-            "/git diff --quiet HEAD --",
             "ldd ",
         )
         for token in required_tokens:
             require(token in contents, "generated script is missing: " + token)
         require(len(metadata["executable_sha256"]) == 64,
                 "executable SHA-256 was not recorded")
-        require(Path(metadata["git_executable"]).is_absolute(),
-                "git executable was not frozen as an absolute path")
+        require(len(metadata["shared_library_sha256"]) == 64,
+                "libIMSRG SHA-256 was not recorded")
+        require(len(metadata["environment_script_sha256"]) == 64,
+                "sourceme.sh SHA-256 was not recorded")
+        require(metadata["shared_library"] in contents,
+                "generated script does not verify libIMSRG")
+        require(metadata["environment_script"] in contents,
+                "generated script does not verify sourceme.sh")
 
         try:
             generate_mr_jscheme_slurm(settings)
