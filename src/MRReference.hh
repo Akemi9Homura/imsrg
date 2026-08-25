@@ -5,6 +5,8 @@
 #include "Operator.hh"
 #include "TwoBodyME.hh"
 
+#include <map>
+#include <string>
 #include <vector>
 
 /// Explicit J_ref=0 multi-reference density context for MR-IMSRG(2).
@@ -22,9 +24,29 @@ class MRReference
   int Nrefmax;
   std::vector<double> occupations;
   TwoBodyME Lambda2;
+  /// Columns are natural J-orbits expressed in the original spherical basis.
+  arma::mat NaturalOrbitTransformation;
+  int J2 = 0;
+  int parity = 1;
+  int emax = -1;
+  int e2max = -1;
+  double hw = 0.0;
+  std::string interaction_sha256;
+  std::string rdm_sha256;
+  std::string wavefunction_sha256;
 
   MRReference(ModelSpace &ms, int A_in, int Z_in, int Nrefmax_in,
               const std::vector<double> &occupations_in);
+
+  /// Read the self-describing little-endian mrimsrg_jref_v1 bridge.
+  /// The ModelSpace must already carry the file occupations so its channel
+  /// occupation weights have been constructed consistently.
+  static MRReference ReadBinary(ModelSpace &ms, const std::string &filename,
+                                double validation_tolerance = 1e-10);
+  /// Read only the orbit occupations so a caller can explicitly rebuild the
+  /// ModelSpace occupation-dependent channel lists before ReadBinary().
+  static std::map<index_t, double> ReadOccupationMap(
+      ModelSpace &ms, const std::string &filename);
 
   bool OccupationsMatchModelSpace(double tolerance = 1e-12) const;
   double MaximumHermiticityViolation() const;

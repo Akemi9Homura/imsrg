@@ -31,7 +31,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 
 - [x] 新增最小 `Jref=0` MR reference 对象，保存每个 J-orbit 的自然
       占据与 J-coupled `lambda2`，不把相关密度隐藏成全局状态。
-- [ ] 读入时验证标量性、Hermiticity、pair antisymmetry、`Tr(gamma1)=A`
+- [x] 读入时验证标量性、Hermiticity、pair antisymmetry、`Tr(gamma1)=A`
       和 `gamma2 -> (A-1)gamma1` 收缩，拒绝 `Jref!=0` 或非自然基密度。
 - [ ] 复用生产正规序/反变换路径，只增加 `lambda2` 必需的 MR 收缩；
       与 Python 的 `E/f/Gamma` 和真空往返逐元素比较。

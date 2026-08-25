@@ -164,10 +164,10 @@ existing SR/fractional-occupation J-scheme contractions
 的中间实现都不能用于新物理结果。
 
 当前进度（2026-08-25）：步骤 1 完成；步骤 2 的显式 `MRReference`、
-J-coupled 恒等式检查和正规序往返已完成，文件 reader 尚未完成；步骤 3--4
+J-coupled 恒等式检查、正规序往返及 `mrimsrg_jref_v1` 文件 reader 已完成；步骤 3--4
 的慢速参考、块矩阵生产收缩、完整 0B/1B/2B MR commutator 及精确 SR
-退化门禁已完成。当前不得跳到完整流出数；下一实施边界是 reader，随后是
-步骤 5 的生成元和步骤 6 的 solver/driver 接线。
+退化门禁已完成。当前不得跳到完整流出数；下一实施边界是步骤 5 的生成元，
+随后是步骤 6 的 solver/driver 接线。
 
 ## 7. 错误定位原则
 

@@ -165,6 +165,21 @@ ratio denominators. `smax` and `checkpoint-s` are absolute flow parameters.
 The dedicated point7 generator accepts the same `--resume-from` option and
 still emits exactly one inspected Slurm job.
 
+Export a saved NCSM reference to the compact production C++ J-scheme input:
+
+```bash
+python3 -m prototype.mrimsrg.export_jref \
+  --reference prototype/mrimsrg/data/Be8_Nrefmax0_final \
+  --output /tmp/Be8_Nrefmax0.jref
+```
+
+The `mrimsrg_jref_v1` payload records provenance hashes, physical metadata,
+the spherical orbit table, natural-orbit transformation and occupations, and
+float64 normalized-pair `lambda2` blocks.  The C++ reader maps by
+`(n,l,j2,tz2)` and validates the scalar density and cumulant contraction; it
+does not load the full m-scheme density during a production flow. Existing
+output files are never overwritten.
+
 Read a materialized ordinary Hamiltonian back into the existing NCSM solver:
 
 ```bash

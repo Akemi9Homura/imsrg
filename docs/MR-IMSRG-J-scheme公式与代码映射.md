@@ -149,8 +149,22 @@ normalized-pair block 形成 `X*lambda*Y`，其中对中间相同粒子 pair 的
    White-NCSM generator 与 flow 集成。
 
 截至 2026-08-25，第 1--6 步中的 commutator 部分均已实现并通过；下一
-边界是 reference-density reader、White-NCSM generator 与 solver/driver
-显式上下文接线。
+边界是 White-NCSM generator 与 solver/driver 显式上下文接线。
+
+## 6. 生产参考态文件闭环
+
+`prototype/mrimsrg/export_jref.py` 复用现有 simpleFCI/shell-model-obs
+波函数桥、`compute_densities()` 和已验收的自然基/J-coupling oracle，写出
+`mrimsrg_jref_v1`。文件使用 little-endian float64，包含来源 SHA-256、
+`A/Z/Nrefmax/J2/parity/hw/emax/e2max`、完整 `(n,l,j2,tz2)` 轨道表、
+自然占据、原 HO 到内部自然 J-orbit 的正交变换，以及 normalized-pair
+`lambda2` blocks。C++ 按量子数映射轨道和 pair，不依赖两端原始编号。
+
+reader 在进入流之前检查 `J=0+`、空间参数、自然变换的正交性和球形 block
+结构、占据范围与粒子/质子 trace、`lambda2` Hermiticity 及 cumulant 收缩。
+`Be8 Nrefmax=0` 的 17 KiB 实文件读回后，来源哈希与既有验收记录一致，
+cumulant 收缩误差 `6.44e-15`，全部 block 对 Python CG 投影逐元素误差
+`<1e-13`。`He4 Nrefmax=2` 的非单位径向自然轨道变换也通过读回与收缩检查。
 
 随机严格标量张量要求 J/m 转换 `<=1e-12`；真实 RDM 的输入标量投影
 残差单独报告并暂以 `1e-10` 为拒绝阈值。所有能量/RHS contraction 的

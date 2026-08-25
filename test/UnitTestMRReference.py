@@ -3,6 +3,7 @@
 import math
 from pathlib import Path
 import sys
+import tempfile
 
 import numpy as np
 import pyIMSRG
@@ -11,8 +12,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from prototype.mrimsrg.jcoupling import (  # noqa: E402
     CoupledBlock,
     couple_scalar_two_body,
+    extract_j_orbits,
     mr_lambda2_one_body_coupled,
 )
+from prototype.mrimsrg.basis import prepare_natural_basis  # noqa: E402
+from prototype.mrimsrg.densities import compute_densities  # noqa: E402
+from prototype.mrimsrg.export_jref import export_reference  # noqa: E402
+from prototype.mrimsrg.reference_io import load_reference  # noqa: E402
 
 
 def max_operator_difference(left, right):
@@ -165,5 +171,80 @@ assert math.isclose(
     rel_tol=0.0,
     abs_tol=2e-11,
 )
+
+# Exercise the complete saved-wavefunction -> natural density -> compact
+# J-scheme bridge -> C++ reader path with the physical correlated Be8 Nrefmax=0
+# reference.  This also freezes the provenance digests from the acceptance log.
+repository_root = Path(__file__).resolve().parents[1]
+be8_path = repository_root / "prototype/mrimsrg/data/Be8_Nrefmax0_final"
+be8_data = load_reference(be8_path)
+be8_natural = prepare_natural_basis(
+    compute_densities(be8_data.determinants, be8_data.coefficients)
+)
+be8_orbits = extract_j_orbits(be8_data.orbits)
+be8_blocks = couple_scalar_two_body(
+    be8_natural.densities.lambda2, be8_data.orbits
+)
+be8_ms = pyIMSRG.ModelSpace(2, "He4", "He4")
+with tempfile.TemporaryDirectory() as temporary_directory:
+    bridge_path = Path(temporary_directory) / "Be8_Nrefmax0.jref"
+    summary = export_reference(be8_path, bridge_path)
+    be8_ms.SetReferenceOcc(
+        pyIMSRG.MRReference.ReadOccupationMap(be8_ms, str(bridge_path))
+    )
+    be8_reference = pyIMSRG.MRReference.ReadBinary(be8_ms, str(bridge_path))
+assert summary["rdm_sha256"] == "9e8da10770cf143dcc87382c96aabf64961263fac86a02ac13ec6a468121c538"
+assert summary["wavefunction_sha256"] == "20f36fd7da0461e2e7b7f92b98662d0241be69f4482df6a1655aaeae02be469b"
+assert be8_reference.rdm_sha256 == summary["rdm_sha256"]
+assert be8_reference.wavefunction_sha256 == summary["wavefunction_sha256"]
+assert be8_reference.MaximumContractionViolation() < 1e-12
+assert be8_reference.MaximumHermiticityViolation() < 1e-12
+for i in range(be8_ms.GetNumberOrbits()):
+    for j in range(be8_ms.GetNumberOrbits()):
+        expected = 1.0 if i == j else 0.0
+        assert abs(be8_reference.NaturalOrbitTransformation(i, j) - expected) < 1e-14
+for block in be8_blocks:
+    channel = be8_ms.GetTwoBodyChannelIndex(block.J, block.parity, block.Tz)
+    two_body_channel = be8_ms.GetTwoBodyChannel(channel)
+    for ibra, (a_file, b_file) in enumerate(block.pairs):
+        oa, ob = be8_orbits[a_file], be8_orbits[b_file]
+        a = be8_ms.GetOrbitIndex(oa.n, oa.l, oa.j2, oa.tz2)
+        b = be8_ms.GetOrbitIndex(ob.n, ob.l, ob.j2, ob.tz2)
+        local_bra = two_body_channel.GetLocalIndex(a, b)
+        for iket, (c_file, d_file) in enumerate(block.pairs):
+            oc, od = be8_orbits[c_file], be8_orbits[d_file]
+            c = be8_ms.GetOrbitIndex(oc.n, oc.l, oc.j2, oc.tz2)
+            d = be8_ms.GetOrbitIndex(od.n, od.l, od.j2, od.tz2)
+            local_ket = two_body_channel.GetLocalIndex(c, d)
+            actual = be8_reference.Lambda2.GetTBME_norm_chij(
+                channel, channel, local_bra, local_ket
+            )
+            assert abs(actual - block.matrix[ibra, iket]) < 1e-13
+
+# A correlated closed-shell Nrefmax=2 reference exercises the non-identity
+# temporary natural-orbit rotation, including radial mixing in fixed (l,j,tz)
+# blocks.  It must survive the same bridge without being mistaken for HO basis.
+he4_nref2_path = repository_root / "prototype/mrimsrg/data/He4_Nrefmax2"
+he4_nref2_ms = pyIMSRG.ModelSpace(2, "He4", "He4")
+with tempfile.TemporaryDirectory() as temporary_directory:
+    bridge_path = Path(temporary_directory) / "He4_Nrefmax2.jref"
+    summary = export_reference(he4_nref2_path, bridge_path)
+    he4_nref2_ms.SetReferenceOcc(
+        pyIMSRG.MRReference.ReadOccupationMap(he4_nref2_ms, str(bridge_path))
+    )
+    he4_nref2_reference = pyIMSRG.MRReference.ReadBinary(
+        he4_nref2_ms, str(bridge_path)
+    )
+assert not summary["natural_basis_is_identity"]
+assert he4_nref2_reference.rdm_sha256 == "b160ba51f981af596d960a03ace8a53ba777093c77afe325ac740e6337b90df2"
+assert he4_nref2_reference.MaximumContractionViolation() < 1e-11
+assert he4_nref2_reference.Lambda2.Norm() > 1e-3
+maximum_off_diagonal_transformation = max(
+    abs(he4_nref2_reference.NaturalOrbitTransformation(i, j))
+    for i in range(he4_nref2_ms.GetNumberOrbits())
+    for j in range(he4_nref2_ms.GetNumberOrbits())
+    if i != j
+)
+assert maximum_off_diagonal_transformation > 1e-3
 
 print("MRReference tests passed")
