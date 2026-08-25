@@ -55,6 +55,10 @@ Python 原型或为测试复制一套 SR 公式的 wrapper。
 不允许从 OCR 文本直接抄长公式。J-scheme 归约要由 Clebsch--Gordan
 展开数值重建，再与 QCombo/m-scheme 逐元素核对。
 
+审计结果已冻结在 `docs/MR-IMSRG-J-scheme公式与代码映射.md`。特别是
+Gebrerufael 未正规化 pair 矩阵元、`TwoBodyME` normalized-pair 存储和
+rank-0 TBTD 三种数值不能混用。
+
 ## 4. 软件边界
 
 ### 4.1 MR reference 对象
@@ -91,7 +95,8 @@ existing SR/fractional-occupation J-scheme contractions
 
 - `Generator` 新增显式 `white_ncsm` 模式，不改变现有 generator 名称语义。
 - 分母复用 `GetTBMEmonopole()` 的 `(2J+1)` 加权 monopole 和当前
-  `1e-6 MeV` cutoff 行为。
+  `1e-6 MeV` cutoff 行为。当前 SR 代码对小分母一律置为正 cutoff；首版
+  MR 为严格退化必须原样复用，不在 MR 分支单独改变符号规则。
 - `Delta e` 掩码由 orbit `e=2n+l` 和 pair total `e` 决定，不用
   core/valence/q-space 标签猜测。
 - `IMSRGSolver` 继续负责 ODE、对称性维护、checkpoint 和停止；MR 参考
@@ -105,7 +110,8 @@ existing SR/fractional-occupation J-scheme contractions
 
 - RDM 恒等式在 J-scheme 中直接通过；
 - 随机 scalar `lambda2` 的 J-to-m-to-J 误差 `<=1e-12`；
-- 真实六个参考态的 `n_p/lambda2` 展开与 Python 数组误差 `<=1e-12`。
+- 真实参考态另报告输入 m-scheme RDM 的标量投影残差，拒绝阈值先取
+  `1e-10`；coupled block 自身闭环仍要求 `<=1e-12`。
 
 ### Gate 2：命名 contraction
 

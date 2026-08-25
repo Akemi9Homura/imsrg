@@ -14,17 +14,18 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 
 ### A. 文献、约定与架构冻结
 
-- [ ] 逐篇阅读 `refs/` 中 Hergert 2016、Gebrerufael/Vobig/Mongelli 学位
+- [x] 逐篇阅读 `refs/` 中 Hergert 2016、Gebrerufael/Vobig/Mongelli 学位
       论文和 IM-NCSM 系列论文，建立 m-scheme 公式、J-scheme 张量约定与
-      `lambda3=0` 截断表。
+      `lambda3=0` 截断表；见 `docs/MR-IMSRG-J-scheme公式与代码映射.md`。
 - [ ] 重生并核对 QCombo `MR_IMSRG2.ipynb`，固定指标方向、反对称、
       组合系数和每个命名 contraction。
-- [ ] 逐文件审读 `Operator`/`TwoBodyME`/`TwoBodyChannel`/`ModelSpace`、
+- [x] 逐文件审读 `Operator`/`TwoBodyME`/`TwoBodyChannel`/`ModelSpace`、
       `Commutator.cc`、`Generator.cc`、`IMSRGSolver.cc` 和现有测试，确定哪些
-      SR contractions 在分数占据下已等于 MR 公式的公共部分。
-- [ ] 冻结 `Operator` TBME 归一化/相位、J-coupled `lambda2` 定义、
+      SR contractions 在分数占据下已等于 MR 公式的公共部分；公共 2B/1B
+      与 0B 项全部复用，新增范围冻结为 IV--VI 与 `C2-lambda2`。
+- [x] 冻结 `Operator` TBME 归一化/相位、J-coupled `lambda2` 定义、
       natural-orbit 占据和 `Jref=0` 标量密度格式；用 J-to-m-to-J 随机
-      张量闭环验证。
+      张量闭环验证；独立 oracle 见 `prototype/mrimsrg/jcoupling.py`。
 
 ### B. 生产参考态与正规序接口
 
