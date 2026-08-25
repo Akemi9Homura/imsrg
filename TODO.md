@@ -207,8 +207,14 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       为 `2.212e-8/3.898e-8/8.871e-10/1.071e-9 MeV`。新旧 J64 的全局
       max-abs 为 `8.384e-13 MeV`，`Nmax=8/0/0/2` 的 12 条 simpleFCI
       低能谱全局最坏变化 `1.741e-13 MeV`。
-- [ ] 对 `dea9125b` 的 skinny Pandya 构造重新执行 point7 四核
+- [x] 对 `dea9125b` 的 skinny Pandya 构造重新执行 point7 四核
       `s=100, rtol=atol=1e-10` 和 `Nmax=8/0/0/2` simpleFCI 谱回归。
+      generator jobs `100393/100395/100397/100399` 全部通过；四核
+      C++/Python 全流最坏差为
+      `2.212e-8/3.898e-8/8.871e-10/1.071e-9 MeV`。相对
+      `cef4fce6` 的 J64 全局 max-abs 为 `8.527e-13 MeV`，12 条低能谱
+      全局最坏变化 `1.990e-13 MeV`，因此 skinny 构造已通过完整流、
+      真空物化和后 NCSM 三层门禁。
 - [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
       Magnus/重启策略；登录节点禁止重计算，统一由 point7 Slurm 运行。
 

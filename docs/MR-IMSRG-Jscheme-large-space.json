@@ -296,14 +296,23 @@
       "two_body_max_abs_mev": 8.881784197001252e-16,
       "passed": true
     },
-    "point7_full_flow_jobs": [100385, 100387, 100389, 100391],
-    "point7_full_flow_jobs_validate_through_commit": "cef4fce6d94132c20d0dce939297b45041f7645a",
+    "lambda_active_support_point7_full_flow_jobs": [100385, 100387, 100389, 100391],
     "lambda_active_support_point7_full_flow_pending": false,
     "point7_maximum_vacuum_h_abs_vs_previous_mev": 8.384404281969182e-13,
     "maximum_ncsm_spectral_abs_vs_previous_mev": 1.7408297026122455e-13,
     "skinny_pandya_mr_correlated_driver_seconds": 352.52,
-    "skinny_pandya_point7_full_flow_pending": true,
+    "point7_full_flow_jobs": [100393, 100395, 100397, 100399],
+    "point7_full_flow_jobs_validate_through_commit": "dea9125bb734b195c2237d6b96ab96c4e42042db",
+    "skinny_pandya_point7_full_flow_pending": false,
+    "skinny_pandya_cpp_python_full_flow_max_abs_mev": {
+      "He4": 2.2121837121528776e-08,
+      "Be8": 3.898388312186247e-08,
+      "C12": 8.871268164512003e-10,
+      "O16": 1.0712355447139998e-09
+    },
+    "skinny_pandya_maximum_vacuum_h_abs_vs_previous_mev": 8.526512829121202e-13,
+    "skinny_pandya_maximum_ncsm_spectral_abs_vs_previous_mev": 1.9895196601282805e-13,
     "local_regression_passed": true,
-    "passed": false
+    "passed": true
   }
 }

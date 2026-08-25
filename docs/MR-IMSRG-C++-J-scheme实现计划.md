@@ -223,7 +223,15 @@ support 分支改为直接形成 `X/Y(:,A)` 与 `X/Y(A,:)`；只有 `A=d` 的一
 checkpoint 的长 CTest 在 `352.52 s` 后通过。此时 emax6 的
 MR `lambda2` addon 为 `0.717 s`，既有 White-NCSM generator update 为
 `2.191 s`，主瓶颈已经跨到公共生成元路径。该结论在 point7 对
-`dea9125b` 再完成四核 full-flow/NCSM 回归前仍标为本地性能门通过。
+`dea9125b` 的四核 full-flow/NCSM 回归后仍成立。专用生成器提交的 jobs
+`100393/100395/100397/100399` 均完成 `s=100, rtol=atol=1e-10` 检查；
+He4/Be8/C12/O16 的 C++/Python 全流最坏差依次为
+`2.212e-8/3.898e-8/8.871e-10/1.071e-9 MeV`。新 J64 相对
+`cef4fce6` 的全局 max-abs 为 `8.527e-13 MeV`，由现有 `simpleFCI`
+按 `Nmax=8/0/0/2` 重算的 12 条低能谱最大变化为 `1.990e-13 MeV`。
+因此 skinny Pandya 构造已通过完整流、真空物化和后 NCSM 门禁。下一步
+不再继续改 MR V 项，而是先剖析和复用现有 White-NCSM generator 路径，
+再根据 emax4/6 实测外推决定大空间完整流及 Magnus/重启策略。
 
 ## 6. 实现顺序与 commit 边界
 
