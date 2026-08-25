@@ -260,16 +260,28 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `3.4784e-3/4.4032e-4`；主导分母约 `24.1 MeV`，没有小分母或 cutoff
       通道。慢尾来自 `2e-4--2e-2` 的小自然占据权重使不同通道依次成为
       主导，而不是 ODE 容差或 generator 计算性能。
-- [ ] 在不改变 Vobig White-NCSM 公式的前提下确定 emax4 的生产终点：并行
-      监测论文使用的二阶能量/后 NCSM 谱稳定性与本项目严格 `Rgen/Rgen0`
-      门槛；不得因论文图只画到 `s≈100` 就把未达 `1e-6` 的点标成严格
-      收敛，也不得在逐通道证据已排除小分母后盲目外推到超大 `s`。
-- [ ] 对 emax4 流后 J64 与 no2bpack 做独立 NCSM 读回，比较 float64/float32
-      谱，并把 ODE 容差收紧十倍后最低能级变化控制在 `<1 keV`。
-- [ ] 根据 emax4 全流的实测步数、峰值内存和 checkpoint 体积决定是否直接
-      启动 emax6 完整 direct flow；若分段重启仍不足，再单独设计并验收
-      MR Magnus/restart。不得在没有同一 RHS/短流/谱回归时把 Magnus 接入
-      生产结果。
+- [x] 扫描 emax4 的下游谱稳定流窗，而不是只看 MR 零体项或 `eta`。
+      `s=0,0.02,0.1` 已完成 `Nmax=2,4,6,8,16` NCSM；`s=1,10,100,1000`
+      已完成 `Nmax=8`。裸 Hamiltonian 的全空间 (`Nmax=16`) 基态为
+      `-25.2912232776 MeV`；`s=0.02/0.1` 的全空间漂移为
+      `-45.476/-187.528 keV`。`s=100/1000` 的 Nmax8 基态已漂到
+      `-30.588/-42.621 MeV`，因此明确拒绝作为下游生产 Hamiltonian。
+- [x] 对 emax4 `s=0.02` 的 J64 与 no2bpack 做独立 NCSM 读回。前三态
+      float32 packing 差值最大 `0.000726 keV`；ODE 容差由 `1e-9` 收紧到
+      `1e-10` 后，J64 0/1/2B 最坏变化 `3.675e-14 MeV`、前三态最坏变化
+      约 `3e-11 keV`，通过 `<1 keV` 门槛。
+- [x] 冻结当前 emax4 判定：`s=0.02` 只称为“有限短流 NCSM 收敛加速器
+      候选”。它把 `Nmax=2/4/6/8` 相对同一流后全空间的截断误差分别改善
+      `412.148/147.117/39.306/9.869 keV`，但
+      `Rgen/Rgen0=0.9659`，远未通过严格 `1e-6` 脱耦门槛。严格脱耦结果
+      仍记为未获得，不得用短流候选替代。
+- [ ] 在进入 emax6 生产流前，给有限流窗增加明确的 downstream stopping
+      rule：联合限制全空间/最大可算 Nmax 谱漂移、相邻 Nmax 收敛改善和
+      ODE/格式误差。严格 `Rgen/Rgen0<=1e-6` 继续作为独立失败门禁，不得
+      静默改写；若二者在 MR-IMSRG(2) 下不兼容，报告不兼容而不是追流。
+- [ ] 只在上述 finite-s rule 冻结后运行 emax6 短流窗。Magnus 只能改善
+      积分/重启成本，不能被当作修复 IMSRG(2) 长流谱漂移的办法；若确需
+      接入，仍须从同一 RHS、短流、真空物化和后 NCSM 谱重新验收。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

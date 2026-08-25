@@ -1,5 +1,5 @@
 {
-  "schema": "mrimsrg_jscheme_large_space_acceptance_v7",
+  "schema": "mrimsrg_jscheme_large_space_acceptance_v8",
   "implementation_commit": "6e02676ce00e237efdbf6cb71df9315f7c576143",
   "baseline_profiler_commit": "1f02961a2c8ab9560ece346284ab4dd2d7a25337",
   "shell_model_obs_commit": "4b10afab0218711b0278ef66ad73e88bc7791c34",
@@ -448,6 +448,108 @@
     "strict_relative_eta_target": 1e-6,
     "strict_target_reached": false,
     "passed_environment_and_materialization": true
+  },
+  "emax4_downstream_flow_window": {
+    "nucleus": "He4",
+    "reference": "Nrefmax=2 emax2 reference embedded in emax4",
+    "ncsm_reader": "prototype/mrimsrg/build-emax4/mrimsrg_validate",
+    "ncsm_reader_basis_sha256": "d3dff5faa2a58d8c234914170caffa3649d0cd3805a1344818f4f4d3c37fd19e",
+    "full_space_nmax": 16,
+    "basis_dimensions": {
+      "Nmax2": 59,
+      "Nmax4": 952,
+      "Nmax6": 7556,
+      "Nmax8": 35658,
+      "Nmax16": 313601
+    },
+    "ground_state_mev": {
+      "s0": {
+        "Nmax2": -17.01349070942774,
+        "Nmax4": -22.361779780540747,
+        "Nmax6": -24.445871866370105,
+        "Nmax8": -25.1530264233765,
+        "Nmax16": -25.291223277555638
+      },
+      "s0.02": {
+        "Nmax2": -17.471115060424815,
+        "Nmax4": -22.554373327553488,
+        "Nmax6": -24.530654043264754,
+        "Nmax8": -25.208371999830185,
+        "Nmax16": -25.336699632708306
+      },
+      "s0.1": {
+        "Nmax2": -19.043455825146676,
+        "Nmax4": -23.20087921298597,
+        "Nmax6": -24.803144544651833,
+        "Nmax8": -25.381000468346478,
+        "Nmax16": -25.478750953909806
+      }
+    },
+    "nmax8_lowest_three_mev": {
+      "s0": [-25.1530264233765, -22.892425666779602, -22.75400754450943],
+      "s0.02_no2bpack": [-25.208371999830185, -22.924549261672482, -22.79281658264279],
+      "s0.02_jcoupled64": [-25.208371273985055, -22.924549137086156, -22.792816437274936],
+      "s1_no2bpack": [-25.867220656258546, -23.721549808974743, -23.611685772732244],
+      "s10_no2bpack": [-25.690113668987728, -23.772379134867162, -23.54244755532542],
+      "s100_no2bpack": [-30.588114430473844, -30.132864821010024, -29.387613833092008],
+      "s1000_no2bpack": [-42.62051058038752, -41.509820406441825, -39.010184393577056]
+    },
+    "truncation_error_to_same_s_full_space_kev": {
+      "s0": {
+        "Nmax2": 8277.732568127899,
+        "Nmax4": 2929.443497014891,
+        "Nmax6": 845.351411185533,
+        "Nmax8": 138.196854179139
+      },
+      "s0.02": {
+        "Nmax2": 7865.584572283491,
+        "Nmax4": 2782.326305154818,
+        "Nmax6": 806.045589443552,
+        "Nmax8": 128.327632878121
+      },
+      "s0.1": {
+        "Nmax2": 6435.29512876313,
+        "Nmax4": 2277.871740923835,
+        "Nmax6": 675.606409257973,
+        "Nmax8": 97.750485563328
+      }
+    },
+    "full_space_drift_from_bare_kev": {
+      "s0.02": -45.476355152668,
+      "s0.1": -187.527676354168
+    },
+    "s0.02_generator_diagnostic": {
+      "eta_norm": 1.0417503906844712,
+      "eta_norm_ratio_to_initial": 0.9658922184380784,
+      "white_ncsm_numerator_norm_mev": 75.31227777801628,
+      "white_ncsm_numerator_ratio_to_initial": 0.9708680196860849,
+      "strict_relative_eta_target": 1e-6,
+      "strict_target_reached": false
+    },
+    "s0.02_float32_no2bpack_minus_float64_jcoupled64_kev": [
+      -0.00072584513,
+      -0.000124586326,
+      -0.000145367853
+    ],
+    "s0.02_ode_tolerance_gate": {
+      "compared_tolerances": [1e-9, 1e-10],
+      "jcoupled64_max_abs_mev": {
+        "zero_body": 1.243e-14,
+        "one_body": 2.842e-14,
+        "two_body": 3.675e-14
+      },
+      "maximum_ncsm_energy_abs_kev": 3e-11,
+      "target_kev": 1.0,
+      "passed": true
+    },
+    "interpretation": {
+      "strict_decoupling_result_obtained": false,
+      "short_flow_accelerator_candidate_s": 0.02,
+      "candidate_claim": "finite-flow IM-NCSM accelerator candidate only; it improves every tested Nmax truncation error and passes ODE/format gates, but reduces the generator residual by only about 3.4 percent",
+      "long_flow_claim": "s=100 and s=1000 are rejected as downstream Hamiltonians because their Nmax8 spectra exhibit severe IMSRG(2) truncation drift",
+      "magnus_claim": "changing to Magnus may improve integration and restart mechanics but cannot by itself remove the observed IMSRG(2) truncation drift",
+      "next_gate": "freeze a finite-s downstream-stability criterion before emax6 production flow; retain the independent strict eta gate as failed"
+    }
   },
   "capacity_claim": {
     "largest_actually_run_emax": 6,
