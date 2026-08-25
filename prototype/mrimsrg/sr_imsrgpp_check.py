@@ -40,7 +40,7 @@ try:
         spherical_orbit_groups_from_orbits,
         white_generator,
     )
-    from .normal_order import MRHamiltonian, VacuumHamiltonian, normal_order
+    from .normal_order import MRHamiltonian, VacuumHamiltonian, normal_order, to_vacuum
     from .reference_io import load_reference
 except ImportError:
     from commutator import commutator, commutator_contributions
@@ -55,7 +55,7 @@ except ImportError:
         spherical_orbit_groups_from_orbits,
         white_generator,
     )
-    from normal_order import MRHamiltonian, VacuumHamiltonian, normal_order
+    from normal_order import MRHamiltonian, VacuumHamiltonian, normal_order, to_vacuum
     from reference_io import load_reference
 
 
@@ -589,9 +589,12 @@ def _full_flow_report(
     generator.SetDenominatorCutoff(WHITE_DENOMINATOR_CUTOFF)
     generator.Update(imsrg_final_j, imsrg_eta_j)
     imsrg_rhs_j = pyimsrg.Commutator.Commutator(imsrg_eta_j, imsrg_final_j)
+    imsrg_vacuum_j = imsrg_final_j.UndoNormalOrdering()
     imsrg_final = operator_to_mscheme(imsrg_final_j, reference.orbits)
     imsrg_eta = operator_to_mscheme(imsrg_eta_j, reference.orbits)
     imsrg_rhs = operator_to_mscheme(imsrg_rhs_j, reference.orbits)
+    imsrg_vacuum = operator_to_mscheme(imsrg_vacuum_j, reference.orbits)
+    production_vacuum = to_vacuum(production_final, densities)
 
     return {
         "production_flow": str(production_flow.resolve()),
@@ -603,6 +606,7 @@ def _full_flow_report(
         "h": _operator_comparison(imsrg_final, production_final),
         "eta": _operator_comparison(imsrg_eta, production_eta),
         "rhs": _operator_comparison(imsrg_rhs, production_rhs),
+        "vacuum_h": _operator_comparison(imsrg_vacuum, production_vacuum),
         "denominators": _denominator_report(
             generator, modelspace, production_final, densities, reference.orbits
         ),
@@ -850,7 +854,7 @@ def _passes(
             if comparison[rank]["max_abs"] > algebra_tolerance:
                 return False
     if "full_flow" in report:
-        for name in ("h", "eta", "rhs"):
+        for name in ("h", "eta", "rhs", "vacuum_h"):
             comparison = report["full_flow"][name]
             for rank in ("zero_body", "one_body", "two_body"):
                 if comparison[rank]["max_abs"] > full_flow_tolerance:
