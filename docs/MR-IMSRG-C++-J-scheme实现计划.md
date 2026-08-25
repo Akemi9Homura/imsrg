@@ -294,6 +294,42 @@ point7 环境和 J64/no2bpack 输出，并由 CTest 与真实 emax4 脚本预演
 wall/RSS 和最坏 TBME 见 `MR-IMSRG-Jscheme-large-space.json`；下一项是
 point7 的 emax4 完整收敛流。
 
+point7 的第一轮实测也已完成，但暴露了必须先澄清的停止尺度。commit
+`6bd0c200`、64 核 `compute_C` 上，job `100413` 从累计 `s=0` 积分到
+`100`，墙钟 `159.38 s`、峰值 RSS `166.99 MB`；job `100423` 从其 J64
+Hamiltonian checkpoint 继续到累计 `s=1000`，墙钟 `187.56 s`、峰值
+RSS `167.19 MB`。终点 `Rgen=||eta||` 分别为 `1.10716e-2` 和
+`1.41309e-3`，相对同一初始值 `1.07854` 为 `1.02654e-2` 和
+`1.31019e-3`，因此两段虽然正常完成，却都没有通过本项目的相对 `1e-6`
+严格门槛。两段 MR 反正规序后的零体核对在打印精度为零，J64 SHA-256
+分别为 `c45495a0...fc1636`、`67d8f171...3c300f`，no2bpack SHA-256
+分别为 `7640dd30...71f85`、`dcf8ef57...6e05`。
+
+这不是生成元构造慢或 ODE 容差造成的假尾。逐通道工具
+`prototype/mrimsrg/diagnose_white_ncsm_tail.py` 直接复用生产
+`Generator::ConstructGenerator_WhiteNCSM`，并把 `s=0/100/1000` 的
+21,840 个 `Delta e != 0` 1B/2B J-scheme 通道拆成未加权 Hamiltonian、
+White-NCSM 分子 `Rnum`、正反方向 EN 分母和 `Rgen`。它逐项重构的
+`eta` norm 与 `Operator::Norm()` 在 `1e-12` 内相同。结果显示：
+
+- `Rnum/Rnum(0)=1, 3.47839e-3, 4.40316e-4`；
+- `Rgen/Rgen(0)=1, 1.02654e-2, 1.31019e-3`；
+- `s=1000` 主导通道的分母仍约 `24.1 MeV`，没有接近 `1e-6 MeV`
+  cutoff 的小分母；
+- 参考态的非零小占据包括 `2.03e-4, 2.20e-4, 2.53e-3, 2.59e-3,`
+  `1.76e-2, 1.77e-2`。这些占据乘积直接进入 Vobig 6.5.28--34 的方向性
+  分子，使快通道先消失、越来越小权重的通道随后接管 norm，形成慢包络；
+- 未加占据权重的掩码 Hamiltonian norm 反而从 `1728.85` 增到
+  `1844.71 MeV`，因为 White-NCSM 的已发表固定点不是把所有
+  `Delta e != 0` 裸 TBME 逐元素压为零，不能用这个量替换 `Rgen`。
+
+Vobig Fig. 6.7 的 White-NCSM 曲线只展示到 `s≈100`，其实现说明使用
+二阶能量修正相对零体项约 `1e-4--1e-3` 的停止判断，并没有给出
+`Rgen/Rgen0=1e-6` 的证据。因此下一步同时做两件事：先对 `s=0,100,1000`
+的 J64/no2bpack 做后 NCSM，找出论文意义上的谱稳定区；再保留本项目更严的
+`Rgen` 门槛，依据通道权重和实际谱变化设计有限、可解释的后续流段。不得
+把 `s=100` 自动叫作收敛，也不再按三点幂律拟合盲目提交到百万量级 `s`。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；

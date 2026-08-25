@@ -815,3 +815,5 @@ add_test(NAME MRDenominators
 add_test(NAME MRJobGenerator
          COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRJobGenerator.py
                  $<TARGET_FILE:imsrg++>)
+add_test(NAME MRTailDiagnostic
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRTailDiagnostic.py)

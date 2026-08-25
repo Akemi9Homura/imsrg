@@ -245,9 +245,25 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `0→0.02` 对 `0→0.01→0.02` 在 emax2/4 的完整 0/1/2B 最坏差为
       `6.15e-14/5.92e-14 MeV`，终点 `E/||H||/||eta1,2||` 在打印精度相同；
       可复现比较器和机器记录见 large-space JSON。
-- [ ] 用 `gen_job.py --mr-jscheme` 在 point7 提交 `He4 Nrefmax=2, emax=4`
-      完整收敛流；先 `sbatch --test-only`，再检查队列和日志。记录步数、
-      终止原因、wall/RSS、`eta`/被选中解耦残差、Hermiticity 和输出哈希。
+- [x] 用 `gen_job.py --mr-jscheme` 在 point7 提交 `He4 Nrefmax=2, emax=4`
+      direct flow；两段均先检查生成脚本并通过 `sbatch --test-only`。job
+      `100413` 完成累计 `s=0→100`（`159.38 s`, `166.99 MB`），job
+      `100423` 以 lossless J64 继续到累计 `s=1000`（`187.56 s`,
+      `167.19 MB`）。两段均正常结束、MR 反正规序零体核对在打印精度为零，
+      且同时产生 J64/no2bpack；但没有达到 `eta_criterion=1e-6`，所以只把
+      它们称为已完成的实测流段，不能称为完整收敛流。
+- [x] 对 `s=0/100/1000` 的每个 `Delta e != 0` J-scheme 通道分解
+      Hamiltonian、lambda-free White-NCSM 分子、正反方向占据权重、EN
+      分母和实际 `eta`。新增可复现工具
+      `prototype/mrimsrg/diagnose_white_ncsm_tail.py`。`Rgen/Rgen(0)` 从
+      `1` 降到 `1.0265e-2/1.3102e-3`，`Rnum/Rnum(0)` 降到
+      `3.4784e-3/4.4032e-4`；主导分母约 `24.1 MeV`，没有小分母或 cutoff
+      通道。慢尾来自 `2e-4--2e-2` 的小自然占据权重使不同通道依次成为
+      主导，而不是 ODE 容差或 generator 计算性能。
+- [ ] 在不改变 Vobig White-NCSM 公式的前提下确定 emax4 的生产终点：并行
+      监测论文使用的二阶能量/后 NCSM 谱稳定性与本项目严格 `Rgen/Rgen0`
+      门槛；不得因论文图只画到 `s≈100` 就把未达 `1e-6` 的点标成严格
+      收敛，也不得在逐通道证据已排除小分母后盲目外推到超大 `s`。
 - [ ] 对 emax4 流后 J64 与 no2bpack 做独立 NCSM 读回，比较 float64/float32
       谱，并把 ODE 容差收紧十倍后最低能级变化控制在 `<1 keV`。
 - [ ] 根据 emax4 全流的实测步数、峰值内存和 checkpoint 体积决定是否直接
