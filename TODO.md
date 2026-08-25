@@ -171,13 +171,16 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `100377/100379/100381/100383` 已通过；新旧真空 Hamiltonian 全局最坏
       `7.44e-13 MeV`，四核各三条 NCSM 低能谱全局最坏变化
       `2.13e-13 MeV`，本项验收完成。
-- [ ] 只有验证 emax6 interaction 的来源、header 和校验和后，才重复
+- [x] 只有验证 emax6 interaction 的来源、header 和校验和后，才重复
       emax6 RHS/短流；不得使用文件名含 `candidate` 的核力产生验收结果。
       输入前置现已通过：从冻结 emax14 母文件
       `118c4c27...b9d7d` 流式抽取 467032 条原始 records，得到 canonical
       emax6 文件 SHA-256 `199d5a7a...b913b`；emax4→emax2 校准逐字节相同，
       emax14→emax6 在 A=4/16 下逐 J-channel 严格零差。旧 candidate 最坏
-      差 `3.8147e-6 MeV`，继续禁用。尚需实际运行 emax6 RHS/短流后勾选。
+      差 `3.8147e-6 MeV`，继续禁用。He4 Nrefmax=2 嵌入参考的真实 emax6
+      固定 RK4 一步已完成：56 个 J-orbit、467032 条 TBME，单线程
+      `11.70 s`、峰值 RSS `281132 KiB`，1/64 线程两体最坏差
+      `8.88e-16 MeV`，且未构造 dense m-scheme Hamiltonian。
 - [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
       Magnus/重启策略；登录节点禁止重计算，统一由 point7 Slurm 运行。
 

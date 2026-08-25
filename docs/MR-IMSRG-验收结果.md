@@ -436,3 +436,12 @@ Hamiltonian 的 0B/1B/2B 全局最坏差为 `7.44e-13/3.11e-13/6.04e-14
 MeV`。新 J64 下载后由 `simpleFCI` 实际重算 He4/Be8/C12/O16 的三条最低
 谱，按 `Nmax=8/0/0/2` 得到的 12 条能级相对优化前最坏变化
 `2.13e-13 MeV`。至此 V/VI 性能重排通过完整流和 NCSM 门禁。
+
+较大空间门禁随后扩到真实 emax6。正式输入由冻结 emax14 母 minipack
+（SHA `118c4c27...b9d7d`）流式抽取，canonical child SHA 为
+`199d5a7a...b913b`；A=4/16 的 `Hamiltonian::truncate(6)` 对照均严格零差，
+旧 candidate 因 `3.8147e-6 MeV` 差而未使用。He4 Nrefmax=2 嵌入参考在
+56 个 J-orbit、467032 条 TBME 上完成一个 `ds=1e-4` RK4 步：单线程
+`11.70 s`、峰值 RSS `281132 KiB`，流后零体 `-17.016801664428 MeV`，
+导出零体一致性为零。1/64 线程 0B/1B 相同，2B 最坏 `8.88e-16 MeV`。
+该结果验收的是 emax6 RHS/短流和存储路径，不是完整收敛流。

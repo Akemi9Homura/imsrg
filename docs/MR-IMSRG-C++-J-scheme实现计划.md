@@ -178,6 +178,17 @@ extractor 先用 emax4→emax2 正式文件完成逐字节校准，再由
 只判为额外 float32 roundtrip 诊断品，不能作为正式输入。下一步可在不改变
 参考态定义的前提下进入真实 emax6 RHS/短流。
 
+该 emax6 实跑现已完成。He4 Nrefmax=2 固定参考从 emax2 嵌入到 56 个
+J-orbit，`lambda2` 收缩误差仍为 `1.85e-15`；canonical minipack 经
+A=4 reader 转为 467032 条 TBME 的 lossless J64 并零误差读回。固定
+`ds=smax=1e-4` RK4 一步单线程墙钟 `11.70 s`、峰值 RSS `281132 KiB`，
+流后 `E=-17.016801664428 MeV`、`||H||=10983.182992216 MeV`，真空导出零体
+一致性严格为零。profiler 中 V/VI 为 `7.751/0.231 s`，V 又分为 build
+`5.855 s`、BLAS `1.873 s`。1/64 线程 0B/1B 相同、2B 最坏
+`8.88e-16 MeV`；64 线程在 10-core 开发机上用时 `14.20 s`，不宣称并行
+加速。Gate 7 因此已覆盖真实 emax4 和 emax6 RHS/短流，但仍不等于 emax6
+完整收敛流。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；
