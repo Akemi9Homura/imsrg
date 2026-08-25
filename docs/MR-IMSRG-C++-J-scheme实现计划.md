@@ -203,6 +203,13 @@ reference/generator/solver 路径逐元素为零；`s=0` 对原 HO vacuum Hamilt
 两点都能生成非空下游 `no2bpack`。当前步骤 6 剩余工作转为 He4/O16 SR
 退化与 Be8/C12/O16 真实参考的共同 checkpoints，而不再是 driver 接线。
 
+随后 `He4/O16, Nrefmax=0` 的真实 driver SR 门禁也已通过：MR 入口使用
+`white-ncsm` 和显式零 `lambda2` reference，原生入口使用现有 `white` 且
+不设置任何 MR context；二者在 `s=0` 及共同 `ds=1e-4` RK4 后导出的
+vacuum 0/1/2B float64 矩阵元全部逐元素为零。这一回归通过 reference 文件
+内容判断零 cumulant，不含 He4/O16 核名分支。下一层仍需单独报告真实
+denominator/eta/named RHS 的误差表，并扩展到相关 Be8/C12/O16 reference。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和

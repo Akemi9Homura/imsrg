@@ -1328,10 +1328,13 @@ int main(int argc, char** argv)
   // This must happen before any targeted/ensemble re-normal-ordering below.
   if (write_H_no2bpack != "none" || write_H_jcoupled64 != "none")
   {
-    if (!use_mr_reference && basis != "HF")
+    if (!use_mr_reference && basis != "HF" &&
+        !(basis == "oscillator" && write_H_no2bpack == "none" &&
+          write_H_jcoupled64 != "none"))
     {
-      std::cerr << "vacuum Hamiltonian export requires basis=HF unless an "
-                << "explicit MR reference supplies the HO/NAT transformation; got basis="
+      std::cerr << "no2bpack vacuum export requires basis=HF in the SR path; "
+                << "lossless jcoupled64 additionally supports basis=oscillator. "
+                << "An explicit MR reference supplies its own HO/NAT transformation; got basis="
                 << basis << std::endl;
       return EXIT_FAILURE;
     }

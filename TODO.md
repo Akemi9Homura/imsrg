@@ -75,9 +75,10 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 
 ### E. 单参考生产退化门禁
 
-- [ ] 对 `He4/O16, Nrefmax=0`，同一生产 MR 入口在 `lambda2=0`
+- [x] 对 `He4/O16, Nrefmax=0`，同一生产 MR 入口在 `lambda2=0`
       时直接运行现有 SR contractions；不允许根据测试核名或 fixture
-      切换实现。
+      切换实现。真实 driver 在 `s=0` 与共同 `ds=1e-4` RK4 后的完整
+      vacuum 0/1/2B 均与原生 SR driver 逐元素为零。
 - [ ] 比较 `E/f/Gamma`、每个被选中的 EN 分母、`eta(s=0)`、每个
       命名 RHS contraction 与总 RHS，报告 max-abs/Frobenius/最坏元素。
 - [ ] 代数级输入转换 max-abs `<=1e-12 MeV`，分母/eta/RHS max-abs

@@ -253,6 +253,12 @@ Hamiltonian 在同一 ModelSpace 中完成 HO→NAT 与 MR 正规序；solver �
 使用真实 `He4 Nrefmax=2` 波函数和 NNLOopt Hamiltonian，同时覆盖 `s=0`
 和 `ds=1e-4` 的完整 RK4 driver。
 
+`lambda2.Norm()==0` 时 `MRCommutator::Commutator()` 直接返回现有 SR
+dispatcher 结果，不执行 MR 浮点加法。真实 `He4/O16 Nrefmax=0` 进一步
+确认该结构门禁贯穿主 driver：MR `white-ncsm` 与原生 SR `white` 在当前
+闭壳层 `Delta e` 选择相同时，`s=0` 和一完整 RK4 步后的真空 Hamiltonian
+0/1/2B 逐元素完全一致。
+
 随机严格标量张量要求 J/m 转换 `<=1e-12`；真实 RDM 的输入标量投影
 残差单独报告并暂以 `1e-10` 为拒绝阈值。所有能量/RHS contraction 的
 coupled 对 m-scheme 误差仍要求 `<=1e-10 MeV`。

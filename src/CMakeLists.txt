@@ -805,3 +805,5 @@ add_test(NAME NormalOrdering    COMMAND  python3 ../test/UnitTestNormalOrdering.
 add_test(NAME MRReference COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRReference.py)
 add_test(NAME MRDriver COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRDriver.py
                                --imsrg-executable $<TARGET_FILE:imsrg++>)
+add_test(NAME MRSRDriver COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRSRDriver.py
+                                 $<TARGET_FILE:imsrg++>)
