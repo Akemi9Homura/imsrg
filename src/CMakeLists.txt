@@ -275,6 +275,20 @@ target_link_libraries(
 )
 
 add_library(
+    MRCommutator
+    MRCommutator.hh MRCommutator.cc
+)
+target_link_libraries(
+    MRCommutator
+    PUBLIC
+    MRReference
+    Operator
+    ModelSpace
+    PRIVATE
+    AngMom
+)
+
+add_library(
     Version
     version.hh
     ${CMAKE_CURRENT_BINARY_DIR}/version.cc
@@ -679,6 +693,7 @@ add_library(
     ThreeBodyME
     Operator
     MRReference
+    MRCommutator
     HartreeFock
     Commutator
     IMSRGSolver
@@ -704,6 +719,7 @@ target_link_libraries(
     ThreeBodyME
     Operator
     MRReference
+    MRCommutator
     HartreeFock
     Commutator
     IMSRGSolver

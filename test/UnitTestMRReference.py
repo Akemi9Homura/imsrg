@@ -1,8 +1,18 @@
 #!/usr/bin/env python3
 
 import math
+from pathlib import Path
+import sys
 
+import numpy as np
 import pyIMSRG
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from prototype.mrimsrg.jcoupling import (  # noqa: E402
+    CoupledBlock,
+    couple_scalar_two_body,
+    mr_lambda2_one_body_coupled,
+)
 
 
 def max_operator_difference(left, right):
@@ -53,5 +63,69 @@ assert math.isclose(
 )
 assert (mr_operator.OneBody - sr_operator.OneBody).Norm() < 1e-12
 assert (mr_operator.TwoBody - sr_operator.TwoBody).Norm() < 1e-12
+
+# Compare the slow C++ spherical-orbit IV/V/VI implementation to the independent
+# Python J-scheme oracle.  The latter has its own direct m-scheme topology test.
+rows = []
+for index in range(ms.GetNumberOrbits()):
+    orbit = ms.GetOrbit(index)
+    for m2 in range(-orbit.j2, orbit.j2 + 1, 2):
+        rows.append([index, orbit.n, orbit.l, orbit.j2, m2, orbit.tz2])
+orbits = np.asarray(rows, dtype=np.int32)
+layout = couple_scalar_two_body(np.zeros((len(rows),) * 4), orbits)
+rng = np.random.default_rng(314159)
+
+
+def random_blocks(hermiticity):
+    blocks = []
+    for block in layout:
+        raw = rng.normal(size=block.matrix.shape)
+        matrix = 0.5 * (raw + hermiticity * raw.T)
+        blocks.append(CoupledBlock(block.J, block.parity, block.Tz, block.pairs, matrix))
+    return tuple(blocks)
+
+
+def fill_two_body(two_body, blocks, hermiticity):
+    for block in blocks:
+        channel = ms.GetTwoBodyChannelIndex(block.J, block.parity, block.Tz)
+        two_body_channel = ms.GetTwoBodyChannel(channel)
+        for ibra, pair in enumerate(block.pairs):
+            assert two_body_channel.GetLocalIndex(*pair) == ibra
+            first_ket = ibra + 1 if hermiticity < 0 else ibra
+            for iket in range(first_ket, len(block.pairs)):
+                two_body.SetTBME_chij(
+                    channel, channel, ibra, iket, float(block.matrix[ibra, iket])
+                )
+
+
+x_blocks = random_blocks(-1)
+y_blocks = random_blocks(+1)
+lambda_blocks = random_blocks(+1)
+x_operator = pyIMSRG.Operator(ms)
+x_operator.SetAntiHermitian()
+y_operator = pyIMSRG.Operator(ms)
+y_operator.SetHermitian()
+algebraic_reference = pyIMSRG.MRReference(ms, 4, 2, 0, occupations)
+fill_two_body(x_operator.TwoBody, x_blocks, -1)
+fill_two_body(y_operator.TwoBody, y_blocks, +1)
+fill_two_body(algebraic_reference.Lambda2, lambda_blocks, +1)
+
+cpp_parts = pyIMSRG.MR_comm221_lambda2_reference(
+    x_operator, y_operator, algebraic_reference
+)
+python_parts = mr_lambda2_one_body_coupled(
+    x_blocks, y_blocks, lambda_blocks, orbits, -1, +1
+)
+for cpp_name, python_name in (("IV", "iv"), ("V", "v"), ("VI", "vi")):
+    cpp_matrix = getattr(cpp_parts, cpp_name)
+    cpp_values = np.asarray(
+        [
+            [cpp_matrix(i, j) for j in range(ms.GetNumberOrbits())]
+            for i in range(ms.GetNumberOrbits())
+        ]
+    )
+    np.testing.assert_allclose(
+        cpp_values, getattr(python_parts, python_name), atol=2e-11, rtol=0
+    )
 
 print("MRReference tests passed")

@@ -24,7 +24,7 @@ from math import sqrt
 
 import numpy as np
 from sympy import Rational
-from sympy.physics.wigner import clebsch_gordan
+from sympy.physics.wigner import clebsch_gordan, wigner_6j
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,19 @@ class CoupledBlock:
     Tz: int
     pairs: tuple[tuple[int, int], ...]
     matrix: np.ndarray
+
+
+@dataclass(frozen=True)
+class MR1BContributions:
+    """Gebrerufael Eq. (4.89b) IV--VI in the spherical one-body basis."""
+
+    iv: np.ndarray
+    v: np.ndarray
+    vi: np.ndarray
+
+    @property
+    def total(self) -> np.ndarray:
+        return self.iv + self.v + self.vi
 
 
 @lru_cache(maxsize=None)
@@ -233,3 +246,181 @@ def coupled_scalar_contraction(
             "ij,ij->", block.matrix, other.matrix, optimize=True
         )
     return float(value)
+
+
+def _block_map(blocks: tuple[CoupledBlock, ...]) -> dict[tuple[int, int, int], CoupledBlock]:
+    return {(block.J, block.parity, block.Tz): block for block in blocks}
+
+
+def _pair_phase(a: JOrbit, b: JOrbit, J: int) -> float:
+    return -1.0 if ((a.j2 + b.j2) // 2 - J + 1) % 2 else 1.0
+
+
+def _unnormalized_element(
+    blocks: tuple[CoupledBlock, ...],
+    block_map: dict[tuple[int, int, int], CoupledBlock],
+    j_orbits: tuple[JOrbit, ...],
+    J: int,
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+) -> float:
+    oa, ob, oc, od = j_orbits[a], j_orbits[b], j_orbits[c], j_orbits[d]
+    parity_bra = (oa.l + ob.l) % 2
+    if parity_bra != (oc.l + od.l) % 2 or oa.tz2 + ob.tz2 != oc.tz2 + od.tz2:
+        return 0.0
+    block = block_map.get((J, parity_bra, (oa.tz2 + ob.tz2) // 2))
+    if block is None:
+        return 0.0
+    phase = 1.0
+    if a > b:
+        phase *= _pair_phase(oa, ob, J)
+        a, b = b, a
+    if c > d:
+        phase *= _pair_phase(oc, od, J)
+        c, d = d, c
+    try:
+        ibra = block.pairs.index((a, b))
+        iket = block.pairs.index((c, d))
+    except ValueError:
+        return 0.0
+    pair_normalization = sqrt(2.0 if a == b else 1.0) * sqrt(2.0 if c == d else 1.0)
+    return float(phase * pair_normalization * block.matrix[ibra, iket])
+
+
+@lru_cache(maxsize=None)
+def _six_j(j2a: int, j2b: int, J: int, j2c: int, j2d: int, Jp: int) -> float:
+    try:
+        return float(
+            wigner_6j(
+                Rational(j2a, 2),
+                Rational(j2b, 2),
+                J,
+                Rational(j2c, 2),
+                Rational(j2d, 2),
+                Jp,
+            )
+        )
+    except ValueError:
+        return 0.0
+
+
+def _pandya_element(
+    blocks: tuple[CoupledBlock, ...],
+    block_map: dict[tuple[int, int, int], CoupledBlock],
+    j_orbits: tuple[JOrbit, ...],
+    J: int,
+    a: int,
+    b: int,
+    c: int,
+    d: int,
+) -> float:
+    """Gebrerufael Eq. (4.49): O^J_(a bar b,c bar d)."""
+
+    oa, ob, oc, od = j_orbits[a], j_orbits[b], j_orbits[c], j_orbits[d]
+    Jp_min = max(abs(oa.j2 - od.j2), abs(oc.j2 - ob.j2)) // 2
+    Jp_max = min(oa.j2 + od.j2, oc.j2 + ob.j2) // 2
+    value = 0.0
+    for Jp in range(Jp_min, Jp_max + 1):
+        value -= (
+            (2 * Jp + 1)
+            * _six_j(oa.j2, ob.j2, J, oc.j2, od.j2, Jp)
+            * _unnormalized_element(blocks, block_map, j_orbits, Jp, a, d, c, b)
+        )
+    return value
+
+
+def mr_lambda2_one_body_coupled(
+    x: tuple[CoupledBlock, ...],
+    y: tuple[CoupledBlock, ...],
+    lambda2: tuple[CoupledBlock, ...],
+    orbits: np.ndarray,
+    x_hermiticity: int,
+    y_hermiticity: int,
+) -> MR1BContributions:
+    """Slow J-scheme oracle for the MR 2B--2B--lambda2 one-body term.
+
+    ``x_hermiticity`` and ``y_hermiticity`` are +1 for Hermitian and -1 for
+    anti-Hermitian inputs.  The implementation follows Gebrerufael Eq. (4.89b)
+    IV--VI with explicit spherical-orbit sums.  IV and V carry an additional
+    factor 1/2 relative to the thesis' unnormalized unrestricted-pair notation
+    when evaluated through ``TwoBodyME`` normalized-pair blocks; the independent
+    CG/m-scheme test below fixes this conversion.
+    """
+
+    if x_hermiticity not in (-1, 1) or y_hermiticity not in (-1, 1):
+        raise ValueError("input hermiticity must be +1 or -1")
+    j_orbits = extract_j_orbits(orbits)
+    norb = len(j_orbits)
+    maps = [_block_map(blocks) for blocks in (x, y, lambda2)]
+    max_pair_J = max((oa.j2 + ob.j2) // 2 for oa in j_orbits for ob in j_orbits)
+
+    def element(which: int, J: int, a: int, b: int, c: int, d: int) -> float:
+        blocks = (x, y, lambda2)[which]
+        return _unnormalized_element(blocks, maps[which], j_orbits, J, a, b, c, d)
+
+    def pandya(which: int, J: int, a: int, b: int, c: int, d: int) -> float:
+        blocks = (x, y, lambda2)[which]
+        return _pandya_element(blocks, maps[which], j_orbits, J, a, b, c, d)
+
+    def raw(one: int, two: int, x_index: int, y_index: int) -> np.ndarray:
+        term = np.zeros(3)
+        jhat1_sq = j_orbits[one].j2 + 1.0
+        for J in range(max_pair_J + 1):
+            Jhat_sq = 2 * J + 1.0
+            for t in range(norb):
+                for s in range(norb):
+                    for w in range(norb):
+                        for r in range(norb):
+                            for v in range(norb):
+                                # The 1/8 and 1/2 coefficients are the normalized-
+                                # pair equivalents of thesis IV and V before the
+                                # final one-body Hermiticity permutation.
+                                term[0] += (
+                                    Jhat_sq
+                                    / (8.0 * jhat1_sq)
+                                    * element(x_index, J, one, t, s, w)
+                                    * element(y_index, J, r, v, two, t)
+                                    * element(2, J, r, v, s, w)
+                                )
+                                term[1] += (
+                                    Jhat_sq
+                                    / (2.0 * jhat1_sq)
+                                    * pandya(x_index, J, one, t, s, r)
+                                    * pandya(2, J, s, r, v, w)
+                                    * pandya(y_index, J, v, w, two, t)
+                                )
+        for J1 in range(max_pair_J + 1):
+            for J2 in range(max_pair_J + 1):
+                angular_weight = (2 * J1 + 1.0) * (2 * J2 + 1.0)
+                for t in range(norb):
+                    for s in range(norb):
+                        if j_orbits[t].j2 != j_orbits[s].j2:
+                            continue
+                        for r in range(norb):
+                            for v in range(norb):
+                                for w in range(norb):
+                                    term[2] -= (
+                                        angular_weight
+                                        / (2.0 * jhat1_sq * (j_orbits[t].j2 + 1.0))
+                                        * element(x_index, J1, one, t, two, s)
+                                        * element(2, J2, s, w, r, v)
+                                        * element(y_index, J2, r, v, t, w)
+                                    )
+        return term
+
+    raw_terms = np.zeros((norb, norb, 3))
+    for one in range(norb):
+        for two in range(norb):
+            if (
+                j_orbits[one].l != j_orbits[two].l
+                or j_orbits[one].j2 != j_orbits[two].j2
+                or j_orbits[one].tz2 != j_orbits[two].tz2
+            ):
+                continue
+            raw_terms[one, two] = raw(one, two, 0, 1) - raw(one, two, 1, 0)
+
+    output_hermiticity = -x_hermiticity * y_hermiticity
+    completed = raw_terms + output_hermiticity * raw_terms.transpose(1, 0, 2)
+    return MR1BContributions(completed[:, :, 0], completed[:, :, 1], completed[:, :, 2])

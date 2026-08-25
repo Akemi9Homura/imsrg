@@ -303,6 +303,16 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("NormalOrder", &MRReference::NormalOrder)
           .def("UndoNormalOrder", &MRReference::UndoNormalOrder);
 
+      py::class_<MRCommutator::MR1BResult>(m, "MR1BResult")
+          .def_readonly("IV", &MRCommutator::MR1BResult::IV)
+          .def_readonly("V", &MRCommutator::MR1BResult::V)
+          .def_readonly("VI", &MRCommutator::MR1BResult::VI)
+          .def("Total", &MRCommutator::MR1BResult::Total);
+
+      m.def("MR_comm221_lambda2_reference",
+            &MRCommutator::comm221_lambda2_reference,
+            py::arg("X"), py::arg("Y"), py::arg("reference"));
+
       py::class_<arma::mat>(m, "ArmaMat")
           .def(py::init<>())
           .def(

@@ -91,6 +91,15 @@ Hergert Eq. (50) 的四个显式 m-scheme `lambda2` 指标式，在上述
 J-coupling 后合并成 Gebrerufael 的 IV、V、VI 三种矩阵拓扑；不是少了一项。
 第一版 C++ 应先保留三种独立 profiler/test 名称，最后才允许融合中间量。
 
+按 `TwoBodyME` normalized-pair block 数值实现 Eq. (4.89b) 的未限制
+spherical-orbit 慢循环时，IV、V 在最终 `1<->2` permutation 之前的系数
+分别为 `1/8`、`1/2`，VI 保持 `-1/2`。这两个额外的 `1/2` 是论文
+unnormalized/unrestricted pair 写法转为当前存储后的结果，不是物理截断。
+独立 CG 展开已把三种拓扑分别对到 m-scheme；C++
+`MRCommutator::comm221_lambda2_reference()` 又分别对到该 Python J-scheme
+oracle，当前 max-abs 依次为 `0`、`0`、`2.84e-14`。优化实现不得重新从
+排版公式猜系数，必须逐项复现这个 reference。
+
 ## 4. 现有代码可直接复用的边界
 
 - `ModelSpace::SetupKets()` 已根据 orbit `occ` 构造分数占据的 pp/hh/ph
