@@ -428,7 +428,41 @@ namespace MRCommutator
     X.profiler.timer["MR comm221 lambda2 V"] += omp_get_wtime() - section_start;
 
     // VI: lambda*Y and lambda*X remove the innermost (r,v) sum by BLAS.
+    // The remaining (J2,w) trace is independent of one,two,J1, so form it
+    // once for every allowed (s,t) pair instead of repeating channel lookups.
     section_start = omp_get_wtime();
+    const double trace_start = section_start;
+    arma::mat ly_trace(norbits, norbits, arma::fill::zeros);
+    arma::mat lx_trace(norbits, norbits, arma::fill::zeros);
+    for (index_t t : modelspace.all_orbits)
+      for (index_t s : modelspace.all_orbits)
+      {
+        const Orbit &ot = modelspace.GetOrbit(t);
+        const Orbit &os = modelspace.GetOrbit(s);
+        if (ot.j2 != os.j2)
+          continue;
+        for (int J2 = 0; J2 <= max_J; ++J2)
+          for (index_t w : modelspace.all_orbits)
+          {
+            const Orbit &ow = modelspace.GetOrbit(w);
+            if ((os.l + ow.l) % 2 != (ot.l + ow.l) % 2 ||
+                os.tz2 + ow.tz2 != ot.tz2 + ow.tz2)
+              continue;
+            const int ch = modelspace.GetTwoBodyChannelIndex(
+                J2, (os.l + ow.l) % 2, (os.tz2 + ow.tz2) / 2);
+            if (ch < 0 || static_cast<size_t>(ch) >= products.LY.size())
+              continue;
+            const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
+            const double weight = (2 * J2 + 1.0) / (ot.j2 + 1.0);
+            ly_trace(s, t) += weight *
+                              MatrixElement(products.LY[ch], channel, s, w, t, w);
+            lx_trace(s, t) += weight *
+                              MatrixElement(products.LX[ch], channel, s, w, t, w);
+          }
+      }
+    X.profiler.timer["MR comm221 lambda2 VI trace"] +=
+        omp_get_wtime() - trace_start;
+
     for (index_t one : modelspace.all_orbits)
       for (index_t two : modelspace.all_orbits)
       {
@@ -437,38 +471,19 @@ namespace MRCommutator
         if (o1.l != o2.l || o1.j2 != o2.j2 || o1.tz2 != o2.tz2)
           continue;
         for (int J1 = 0; J1 <= max_J; ++J1)
-          for (int J2 = 0; J2 <= max_J; ++J2)
+          for (index_t t : modelspace.all_orbits)
           {
-            const double angular_weight = (2 * J1 + 1.0) * (2 * J2 + 1.0);
-            for (index_t t : modelspace.all_orbits)
+            const Orbit &ot = modelspace.GetOrbit(t);
+            for (index_t s : modelspace.all_orbits)
             {
-              const Orbit &ot = modelspace.GetOrbit(t);
-              for (index_t s : modelspace.all_orbits)
-              {
-                if (ot.j2 != modelspace.GetOrbit(s).j2)
-                  continue;
-                const double x = X.TwoBody.GetTBME_J(J1, J1, one, t, two, s);
-                const double y = Y.TwoBody.GetTBME_J(J1, J1, one, t, two, s);
-                if (x == 0.0 && y == 0.0)
-                  continue;
-                for (index_t w : modelspace.all_orbits)
-                {
-                  const Orbit &os = modelspace.GetOrbit(s);
-                  const Orbit &ow = modelspace.GetOrbit(w);
-                  if ((os.l + ow.l) % 2 != (ot.l + ow.l) % 2 ||
-                      os.tz2 + ow.tz2 != ot.tz2 + ow.tz2)
-                    continue;
-                  const int ch = modelspace.GetTwoBodyChannelIndex(
-                      J2, (os.l + ow.l) % 2, (os.tz2 + ow.tz2) / 2);
-                  if (ch < 0 || static_cast<size_t>(ch) >= products.LY.size())
-                    continue;
-                  const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
-                  raw(one, two, 2) -= angular_weight /
-                                      ((o1.j2 + 1.0) * (ot.j2 + 1.0)) *
-                                      (x * MatrixElement(products.LY[ch], channel, s, w, t, w) -
-                                       y * MatrixElement(products.LX[ch], channel, s, w, t, w));
-                }
-              }
+              if (ot.j2 != modelspace.GetOrbit(s).j2)
+                continue;
+              const double x = X.TwoBody.GetTBME_J(J1, J1, one, t, two, s);
+              const double y = Y.TwoBody.GetTBME_J(J1, J1, one, t, two, s);
+              if (x == 0.0 && y == 0.0)
+                continue;
+              raw(one, two, 2) -= (2 * J1 + 1.0) / (o1.j2 + 1.0) *
+                                  (x * ly_trace(s, t) - y * lx_trace(s, t));
             }
           }
       }
