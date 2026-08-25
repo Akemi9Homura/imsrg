@@ -6,6 +6,12 @@
   "implementation": "imsrg++ C++ J-scheme direct flow_RK4",
   "step": 0.001,
   "tolerance_max_abs_mev": 2e-10,
+  "explicit_euler_ds_1e-4_max_abs_mev": {
+    "He4_Nrefmax2": 3.357e-11,
+    "Be8_Nrefmax0": 2.971e-11,
+    "C12_Nrefmax0": 4.638e-11,
+    "O16_Nrefmax2": 6.506e-11
+  },
   "comparisons": {
     "He4_Nrefmax2": [
       {"s": 0.001, "H": 3.353e-11, "eta": 9.195e-13, "RHS": 3.771e-11},

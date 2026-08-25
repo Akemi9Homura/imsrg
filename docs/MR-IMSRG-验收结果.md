@@ -347,5 +347,9 @@ driver 写出的 HO 真空 `jcoupled64` 重新读入，再做 HO→NAT 与 MR �
 全部通过 `2e-10 MeV` 门槛，全局最坏误差为 O16 `s=0.001` 的 RHS
 `7.043e-11 MeV`。
 
+另以 `ds=1e-4` 显式构造 `H_1=H_0+ds RHS(H_0)`，四体系 J/m Euler
+一步的全局最坏误差为 `6.506e-11 MeV`。`IMSRGSolver` 中历史名称
+`flow_euler` 实际使用 Boost `runge_kutta4`，故本门禁没有借用该名称。
+
 完整数值见 [`MR-IMSRG-Jscheme-checkpoints.json`](MR-IMSRG-Jscheme-checkpoints.json)；
 自动门禁为 CTest `MRCorrelatedDriver`，本次完整运行耗时约 250 秒。

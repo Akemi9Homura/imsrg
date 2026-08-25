@@ -100,7 +100,9 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `s=0.001,0.002,0.003`，每点从 driver 的 HO 真空 J64 输出读回、
       HO→NAT 并 MR 正规序后重新比较 `H/eta/RHS`；全局最坏 max-abs
       `7.043e-11 MeV`。机器记录见
-      `docs/MR-IMSRG-Jscheme-checkpoints.json`。独立 Euler 门禁仍待补。
+      `docs/MR-IMSRG-Jscheme-checkpoints.json`。四体系显式
+      `H_1=H_0+10^-4 RHS(H_0)` Euler J/m 对照也通过，全局最坏
+      `6.506e-11 MeV`；不使用历史上实际调用 RK4 的 `flow_euler` 名称冒充。
 - [ ] 统一生成元/cutoff/停止条件/容差后比较完整流、真空
       `E0+t+V` 与 NCSM 谱；float32 `no2bpack` 只做下游格式验收。
 

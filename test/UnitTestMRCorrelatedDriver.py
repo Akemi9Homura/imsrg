@@ -288,6 +288,22 @@ def main():
             print(f"{nucleus} named RHS max={named_maximum:.3e}")
             assert named_maximum < 1e-10
 
+            euler_step = 1e-4
+            expected_euler = type(expected_initial)(
+                expected_initial.zero_body
+                + euler_step * expected_rhs.zero_body,
+                expected_initial.one_body
+                + euler_step * expected_rhs.one_body,
+                expected_initial.two_body
+                + euler_step * expected_rhs.two_body,
+            )
+            actual_euler = initial + euler_step * actual_rhs
+            euler_errors = mr_operator_errors(
+                actual_euler, expected_euler, data.orbits
+            )
+            print(f"{nucleus} Euler ds=1e-4 H={max(euler_errors):.3e}")
+            assert max(euler_errors) < 2e-10
+
             for label, smax in (("s0", 0.0), ("rk4", 1e-4)):
                 if smax == 0.0:
                     final_mr = pyIMSRG.Operator(initial)
