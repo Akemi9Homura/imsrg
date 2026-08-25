@@ -711,11 +711,17 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("SetDenominatorPartitioning", &Generator::SetDenominatorPartitioning, py::arg("Moller_Plessett or Epstein_Nesbet"))
           .def("SetDenominatorCutoff", &Generator::SetDenominatorCutoff, py::arg("cutoff"))
           .def("Get1bDenominator", &Generator::Get1bDenominator, py::arg("i"), py::arg("j"))
+          .def("Get1bDenominatorWhiteNCSM",
+               &Generator::Get1bDenominatorWhiteNCSM,
+               py::arg("i"), py::arg("j"))
           .def(
               "Get2bDenominator",
               [](Generator &self, int channel, int bra, int ket)
               { return self.Get2bDenominator(channel, bra, ket); },
               py::arg("channel"), py::arg("bra"), py::arg("ket"))
+          .def("Get2bDenominatorWhiteNCSM",
+               &Generator::Get2bDenominatorWhiteNCSM,
+               py::arg("channel"), py::arg("bra"), py::arg("ket"))
           .def("SetUseIsospinAveraging", &Generator::SetUseIsospinAveraging, py::arg("tf"))
           .def("Update", &Generator::Update, py::arg("H"), py::arg("Eta"))
           .def("GetHod_SingleRef", &Generator::GetHod_SingleRef, py::arg("H"))

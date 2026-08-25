@@ -166,8 +166,9 @@ existing SR/fractional-occupation J-scheme contractions
 当前进度（2026-08-25）：步骤 1 完成；步骤 2 的显式 `MRReference`、
 J-coupled 恒等式检查、正规序往返及 `mrimsrg_jref_v1` 文件 reader 已完成；步骤 3--4
 的慢速参考、块矩阵生产收缩、完整 0B/1B/2B MR commutator 及精确 SR
-退化门禁已完成。当前不得跳到完整流出数；下一实施边界是步骤 5 的生成元，
-随后是步骤 6 的 solver/driver 接线。
+退化门禁已完成。步骤 5 的 White-NCSM 方向分子、MR EN 分母和
+`Delta e != 0` 掩码也已完成并对 Python m-scheme 验证。当前不得跳到
+完整流出数；下一实施边界是步骤 6 的 solver/driver 接线。
 
 ## 7. 错误定位原则
 

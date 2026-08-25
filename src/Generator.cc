@@ -5,6 +5,7 @@
 #include "PhysicalConstants.hh" // for HBARC and M_NUCLEON
 
 #include "omp.h"
+#include <stdexcept>
 #include <string>
 
 using PhysConst::M_NUCLEON;
@@ -59,6 +60,7 @@ void Generator::AddToEta(Operator& H_s, Operator& Eta_s)
    else if (generator_type == "shell-model-atan")             ConstructGenerator_ShellModel(atan_func);
    else if (generator_type == "shell-model-atan-npnh")        ConstructGenerator_ShellModel_NpNh(atan_func);
    else if (generator_type == "shell-model-imaginary-time")   ConstructGenerator_ShellModel(imaginarytime_func);
+   else if (generator_type == "white-ncsm")                   ConstructGenerator_WhiteNCSM();
    else if (generator_type == "hartree-fock")                 ConstructGenerator_HartreeFock();
    else if (generator_type == "1PA")                          ConstructGenerator_1PA(atan_func);
    else if (generator_type.find("qtransfer-atan") != std::string::npos )
@@ -247,6 +249,115 @@ double Generator::Get2bDenominator_Jdep(int ch, int ibra, int iket)
    if (std::abs(denominator)<denominator_cutoff)
      denominator = denominator_cutoff;
    return denominator;
+}
+
+double Generator::Get1bDenominatorWhiteNCSM(int i, int j)
+{
+   const Orbit& oi = H->modelspace->GetOrbit(i);
+   const Orbit& oj = H->modelspace->GetOrbit(j);
+   const double ni = oi.occ;
+   const double nj = oj.occ;
+   const double nbi = 1.0 - ni;
+   double denominator =
+       -nbi*nbi*nj*nj * H->TwoBody.GetTBMEmonopole(i,j,i,j)
+       +nbi*nbi*nj * H->OneBody(i,i)
+       -nbi*nj*nj * H->OneBody(j,j)
+       +H->ZeroBody * (nbi*nj - 1.0);
+   if (std::abs(denominator) < denominator_cutoff)
+      denominator = denominator_cutoff;
+   return denominator;
+}
+
+double Generator::Get2bDenominatorWhiteNCSM(int ch, int ibra, int iket)
+{
+   TwoBodyChannel& channel = H->modelspace->GetTwoBodyChannel(ch);
+   Ket& bra = channel.GetKet(ibra);
+   Ket& ket = channel.GetKet(iket);
+   const int i = bra.p;
+   const int j = bra.q;
+   const int k = ket.p;
+   const int l = ket.q;
+   const double ni = bra.op->occ;
+   const double nj = bra.oq->occ;
+   const double nk = ket.op->occ;
+   const double nl = ket.oq->occ;
+   const double nbi = 1.0 - ni;
+   const double nbj = 1.0 - nj;
+   const double weight = nbi * nbj * nk * nl;
+   double denominator = weight * (
+       nbi*nbj * H->TwoBody.GetTBMEmonopole(i,j,i,j)
+       +nk*nl * H->TwoBody.GetTBMEmonopole(k,l,k,l)
+       -nbi*nl * H->TwoBody.GetTBMEmonopole(i,l,i,l)
+       -nbi*nk * H->TwoBody.GetTBMEmonopole(i,k,i,k)
+       -nbj*nk * H->TwoBody.GetTBMEmonopole(j,k,j,k)
+       -nbj*nl * H->TwoBody.GetTBMEmonopole(j,l,j,l)
+       +nbi * H->OneBody(i,i) + nbj * H->OneBody(j,j)
+       -nk * H->OneBody(k,k) - nl * H->OneBody(l,l))
+       +H->ZeroBody * (weight - 1.0);
+   if (std::abs(denominator) < denominator_cutoff)
+      denominator = denominator_cutoff;
+   return denominator;
+}
+
+void Generator::ConstructGenerator_WhiteNCSM()
+{
+   if (H->GetJRank()!=0 || H->GetTRank()!=0 || H->GetParity()!=0)
+      throw std::invalid_argument("White-NCSM generator requires a scalar Hamiltonian");
+   if (H->GetParticleRank()>2 || Eta->GetParticleRank()>2)
+      throw std::invalid_argument("White-NCSM generator currently supports NN/NO2B operators only");
+   if (denominator_partitioning != Epstein_Nesbet)
+      throw std::invalid_argument("White-NCSM generator requires Epstein-Nesbet partitioning");
+   ModelSpace& modelspace = *H->modelspace;
+   // The scalar 1B operator only connects identical (l,j,tz) channels.  An
+   // all-orbit loop is kept here so the Delta-e definition remains explicit.
+   for (index_t i : modelspace.all_orbits)
+   {
+      const Orbit& oi = modelspace.GetOrbit(i);
+      for (index_t j : modelspace.all_orbits)
+      {
+         if (i >= j) continue;
+         const Orbit& oj = modelspace.GetOrbit(j);
+         if (oi.l != oj.l || oi.j2 != oj.j2 || oi.tz2 != oj.tz2) continue;
+         if (2*oi.n + oi.l == 2*oj.n + oj.l) continue;
+         const double forward_weight = (1.0-oi.occ) * oj.occ;
+         const double reverse_weight = (1.0-oj.occ) * oi.occ;
+         const double eta = H->OneBody(i,j) *
+             (forward_weight / Get1bDenominatorWhiteNCSM(i,j)
+              - reverse_weight / Get1bDenominatorWhiteNCSM(j,i));
+         Eta->OneBody(i,j) = eta;
+         Eta->OneBody(j,i) = -eta;
+      }
+   }
+   if (only_1b_eta) return;
+
+   const size_t nch = modelspace.GetNumberTwoBodyChannels();
+   for (size_t ch=0; ch<nch; ++ch)
+   {
+      TwoBodyChannel& channel = modelspace.GetTwoBodyChannel(ch);
+      arma::mat& eta_matrix = Eta->TwoBody.GetMatrix(ch);
+      const arma::mat& h_matrix = H->TwoBody.GetMatrix(ch);
+      const size_t nkets = channel.GetNumberKets();
+      for (size_t ibra=0; ibra<nkets; ++ibra)
+      {
+         Ket& bra = channel.GetKet(ibra);
+         const int bra_quanta = 2*bra.op->n + bra.op->l + 2*bra.oq->n + bra.oq->l;
+         for (size_t iket=ibra+1; iket<nkets; ++iket)
+         {
+            Ket& ket = channel.GetKet(iket);
+            const int ket_quanta = 2*ket.op->n + ket.op->l + 2*ket.oq->n + ket.oq->l;
+            if (bra_quanta == ket_quanta) continue;
+            const double forward_weight = (1.0-bra.op->occ) * (1.0-bra.oq->occ)
+                                          * ket.op->occ * ket.oq->occ;
+            const double reverse_weight = (1.0-ket.op->occ) * (1.0-ket.oq->occ)
+                                          * bra.op->occ * bra.oq->occ;
+            const double eta = h_matrix(ibra,iket) *
+                (forward_weight / Get2bDenominatorWhiteNCSM(ch,ibra,iket)
+                 - reverse_weight / Get2bDenominatorWhiteNCSM(ch,iket,ibra));
+            eta_matrix(ibra,iket) = eta;
+            eta_matrix(iket,ibra) = -eta;
+         }
+      }
+   }
 }
 
 
@@ -776,4 +887,3 @@ Operator Generator::GetHod_ShellModel(Operator& H)
     return Hod;
 }
  
-

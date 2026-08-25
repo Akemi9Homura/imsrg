@@ -14,10 +14,17 @@ from prototype.mrimsrg.jcoupling import (  # noqa: E402
     couple_scalar_two_body,
     extract_j_orbits,
     mr_lambda2_one_body_coupled,
+    reconstruct_scalar_two_body,
 )
 from prototype.mrimsrg.basis import prepare_natural_basis  # noqa: E402
 from prototype.mrimsrg.densities import compute_densities  # noqa: E402
 from prototype.mrimsrg.export_jref import export_reference  # noqa: E402
+from prototype.mrimsrg.generator import (  # noqa: E402
+    oscillator_quanta_from_orbits,
+    spherical_orbit_groups_from_orbits,
+    white_generator,
+)
+from prototype.mrimsrg.normal_order import MRHamiltonian  # noqa: E402
 from prototype.mrimsrg.reference_io import load_reference  # noqa: E402
 
 
@@ -47,6 +54,21 @@ pyIMSRG.MRReference(ms_he8, 8, 2, 0, occupations_he8).Validate(1e-12)
 unit_test = pyIMSRG.UnitTest(ms)
 unit_test.SetRandomSeed(8675309)
 vacuum = unit_test.RandomOp(ms, 0, 0, 0, 2, +1)
+
+# The new explicit entry must reduce to the existing White generator for a
+# Slater reference whenever the relaxed Delta-e mask selects the same ph and
+# pp-hh channels (He4 in this emax=1 test space).
+eta_sr = pyIMSRG.Operator(ms)
+eta_sr.SetAntiHermitian()
+eta_ncsm_sr = pyIMSRG.Operator(ms)
+eta_ncsm_sr.SetAntiHermitian()
+generator_sr = pyIMSRG.Generator()
+generator_sr.SetType("white")
+generator_ncsm_sr = pyIMSRG.Generator()
+generator_ncsm_sr.SetType("white-ncsm")
+generator_sr.Update(vacuum, eta_sr)
+generator_ncsm_sr.Update(vacuum, eta_ncsm_sr)
+assert max_operator_difference(eta_sr, eta_ncsm_sr) < 1e-12
 
 # Exercise a nonzero normalized-pair lambda2. It is deliberately not required
 # to be a physical density for this algebraic normal-ordering round trip.
@@ -220,6 +242,99 @@ for block in be8_blocks:
                 channel, channel, local_bra, local_ket
             )
             assert abs(actual - block.matrix[ibra, iket]) < 1e-13
+
+# Compare the complete fractional-occupation White-NCSM generator against the
+# Python m-scheme implementation.  The C++ path uses only spherical monopoles
+# and J blocks; conversion here is solely the independent test oracle.
+be8_unit_test = pyIMSRG.UnitTest(be8_ms)
+be8_unit_test.SetRandomSeed(20260825)
+be8_hamiltonian = be8_unit_test.RandomOp(be8_ms, 0, 0, 0, 2, +1)
+file_to_model = {
+    orbit.index: be8_ms.GetOrbitIndex(orbit.n, orbit.l, orbit.j2, orbit.tz2)
+    for orbit in be8_orbits
+}
+be8_one_body_m = np.zeros((be8_data.norb, be8_data.norb))
+for p, row_p in enumerate(be8_data.orbits):
+    a = int(row_p[0])
+    for q, row_q in enumerate(be8_data.orbits):
+        b = int(row_q[0])
+        if (
+            row_p[2] == row_q[2]
+            and row_p[3] == row_q[3]
+            and row_p[4] == row_q[4]
+            and row_p[5] == row_q[5]
+        ):
+            be8_one_body_m[p, q] = be8_hamiltonian.OneBody(
+                file_to_model[a], file_to_model[b]
+            )
+be8_hamiltonian_blocks = []
+for layout_block in be8_blocks:
+    channel = be8_ms.GetTwoBodyChannelIndex(
+        layout_block.J, layout_block.parity, layout_block.Tz
+    )
+    two_body_channel = be8_ms.GetTwoBodyChannel(channel)
+    matrix = np.zeros_like(layout_block.matrix)
+    for ibra, (a_file, b_file) in enumerate(layout_block.pairs):
+        local_bra = two_body_channel.GetLocalIndex(
+            file_to_model[a_file], file_to_model[b_file]
+        )
+        for iket, (c_file, d_file) in enumerate(layout_block.pairs):
+            local_ket = two_body_channel.GetLocalIndex(
+                file_to_model[c_file], file_to_model[d_file]
+            )
+            matrix[ibra, iket] = be8_hamiltonian.TwoBody.GetTBME_norm_chij(
+                channel, channel, local_bra, local_ket
+            )
+    be8_hamiltonian_blocks.append(
+        CoupledBlock(
+            layout_block.J,
+            layout_block.parity,
+            layout_block.Tz,
+            layout_block.pairs,
+            matrix,
+        )
+    )
+be8_two_body_m = reconstruct_scalar_two_body(
+    tuple(be8_hamiltonian_blocks), be8_data.orbits
+)
+be8_python_eta = white_generator(
+    MRHamiltonian(
+        be8_hamiltonian.ZeroBody, be8_one_body_m, be8_two_body_m
+    ),
+    be8_natural.densities,
+    oscillator_quanta_from_orbits(be8_data.orbits),
+    spherical_orbit_groups=spherical_orbit_groups_from_orbits(be8_data.orbits),
+)
+be8_cpp_eta = pyIMSRG.Operator(be8_ms)
+be8_cpp_eta.SetAntiHermitian()
+be8_generator = pyIMSRG.Generator()
+be8_generator.SetType("white-ncsm")
+be8_generator.Update(be8_hamiltonian, be8_cpp_eta)
+for a in be8_orbits:
+    for b in be8_orbits:
+        if (a.l, a.j2, a.tz2) != (b.l, b.j2, b.tz2):
+            continue
+        expected = be8_python_eta.one_body[a.substates[0], b.substates[0]]
+        actual = be8_cpp_eta.OneBody(file_to_model[a.index], file_to_model[b.index])
+        assert abs(actual - expected) < 2e-11
+be8_python_eta_blocks = couple_scalar_two_body(
+    be8_python_eta.two_body, be8_data.orbits
+)
+for block in be8_python_eta_blocks:
+    channel = be8_ms.GetTwoBodyChannelIndex(block.J, block.parity, block.Tz)
+    two_body_channel = be8_ms.GetTwoBodyChannel(channel)
+    for ibra, (a_file, b_file) in enumerate(block.pairs):
+        local_bra = two_body_channel.GetLocalIndex(
+            file_to_model[a_file], file_to_model[b_file]
+        )
+        for iket, (c_file, d_file) in enumerate(block.pairs):
+            local_ket = two_body_channel.GetLocalIndex(
+                file_to_model[c_file], file_to_model[d_file]
+            )
+            actual = be8_cpp_eta.TwoBody.GetTBME_norm_chij(
+                channel, channel, local_bra, local_ket
+            )
+            assert abs(actual - block.matrix[ibra, iket]) < 2e-11
 
 # A correlated closed-shell Nrefmax=2 reference exercises the non-identity
 # temporary natural-orbit rotation, including radial mixing in fixed (l,j,tz)

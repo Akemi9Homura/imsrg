@@ -166,6 +166,41 @@ reader 在进入流之前检查 `J=0+`、空间参数、自然变换的正交性
 cumulant 收缩误差 `6.44e-15`，全部 block 对 Python CG 投影逐元素误差
 `<1e-13`。`He4 Nrefmax=2` 的非单位径向自然轨道变换也通过读回与收缩检查。
 
+## 7. White-NCSM 生成元的生产归约
+
+`Generator(type="white-ncsm")` 实现 Vobig Sec. 6.5.4 中舍去所有
+irreducible-density 项的方向分子，同时保留自然占据产生的 norm factors。
+令 `bari=1-n_i`，则球形一体方向量为
+
+```text
+D1(i,j) = bari*n_j*f(i,j)
+Delta1(i,j) = -bari^2*n_j^2*GammaMono(i,j)
+              +bari^2*n_j*f(i,i) - bari*n_j^2*f(j,j)
+              +E*(bari*n_j-1).
+```
+
+二体方向量为
+
+```text
+w = bari*barj*n_k*n_l
+D2(ij,kl) = w*Gamma(ij,kl)
+Delta2(ij,kl) = w*[bari*barj*GammaMono(i,j)
+                    +n_k*n_l*GammaMono(k,l)
+                    -bari*n_l*GammaMono(i,l)
+                    -bari*n_k*GammaMono(i,k)
+                    -barj*n_k*GammaMono(j,k)
+                    -barj*n_l*GammaMono(j,l)
+                    +bari*f(i,i)+barj*f(j,j)
+                    -n_k*f(k,k)-n_l*f(l,l)] + E*(w-1).
+```
+
+生产代码先对每个方向应用与现有 `Generator.cc` 相同的正 `1e-6 MeV`
+cutoff，再作 `eta=D/Delta-(D/Delta)^dagger`；不能先反厄米化分子再除一个
+公共分母。只保留 `2n_i+l_i != 2n_j+l_j` 和
+`e_i+e_j != e_k+e_l`。Slater He4 随机算符对原 `white` 入口的完整差
+`<1e-12`；分数占据 Be8 随机算符对 Python m-scheme 的全部 1B/J-coupled
+2B block 误差 `<2e-11`。
+
 随机严格标量张量要求 J/m 转换 `<=1e-12`；真实 RDM 的输入标量投影
 残差单独报告并暂以 `1e-10` 为拒绝阈值。所有能量/RHS contraction 的
 coupled 对 m-scheme 误差仍要求 `<=1e-10 MeV`。
