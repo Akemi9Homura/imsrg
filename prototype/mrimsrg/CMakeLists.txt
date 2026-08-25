@@ -32,8 +32,11 @@ add_executable(mrimsrg_prepare cpp/prepare_reference.cpp)
 add_executable(mrimsrg_validate cpp/validate_flow.cpp)
 add_executable(mrimsrg_export_no2bpack cpp/export_no2bpack.cpp)
 add_executable(mrimsrg_minipack_to_j64 cpp/minipack_to_j64.cpp)
+add_executable(mrimsrg_check_minipack_subset cpp/check_minipack_subset.cpp)
+add_executable(mrimsrg_extract_minipack_subset cpp/extract_minipack_subset.cpp)
 foreach(target mrimsrg_prepare mrimsrg_validate mrimsrg_export_no2bpack
-               mrimsrg_minipack_to_j64)
+               mrimsrg_minipack_to_j64 mrimsrg_check_minipack_subset
+               mrimsrg_extract_minipack_subset)
     target_link_libraries(${target} PRIVATE fci nucleus util)
     target_compile_definitions(${target} PRIVATE
         SIMPLE_FCI_EMAX=2

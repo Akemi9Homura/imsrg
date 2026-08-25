@@ -243,6 +243,30 @@ J-channel matrices, and requires an exact J64 write/read round trip. The J64
 file already contains the complete vacuum Hamiltonian, so the IMSRG driver
 must use `fmt2=jcoupled64` and must not add `Trel_Op` again.
 
+For a larger HO child space, preserve the bare minipack payload directly
+instead of reading an A-dependent Hamiltonian and writing it back:
+
+```bash
+prototype/mrimsrg/build/mrimsrg_extract_minipack_subset \
+  --parent /path/to/TwBME_N2LO_opt_bare_hw20_emax14_e2max28.minipack \
+  --output /path/to/TwBME_N2LO_opt_hw20_emax6_e2max12.minipack \
+  --emax 6
+
+prototype/mrimsrg/build/mrimsrg_check_minipack_subset \
+  --parent /path/to/TwBME_N2LO_opt_bare_hw20_emax14_e2max28.minipack \
+  --child /path/to/TwBME_N2LO_opt_hw20_emax6_e2max12.minipack --A 4
+```
+
+The extractor copies the original float32 interaction and optional Hcm/
+`p1.p2` records selected by the existing Oslo HO channel layout, verifies
+both record counts and rejects trailing data. The checker independently reads
+both files with `shell-model-obs`, calls its production
+`Hamiltonian::truncate()`, and demands exact 0B/1B/2B agreement. Run the
+checker at two different masses to constrain both the bare interaction and
+the A-dependent intrinsic-kinetic payload. Do not implement this operation as
+`read_minipack(A) -> write_minipack()`: the read Hamiltonian already contains
+the A-dependent kinetic term and is not the original bare payload.
+
 Read a materialized ordinary Hamiltonian back into the existing NCSM solver:
 
 ```bash

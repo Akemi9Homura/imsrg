@@ -173,6 +173,11 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `2.13e-13 MeV`，本项验收完成。
 - [ ] 只有验证 emax6 interaction 的来源、header 和校验和后，才重复
       emax6 RHS/短流；不得使用文件名含 `candidate` 的核力产生验收结果。
+      输入前置现已通过：从冻结 emax14 母文件
+      `118c4c27...b9d7d` 流式抽取 467032 条原始 records，得到 canonical
+      emax6 文件 SHA-256 `199d5a7a...b913b`；emax4→emax2 校准逐字节相同，
+      emax14→emax6 在 A=4/16 下逐 J-channel 严格零差。旧 candidate 最坏
+      差 `3.8147e-6 MeV`，继续禁用。尚需实际运行 emax6 RHS/短流后勾选。
 - [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
       Magnus/重启策略；登录节点禁止重计算，统一由 point7 Slurm 运行。
 

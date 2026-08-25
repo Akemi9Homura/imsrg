@@ -168,6 +168,16 @@ existing SR/fractional-occupation J-scheme contractions
 - `emax=14` 的解析存储表仍是容量规划，不是已运行证据；计划和验收文档
   必须始终分别报告“解析外推”与“实际运行”的最大空间。
 
+emax6 输入前置现已建立。冻结的 emax14/e2max28 母 minipack SHA-256 为
+`118c4c27ab7e2b1f3ae8df8ea24beb2784df681dd286bdb3ae5f42dbe09b9d7d`；
+流式保留原始 float32 interaction/Hcm/`p1.p2` payload 的 child SHA-256 为
+`199d5a7a3e060427582d112bd2ab36688db199629ddebb6e097a4676980b913b`。
+extractor 先用 emax4→emax2 正式文件完成逐字节校准，再由
+`Hamiltonian::truncate(6)` 在 A=4 和 A=16 下独立读回，0B/1B/2B 均严格
+零差。旧 `candidate` 在两种 A 下同一 2B 元均差 `3.814697265625e-6 MeV`，
+只判为额外 float32 roundtrip 诊断品，不能作为正式输入。下一步可在不改变
+参考态定义的前提下进入真实 emax6 RHS/短流。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；
