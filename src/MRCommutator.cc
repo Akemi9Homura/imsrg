@@ -316,8 +316,13 @@ namespace
     std::vector<std::array<index_t, 2>> pairs;
     std::vector<int> pair_index;
     arma::uvec active_pair_indices;
+    bool full_active;
     arma::mat X;
     arma::mat Y;
+    arma::mat X_active_columns;
+    arma::mat X_active_rows;
+    arma::mat Y_active_columns;
+    arma::mat Y_active_rows;
     arma::mat Lambda;
 
     int Find(index_t a, index_t b) const
@@ -335,7 +340,7 @@ namespace
     const size_t norbits = modelspace.GetNumberOrbits();
     OrderedCrossBlock block{J, parity, delta_tz, norbits, {},
                             std::vector<int>(norbits * norbits, -1),
-                            {}, {}, {}, {}};
+                            {}, false, {}, {}, {}, {}, {}, {}, {}};
     std::vector<arma::uword> active_pair_indices;
     for (index_t a : modelspace.all_orbits)
       for (index_t b : modelspace.all_orbits)
@@ -353,19 +358,53 @@ namespace
       }
     const size_t dimension = block.pairs.size();
     block.active_pair_indices = arma::conv_to<arma::uvec>::from(active_pair_indices);
-    block.X.zeros(dimension, dimension);
-    block.Y.zeros(dimension, dimension);
+    if (active_pair_indices.empty())
+      return block;
+    block.full_active = active_pair_indices.size() == dimension;
     block.Lambda.zeros(active_pair_indices.size(), active_pair_indices.size());
-    for (size_t i = 0; i < dimension; ++i)
-      for (size_t j = 0; j < dimension; ++j)
-      {
-        const auto bra = block.pairs[i];
-        const auto ket = block.pairs[j];
-        const std::array<double, 2> values = PandyaElements(
-            X, Y, J, bra[0], bra[1], ket[0], ket[1]);
-        block.X(i, j) = values[0];
-        block.Y(i, j) = values[1];
-      }
+    if (block.full_active)
+    {
+      block.X.zeros(dimension, dimension);
+      block.Y.zeros(dimension, dimension);
+      for (size_t i = 0; i < dimension; ++i)
+        for (size_t j = 0; j < dimension; ++j)
+        {
+          const auto bra = block.pairs[i];
+          const auto ket = block.pairs[j];
+          const std::array<double, 2> values = PandyaElements(
+              X, Y, J, bra[0], bra[1], ket[0], ket[1]);
+          block.X(i, j) = values[0];
+          block.Y(i, j) = values[1];
+        }
+    }
+    else
+    {
+      const size_t active_dimension = active_pair_indices.size();
+      block.X_active_columns.zeros(dimension, active_dimension);
+      block.Y_active_columns.zeros(dimension, active_dimension);
+      block.X_active_rows.zeros(active_dimension, dimension);
+      block.Y_active_rows.zeros(active_dimension, dimension);
+      for (size_t i = 0; i < dimension; ++i)
+        for (size_t j = 0; j < active_dimension; ++j)
+        {
+          const auto bra = block.pairs[i];
+          const auto ket = block.pairs[active_pair_indices[j]];
+          const std::array<double, 2> values = PandyaElements(
+              X, Y, J, bra[0], bra[1], ket[0], ket[1]);
+          block.X_active_columns(i, j) = values[0];
+          block.Y_active_columns(i, j) = values[1];
+        }
+      for (size_t i = 0; i < active_dimension; ++i)
+        for (size_t j = 0; j < dimension; ++j)
+        {
+          const auto bra = block.pairs[active_pair_indices[i]];
+          const auto ket = block.pairs[j];
+          const std::array<double, 2> values = PandyaElements(
+              X, Y, J, bra[0], bra[1], ket[0], ket[1]);
+          block.X_active_rows(i, j) = values[0];
+          block.Y_active_rows(i, j) = values[1];
+        }
+    }
     for (size_t i = 0; i < active_pair_indices.size(); ++i)
       for (size_t j = 0; j < active_pair_indices.size(); ++j)
       {
@@ -485,12 +524,14 @@ namespace MRCommutator
           // the intermediate index to that principal submatrix therefore
           // preserves X*Lambda*Y exactly while bounding the correlated-reference
           // work by its active space instead of the full single-particle space.
-          const arma::mat xly =
-              (block.X.cols(block.active_pair_indices) * block.Lambda) *
-              block.Y.rows(block.active_pair_indices);
-          const arma::mat ylx =
-              (block.Y.cols(block.active_pair_indices) * block.Lambda) *
-              block.X.rows(block.active_pair_indices);
+          const arma::mat xly = block.full_active
+                                    ? (block.X * block.Lambda) * block.Y
+                                    : (block.X_active_columns * block.Lambda) *
+                                          block.Y_active_rows;
+          const arma::mat ylx = block.full_active
+                                    ? (block.Y * block.Lambda) * block.X
+                                    : (block.Y_active_columns * block.Lambda) *
+                                          block.X_active_rows;
           v_blas_seconds += omp_get_wtime() - v_part_start;
           const double angular_weight = 2 * block.J + 1.0;
           v_part_start = omp_get_wtime();
