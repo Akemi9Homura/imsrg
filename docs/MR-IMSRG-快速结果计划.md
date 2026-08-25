@@ -115,9 +115,10 @@ Frobenius 为 `1.380e-15`，EN 分母 max-abs `1.421e-14 MeV`，完整流
 `H/eta/RHS/vacuum H` 的四核最坏值为 `6.88e-8 MeV`。流后的普通真空
 Hamiltonian 已同时以 float64 J64 和 float32 `no2bpack` 交给独立 NCSM
 reader；四核全部完成对角化，格式打包导致的基态差不超过
-`1.225e-6 MeV`。机器记录见 `MR-IMSRG-Jscheme-full-flow.json`。当前剩余
-门禁是补齐独立 SR 逐项机器表，并以收紧十倍 ODE 容差的后 NCSM 谱确认
-`<1 keV` 稳定性。
+`1.225e-6 MeV`。机器记录见 `MR-IMSRG-Jscheme-full-flow.json`。独立 SR
+逐项机器表也已补齐，见 `MR-IMSRG-SR-degeneration.json`；He4/O16 的
+分母、命名 RHS 和短流代数误差均在 `4.26e-14 MeV` 以下。当前剩余门禁
+是以收紧十倍 ODE 容差的后 NCSM 谱确认 `<1 keV` 稳定性。
 
 ### M0：冻结普通 Hamiltonian 和基准
 

@@ -231,8 +231,11 @@ Frobenius 为 `1.380e-15`；最坏索引已持久化。共同
 量子数和 `(a,b,c,d,J)` 记录映射到独立 `shell-model-obs` channel 顺序；
 四核 NCSM 均完成读回。再转成下游 float32 `no2bpack` 后，基态相对 J64
 的最大差为 `1.225e-6 MeV`（`0.001225 keV`）。因此 Gate 5 的相关参考
-完整流、真空物化和谱闭环已经通过，剩余严格门禁是把现有 SR 逐项证据
-汇总为与 MR 报告同结构的机器表，以及做 ODE 容差收紧的后 NCSM 检查。
+完整流、真空物化和谱闭环已经通过。SR 逐项证据也已汇总为
+`docs/MR-IMSRG-SR-degeneration.json`：He4/O16 的输入、分母、eta、十个
+命名 RHS 项、总 RHS、Euler/RK4 和 `s=100` 完整流全部通过，代数层最坏
+为 `4.26e-14 MeV`（分母）和 `1.15e-14 MeV`（命名 RHS）。剩余严格门禁
+是做 ODE 容差收紧的后 NCSM 检查。
 
 Gate 6 的首个可复现基准也已完成。真实 `He4 Nrefmax=2`、单线程、三次
 中位数下，C++ J-scheme MR RHS 为 `6.88e-3 s`，Python dense m-scheme 为

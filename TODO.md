@@ -79,10 +79,13 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       时直接运行现有 SR contractions；不允许根据测试核名或 fixture
       切换实现。真实 driver 在 `s=0` 与共同 `ds=1e-4` RK4 后的完整
       vacuum 0/1/2B 均与原生 SR driver 逐元素为零。
-- [ ] 比较 `E/f/Gamma`、每个被选中的 EN 分母、`eta(s=0)`、每个
-      命名 RHS contraction 与总 RHS，报告 max-abs/Frobenius/最坏元素。
-- [ ] 代数级输入转换 max-abs `<=1e-12 MeV`，分母/eta/RHS max-abs
-      `<=1e-10 MeV`、相对 Frobenius `<=1e-10`。
+- [x] 比较 `E/f/Gamma`、每个被选中的 EN 分母、`eta(s=0)`、每个
+      命名 RHS contraction 与总 RHS，报告 max-abs/Frobenius/最坏元素；
+      完整机器表见 `docs/MR-IMSRG-SR-degeneration.json`。
+- [x] 代数级输入转换、分母、eta 和 RHS 均通过：两核输入最坏
+      `3.55e-15 MeV`，分母最坏 `4.26e-14 MeV`，命名 RHS 最坏
+      `1.15e-14 MeV`；短流相对 Frobenius 最坏 `1.24e-15`。完整
+      `s=100` 的矩阵元最坏为 `3.00e-8 MeV`，另按 ODE 门限报告。
 
 ### F. 相关参考态对 Python m-scheme 的退化门禁
 
@@ -124,7 +127,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       m-scheme 快 `256.8` 倍，输入主数组小 `1468` 倍；解析存储估算可到
       `emax=14` 且不分配稠密 m-scheme 张量。见
       `docs/MR-IMSRG-Jscheme-performance.json`。
-- [ ] `He4/O16 Nrefmax=0`、`Be8/C12 Nrefmax=0` 和 `He4/O16 Nrefmax=2`
+- [x] `He4/O16 Nrefmax=0`、`Be8/C12 Nrefmax=0` 和 `He4/O16 Nrefmax=2`
       按 E--F 门禁通过。
 - [ ] 四核完成流和 NCSM/no2bpack 读回通过，命令、commit、环境、
       误差表、最坏元素及性能写入新验收文档。

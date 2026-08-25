@@ -367,3 +367,31 @@ White-NCSM 的 EN 分母另由 CTest `MRDenominators` 逐条核对生产
 4 个 1B 和 704 个 2B 正/反向 `Delta e != 0` 通道，四核共 2832 条，
 全局 max-abs `1.421e-14 MeV`。紧凑机器表及列定义见
 [`MR-IMSRG-Jscheme-denominators.json`](MR-IMSRG-Jscheme-denominators.json)。
+
+## 8. C++ J-scheme 完整流、SR 退化与下游谱
+
+point7 上使用统一 `rtol=atol=1e-9` 和固定终点 `s=100`，对
+`Be8/C12 Nrefmax=0`、`He4/O16 Nrefmax=2` 比较 Python DOP853 与 C++
+Boost Dopri5 的终点 `H/eta/RHS`，随后反正规序并变回 HO 基比较普通真空
+Hamiltonian。四核全局 max-abs 依次为
+`4.40e-9/6.88e-8/1.87e-8/1.04e-8 MeV`，均通过 `1e-5 MeV` 的完整流
+门限。float64 J64 由独立 `shell-model-obs` NCSM reader 读回后，再转成
+下游 float32 `no2bpack` 并重复对角化；打包导致的基态差最大为 Be8 的
+`1.225e-6 MeV = 0.001225 keV`。逐对象最坏秩、索引、相对 Frobenius、
+三条最低能级、Slurm job 和环境见
+[`MR-IMSRG-Jscheme-full-flow.json`](MR-IMSRG-Jscheme-full-flow.json)。
+
+`He4/O16 Nrefmax=0` 的原生 SR 与同一 MR driver 零 cumulant 入口另作严格
+退化。输入真空 Hamiltonian 最坏 `3.55e-15 MeV`，EN 分母最坏
+`4.26e-14 MeV`，十个命名 RHS 项最坏 `1.15e-14 MeV`，共同 Euler/RK4
+短流也保持在 `1.42e-14 MeV` 内。`Delta e` 掩码没有删去任何原生 SR
+非对角元素；两个 MR `lambda2` addon 精确为零。固定 `s=100` 完整流最坏
+为 O16 RHS 的 `3.00e-8 MeV`。完整命名项、相对 Frobenius 和最坏元素见
+[`MR-IMSRG-SR-degeneration.json`](MR-IMSRG-SR-degeneration.json)。
+
+真实 `He4 Nrefmax=2` 单线程 RHS 基准中，C++ J-scheme 三次中位数为
+`6.88 ms`，Python dense m-scheme 为 `1.766 s`，加速 `256.8` 倍；两输入
+算符加参考密度的主数值数组由 `61.48 MB` 降到 `41.9 kB`。解析 channel
+尺寸而不分配算符的存储表延伸到 `emax=14`，证明生产主存储按 J-channel
+而非完整 magnetic-substate 四指标张量增长。复现命令和机器数据见
+[`MR-IMSRG-Jscheme-performance.json`](MR-IMSRG-Jscheme-performance.json)。
