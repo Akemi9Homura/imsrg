@@ -1,5 +1,5 @@
 {
-  "schema": "mrimsrg_jscheme_full_flow_acceptance_v2",
+  "schema": "mrimsrg_jscheme_full_flow_acceptance_v3",
   "flow_commit": "d5cf2877594a856387f1179204ffad090867b54c",
   "validation": {
     "cpp_ode": "boost::odeint runge_kutta_dopri5",
@@ -155,6 +155,57 @@
         "baseline_energies_mev": [-63.80052432941001, -55.634822811507618, -55.214536909286252],
         "tightened_energies_mev": [-63.80052432940726, -55.634822811504939, -55.214536909283545],
         "tightened_minus_baseline_mev": [2.7498003873915877e-12, 2.6787461138155777e-12, 2.7071678232459817e-12]
+      }
+    ]
+  },
+  "performance_regression_after_v_optimization": {
+    "implementation_commit": "2458d48c0365976a3bb11fb8dc12e4f99d0dd7a4",
+    "point7_checkout_commit": "1e7debd096850bdff803064b4645e3a2f882a2da",
+    "target_s": 100.0,
+    "ode_tolerance": 1e-10,
+    "maximum_vacuum_h_abs_vs_preoptimization_mev": 7.442935157087049e-13,
+    "maximum_ncsm_spectral_abs_vs_preoptimization_mev": 2.1316282072803006e-13,
+    "passed": true,
+    "cases": [
+      {
+        "nucleus": "He4",
+        "nrefmax": 2,
+        "slurm_cpp_validation_job": 100377,
+        "cpp_python_max_abs_mev": 2.2121837122724786e-08,
+        "vacuum_h_max_abs_vs_preoptimization_mev": {"zero_body": 3.2862601528904634e-13, "one_body": 2.433608869978343e-13, "two_body": 6.039613253960852e-14},
+        "nmax": 8,
+        "ncsm_energies_mev": [-20.490380467859563, -19.26106870651374, -19.205702863744925],
+        "ncsm_max_abs_vs_preoptimization_mev": 1.3145040611561853e-13
+      },
+      {
+        "nucleus": "Be8",
+        "nrefmax": 0,
+        "slurm_cpp_validation_job": 100379,
+        "cpp_python_max_abs_mev": 3.898388312143215e-08,
+        "vacuum_h_max_abs_vs_preoptimization_mev": {"zero_body": 5.204725539442734e-13, "one_body": 3.1086244689504383e-13, "two_body": 5.240252676230739e-14},
+        "nmax": 0,
+        "ncsm_energies_mev": [-27.940598864158286, -23.308509007685181, -12.635185398541175],
+        "ncsm_max_abs_vs_preoptimization_mev": 1.5987211554602254e-13
+      },
+      {
+        "nucleus": "C12",
+        "nrefmax": 0,
+        "slurm_cpp_validation_job": 100381,
+        "cpp_python_max_abs_mev": 8.870060241861211e-10,
+        "vacuum_h_max_abs_vs_preoptimization_mev": {"zero_body": 5.400124791776761e-13, "one_body": 2.362554596402333e-13, "two_body": 4.707345624410664e-14},
+        "nmax": 0,
+        "ncsm_energies_mev": [-43.530789441540293, -38.654833895790645, -27.7755350361927],
+        "ncsm_max_abs_vs_preoptimization_mev": 1.2789769243681803e-13
+      },
+      {
+        "nucleus": "O16",
+        "nrefmax": 2,
+        "slurm_cpp_validation_job": 100383,
+        "cpp_python_max_abs_mev": 1.0710436981753446e-09,
+        "vacuum_h_max_abs_vs_preoptimization_mev": {"zero_body": 7.442935157087049e-13, "one_body": 1.6342482922482304e-13, "two_body": 3.6415315207705135e-14},
+        "nmax": 2,
+        "ncsm_energies_mev": [-63.800524329407473, -55.634822811505082, -55.214536909283659],
+        "ncsm_max_abs_vs_preoptimization_mev": 2.1316282072803006e-13
       }
     ]
   }

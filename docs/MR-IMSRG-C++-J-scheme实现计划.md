@@ -312,6 +312,15 @@ emax4 的 V 从 `0.616 s` 降至 `0.332 s`，单线程短流由 `0.88 s` 降至
 OpenMP 在 emax4 未产生实测加速且增加线程驻留，试验改动已撤回。Gate 7
 的 profiler 优化仍须完成 point7 完整流和 NCSM 回归后才最终勾选。
 
+该远端回归现已完成。point7 用生成器提交 He4/Be8/C12/O16 jobs
+`100377/100379/100381/100383`，固定旧 Python `s=100, rtol=atol=1e-10`
+轨迹并以优化后的 C++ 重新积分。四核 C++/Python 全流最坏差依次为
+`2.212e-8/3.898e-8/8.870e-10/1.071e-9 MeV`，和优化前一致；新旧流后
+真空 Hamiltonian 的全局 max-abs 为 `7.44e-13 MeV`。下载新 J64 后由
+现有 `simpleFCI` 按 `Nmax=8/0/0/2` 重新对角化，12 条低能谱相对优化前
+全局最坏变化 `2.13e-13 MeV`。因此 Gate 7 的 profiler 优化子项通过；
+emax6 仍必须等可验证 interaction，不能由本结果外推冒充实跑。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和

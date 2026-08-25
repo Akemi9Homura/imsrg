@@ -121,6 +121,9 @@
   "regression": {
     "ctest": ["MRReference", "MRDriver", "MRSRDriver", "MRCorrelatedDriver"],
     "mr_correlated_driver_seconds": 351.93,
+    "point7_full_flow_jobs": [100377, 100379, 100381, 100383],
+    "point7_maximum_vacuum_h_abs_vs_preoptimization_mev": 7.442935157087049e-13,
+    "maximum_ncsm_spectral_abs_vs_preoptimization_mev": 2.1316282072803006e-13,
     "passed": true
   }
 }

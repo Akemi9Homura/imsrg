@@ -156,7 +156,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       实测 30 个 J-orbit、34320 条 TBME，单线程 RK4 短流 `1.37 s`、峰值
       RSS `54,360 KiB`；1/64 线程两体最坏差 `4.44e-16 MeV`。V/VI 收缩
       分别占 `0.628/0.492 s`，见 `docs/MR-IMSRG-Jscheme-large-space.json`。
-- [ ] 根据 emax4 profiler 优化真实瓶颈；每次优化必须先过 emax2 的 SR、
+- [x] 根据 emax4 profiler 优化真实瓶颈；每次优化必须先过 emax2 的 SR、
       相关参考逐项、完整流和 NCSM 回归，再重跑 emax4 门禁。
       第一步已把 VI 的独立 `(J2,w)` 迹提出循环，emax4 VI 从 `0.492 s`
       降至 `0.022 s`，短流从 `1.37 s` 降至 `0.88 s`；输出相对优化前逐元素
@@ -167,7 +167,10 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       快 `2.28` 倍。单线程 J64 与优化前 bitwise 相同，1/64 线程最坏仍为
       `4.44e-16 MeV`，emax2 oracle 仍为 `3.11e-12 MeV`，完整相关参考 CTest
       用时 `351.93 s` 并通过。块内 OpenMP 在 emax4 无实测收益，已撤回。
-      本项只等待 point7 完整流/NCSM 回归后勾选。
+      point7 `s=100, rtol=atol=1e-10` 完整流回归 jobs
+      `100377/100379/100381/100383` 已通过；新旧真空 Hamiltonian 全局最坏
+      `7.44e-13 MeV`，四核各三条 NCSM 低能谱全局最坏变化
+      `2.13e-13 MeV`，本项验收完成。
 - [ ] 只有验证 emax6 interaction 的来源、header 和校验和后，才重复
       emax6 RHS/短流；不得使用文件名含 `candidate` 的核力产生验收结果。
 - [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
