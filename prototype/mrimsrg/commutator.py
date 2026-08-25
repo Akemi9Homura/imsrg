@@ -76,7 +76,33 @@ def commutator(
     No symmetry projection is applied to the result; the tests intentionally
     check that the equations themselves preserve the expected symmetries.
     """
-    _validate_shapes(left, right, densities)
+    contributions = commutator_contributions(
+        left, right, densities, natural_tolerance=natural_tolerance
+    )
+    return MRHamiltonian(
+        sum(term.zero_body for term in contributions.values()),
+        sum(term.one_body for term in contributions.values()),
+        sum(term.two_body for term in contributions.values()),
+    )
+
+
+def commutator_contributions(
+    left: MRHamiltonian,
+    right: MRHamiltonian,
+    densities: Densities,
+    *,
+    natural_tolerance: float = 1e-10,
+) -> dict[str, MRHamiltonian]:
+    """Return the named contractions used by :func:`commutator`.
+
+    The eight ``comm...ss`` keys are the scalar IMSRG(2) decomposition used
+    by the current ``src/Commutator.cc``.  The two ``mr_lambda2`` keys are the
+    additional contractions in Hergert Eqs. (49)--(50); they vanish exactly
+    in the single-reference limit.  This is a diagnostic view of the actual
+    production calculation: :func:`commutator` sums this mapping rather than
+    evaluating a second implementation.
+    """
+    norb = _validate_shapes(left, right, densities)
     n = _natural_occupations(densities, natural_tolerance)
     nbar = 1.0 - n
     lambda2 = densities.lambda2
@@ -85,7 +111,7 @@ def commutator(
 
     # Eq. (51): two-body part.  This is evaluated first because Eq. (49)
     # contains 1/4 C2^{ab}_{cd} lambda2^{ab}_{cd}.
-    c2 = (
+    c2_122 = (
         np.einsum("ia,ajkl->ijkl", x1, y2, optimize=True)
         + np.einsum("ja,iakl->ijkl", x1, y2, optimize=True)
         - np.einsum("ak,ijal->ijkl", x1, y2, optimize=True)
@@ -96,12 +122,12 @@ def commutator(
         + np.einsum("al,ijka->ijkl", y1, x2, optimize=True)
     )
     pair_weight = 1.0 - n[:, None] - n[None, :]
-    c2 += 0.5 * (
+    c2_222_pp_hh = 0.5 * (
         np.einsum("ijab,abkl,ab->ijkl", x2, y2, pair_weight, optimize=True)
         - np.einsum("ijab,abkl,ab->ijkl", y2, x2, pair_weight, optimize=True)
     )
     occupation_difference = n[:, None] - n[None, :]
-    c2 += (
+    c2_222_ph = (
         np.einsum(
             "iakb,jbla,ab->ijkl", x2, y2, occupation_difference, optimize=True
         )
@@ -117,10 +143,10 @@ def commutator(
     )
 
     # Eq. (50): one-body part.
-    c1 = np.einsum("ia,aj->ij", x1, y1, optimize=True) - np.einsum(
+    c1_111 = np.einsum("ia,aj->ij", x1, y1, optimize=True) - np.einsum(
         "ia,aj->ij", y1, x1, optimize=True
     )
-    c1 += np.einsum(
+    c1_121 = np.einsum(
         "ab,biaj,ab->ij", x1, y2, occupation_difference, optimize=True
     ) - np.einsum(
         "ab,biaj,ab->ij", y1, x2, occupation_difference, optimize=True
@@ -129,42 +155,66 @@ def commutator(
         n[:, None, None] * nbar[None, :, None] * nbar[None, None, :]
         + nbar[:, None, None] * n[None, :, None] * n[None, None, :]
     )
-    c1 += 0.5 * (
+    c1_221 = 0.5 * (
         np.einsum("iabc,bcja,abc->ij", x2, y2, three_index_weight, optimize=True)
         - np.einsum("iabc,bcja,abc->ij", y2, x2, three_index_weight, optimize=True)
     )
 
+    c1_mr_lambda2 = np.zeros((norb, norb), dtype=np.result_type(x1, x2, y1, y2))
     if np.any(lambda2):
-        c1 += 0.25 * (
+        c1_mr_lambda2 += 0.25 * (
             np.einsum("iabc,deja,debc->ij", x2, y2, lambda2, optimize=True)
             - np.einsum("iabc,deja,debc->ij", y2, x2, lambda2, optimize=True)
         )
-        c1 += np.einsum(
+        c1_mr_lambda2 += np.einsum(
             "iabc,bejd,aecd->ij", x2, y2, lambda2, optimize=True
         ) - np.einsum(
             "iabc,bejd,aecd->ij", y2, x2, lambda2, optimize=True
         )
-        c1 -= 0.5 * (
+        c1_mr_lambda2 -= 0.5 * (
             np.einsum("iajb,cdae,cdbe->ij", x2, y2, lambda2, optimize=True)
             - np.einsum("iajb,cdae,cdbe->ij", y2, x2, lambda2, optimize=True)
         )
-        c1 += 0.5 * (
+        c1_mr_lambda2 += 0.5 * (
             np.einsum("iajb,bcde,acde->ij", x2, y2, lambda2, optimize=True)
             - np.einsum("iajb,bcde,acde->ij", y2, x2, lambda2, optimize=True)
         )
 
     # Eq. (49), with lambda3=0.
-    c0 = np.einsum(
+    c0_110 = np.einsum(
         "ab,ba,ab->", x1, y1, occupation_difference, optimize=True
     )
-    c0 += 0.25 * (
+    c0_220 = 0.25 * (
         np.einsum("abcd,cdab,a,b,c,d->", x2, y2, n, n, nbar, nbar, optimize=True)
         - np.einsum(
             "abcd,cdab,a,b,c,d->", y2, x2, n, n, nbar, nbar, optimize=True
         )
     )
-    c0 += 0.25 * np.einsum("abcd,abcd->", c2, lambda2, optimize=True)
+    c2 = c2_122 + c2_222_pp_hh + c2_222_ph
+    c0_mr_lambda2 = 0.25 * np.einsum(
+        "abcd,abcd->", c2, lambda2, optimize=True
+    )
 
-    scalar = np.real_if_close(c0).item()
-    return MRHamiltonian(scalar, c1, c2)
+    zero1 = np.zeros((norb, norb), dtype=np.result_type(x1, x2, y1, y2))
+    zero2 = np.zeros((norb, norb, norb, norb), dtype=zero1.dtype)
 
+    def term(
+        *,
+        zero_body: complex | float = 0.0,
+        one_body: np.ndarray = zero1,
+        two_body: np.ndarray = zero2,
+    ) -> MRHamiltonian:
+        return MRHamiltonian(np.real_if_close(zero_body).item(), one_body, two_body)
+
+    return {
+        "comm110ss": term(zero_body=c0_110),
+        "comm220ss": term(zero_body=c0_220),
+        "comm111ss": term(one_body=c1_111),
+        "comm121ss": term(one_body=c1_121),
+        "comm221ss": term(one_body=c1_221),
+        "comm122ss": term(two_body=c2_122),
+        "comm222_pp_hhss": term(two_body=c2_222_pp_hh),
+        "comm222_phss": term(two_body=c2_222_ph),
+        "mr_lambda2_one_body": term(one_body=c1_mr_lambda2),
+        "mr_lambda2_zero_body": term(zero_body=c0_mr_lambda2),
+    }

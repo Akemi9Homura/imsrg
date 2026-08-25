@@ -36,7 +36,7 @@
       当前 `src/Generator.cc` 的实际符号约定一致。
 - [x] 比较 `eta(s=0)` 的 1B/2B 全部矩阵元。
 - [x] 比较 `dH/ds=[eta,H]` 的 0B/1B/2B 全部矩阵元。
-- [ ] 对 commutator 的 0B/1B/2B 各收缩项增加可单独开关的诊断，定位首个
+- [x] 对 commutator 的 0B/1B/2B 各收缩项增加可单独开关的诊断，定位首个
       不一致项，不能只比较总和。
 
 代数级门槛：输入转换 max-abs `<=1e-12 MeV`；分母、`eta` 和 RHS 的

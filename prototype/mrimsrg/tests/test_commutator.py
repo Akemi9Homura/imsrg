@@ -9,7 +9,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from commutator import commutator
+from commutator import commutator, commutator_contributions
 from densities import compute_densities
 from normal_order import MRHamiltonian, to_vacuum
 
@@ -99,6 +99,41 @@ def vacuum_matrix(operator: MRHamiltonian, densities, particle_number: int) -> t
 
 
 class CommutatorTests(unittest.TestCase):
+    def test_named_contributions_are_the_production_sum(self) -> None:
+        norb = 4
+        densities = compute_densities(
+            occupations((0, 1), (2, 3), norb=norb),
+            np.array([np.sqrt(0.3), np.sqrt(0.7)]),
+        )
+        left = random_operator(norb, 910, 1)
+        right = random_operator(norb, 911, 1)
+        terms = commutator_contributions(left, right, densities)
+        result = commutator(left, right, densities)
+        self.assertEqual(
+            set(terms),
+            {
+                "comm110ss",
+                "comm220ss",
+                "comm111ss",
+                "comm121ss",
+                "comm221ss",
+                "comm122ss",
+                "comm222_pp_hhss",
+                "comm222_phss",
+                "mr_lambda2_one_body",
+                "mr_lambda2_zero_body",
+            },
+        )
+        self.assertAlmostEqual(
+            result.zero_body, sum(term.zero_body for term in terms.values())
+        )
+        np.testing.assert_array_equal(
+            result.one_body, sum(term.one_body for term in terms.values())
+        )
+        np.testing.assert_array_equal(
+            result.two_body, sum(term.two_body for term in terms.values())
+        )
+
     def test_antisymmetry_for_correlated_reference(self) -> None:
         norb = 4
         densities = compute_densities(

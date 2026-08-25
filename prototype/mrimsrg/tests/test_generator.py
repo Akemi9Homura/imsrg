@@ -272,11 +272,11 @@ class GeneratorTests(unittest.TestCase):
         np.testing.assert_allclose(delta2, delta2.swapaxes(0, 1), atol=2e-12)
         np.testing.assert_allclose(delta2, delta2.swapaxes(2, 3), atol=2e-12)
 
-    def test_denominator_cutoff_preserves_nonzero_sign(self) -> None:
+    def test_denominator_cutoff_matches_current_imsrgpp_positive_floor(self) -> None:
         values = np.array([-1e-12, 0.0, 1e-12, -2.0, 3.0])
         np.testing.assert_array_equal(
             _safe_denominator(values, 1e-6),
-            np.array([-1e-6, 1e-6, 1e-6, -2.0, 3.0]),
+            np.array([1e-6, 1e-6, 1e-6, -2.0, 3.0]),
         )
 
 

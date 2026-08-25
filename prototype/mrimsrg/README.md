@@ -54,7 +54,9 @@ actual calls to `Operator::DoNormalOrdering`, `Generator::Update`, and
 denominator, `H/eta/RHS` at `s=0`, and the same quantities after a shared
 `ds=1e-4` Euler step.  It then compares three shared fixed-step RK4
 checkpoints at `s=0.001,0.002,0.003`.  It exits nonzero if any rank exceeds
-`1e-10 MeV`.
+`1e-10 MeV`.  The RHS check also compares each of the eight named SR
+contractions to the corresponding current C++ routine, so cancellation
+between independently wrong terms cannot pass the gate.
 
 `commutator.py` implements the natural-orbital MR-IMSRG(2) commutator with
 `lambda3=0`.  Its equations were regenerated independently with QCombo 0.2.0:

@@ -12,8 +12,8 @@ Vobig Sec. 6.5.4.  In addition to omitting the explicitly indicated
 ``O(lambda2)`` denominator corrections, that implementation defines
 "White-NCSM" by neglecting *all* irreducible-density terms in the generator
 matrix elements.  The MR-IMSRG(2) commutator itself still retains
-``lambda2``.  A sign-preserving cutoff follows the established ``imsrg++``
-handling of small denominators.
+``lambda2``.  Denominators with magnitude below the cutoff are replaced by
+the positive cutoff, matching the current ``src/Generator.cc`` implementation.
 
 Only natural-orbital matrix elements whose inherited labels change the sum of
 HO single-particle quanta are retained, i.e. the relaxed IM-NCSM pattern of
@@ -302,8 +302,7 @@ def epstein_nesbet_denominators(
 def _safe_denominator(values: np.ndarray, cutoff: float) -> np.ndarray:
     if cutoff <= 0.0:
         raise ValueError("denominator cutoff must be positive")
-    signs = np.where(values < 0.0, -1.0, 1.0)
-    return np.where(np.abs(values) < cutoff, signs * cutoff, values)
+    return np.where(np.abs(values) < cutoff, cutoff, values)
 
 
 def masked_decoupling_residual(

@@ -28,7 +28,7 @@ from sympy import Rational
 from sympy.physics.wigner import clebsch_gordan
 
 try:
-    from .commutator import commutator
+    from .commutator import commutator, commutator_contributions
     from .densities import compute_densities, validate_densities
     from .generator import (
         WHITE_DENOMINATOR_CUTOFF,
@@ -42,7 +42,7 @@ try:
     from .normal_order import MRHamiltonian, VacuumHamiltonian, normal_order
     from .reference_io import load_reference
 except ImportError:
-    from commutator import commutator
+    from commutator import commutator, commutator_contributions
     from densities import compute_densities, validate_densities
     from generator import (
         WHITE_DENOMINATOR_CUTOFF,
@@ -309,6 +309,43 @@ def _operator_comparison(actual: MRHamiltonian, expected: MRHamiltonian) -> dict
     }
 
 
+def _commutator_contribution_report(
+    pyimsrg: Any,
+    modelspace: Any,
+    left_j: Any,
+    right_j: Any,
+    production_terms: dict[str, MRHamiltonian],
+    orbits: np.ndarray,
+) -> dict[str, Any]:
+    """Compare the named production contractions to current C++ routines."""
+    report: dict[str, Any] = {}
+    cpp_names = (
+        "comm110ss",
+        "comm220ss",
+        "comm111ss",
+        "comm121ss",
+        "comm221ss",
+        "comm122ss",
+        "comm222_pp_hhss",
+        "comm222_phss",
+    )
+    for name in cpp_names:
+        result_j = pyimsrg.Operator(modelspace, 0, 0, 0, 2)
+        result_j.SetHermitian()
+        getattr(pyimsrg.Commutator, name)(left_j, right_j, result_j)
+        report[name] = _operator_comparison(
+            operator_to_mscheme(result_j, orbits), production_terms[name]
+        )
+    for name in ("mr_lambda2_one_body", "mr_lambda2_zero_body"):
+        zero = MRHamiltonian(
+            0.0,
+            np.zeros_like(production_terms[name].one_body),
+            np.zeros_like(production_terms[name].two_body),
+        )
+        report[name] = _operator_comparison(zero, production_terms[name])
+    return report
+
+
 def _mask_report(densities: Any, oscillator_quanta: np.ndarray) -> dict[str, int]:
     occupations = np.diag(densities.gamma1)
     holes = occupations > 0.5
@@ -488,6 +525,9 @@ def run_check(args: argparse.Namespace) -> dict[str, Any]:
     production_eta = white_generator(
         production_h, densities, quanta, spherical_orbit_groups=groups
     )
+    production_rhs_terms = commutator_contributions(
+        production_eta, production_h, densities
+    )
     production_rhs = commutator(production_eta, production_h, densities)
 
     modelspace, imsrg_vacuum = make_imsrg_operator(pyimsrg, payload, args.nucleus)
@@ -502,6 +542,14 @@ def run_check(args: argparse.Namespace) -> dict[str, Any]:
         generator, modelspace, production_h, densities, reference.orbits
     )
     imsrg_rhs_j = pyimsrg.Commutator.Commutator(imsrg_eta_j, imsrg_h_j)
+    contribution_report = _commutator_contribution_report(
+        pyimsrg,
+        modelspace,
+        imsrg_eta_j,
+        imsrg_h_j,
+        production_rhs_terms,
+        reference.orbits,
+    )
 
     production_h_euler = MRHamiltonian(
         production_h.zero_body + args.euler_step * production_rhs.zero_body,
@@ -586,6 +634,19 @@ def run_check(args: argparse.Namespace) -> dict[str, Any]:
         "normal_ordered_h": _operator_comparison(imsrg_h_m, production_h),
         "eta_s0": _operator_comparison(imsrg_eta_m, production_eta),
         "rhs_s0": _operator_comparison(imsrg_rhs_m, production_rhs),
+        "commutator_terms_s0": contribution_report,
+        "eta_norm_s0": {
+            "production_mscheme": float(
+                np.sqrt(
+                    np.vdot(production_eta.one_body, production_eta.one_body).real
+                    + 0.25
+                    * np.vdot(production_eta.two_body, production_eta.two_body).real
+                )
+            ),
+            "imsrgpp_operator_norm": float(imsrg_eta_j.Norm()),
+            "imsrgpp_one_body_norm": float(imsrg_eta_j.OneBodyNorm()),
+            "imsrgpp_two_body_norm": float(imsrg_eta_j.TwoBodyNorm()),
+        },
         "euler_step": args.euler_step,
         "h_after_euler": _operator_comparison(
             imsrg_h_euler_m, production_h_euler
@@ -635,6 +696,10 @@ def _passes(report: dict[str, Any], algebra_tolerance: float) -> bool:
     for checkpoint in report["rk4_checkpoints"]:
         for rank in ("zero_body", "one_body", "two_body"):
             if checkpoint["h"][rank]["max_abs"] > algebra_tolerance:
+                return False
+    for comparison in report["commutator_terms_s0"].values():
+        for rank in ("zero_body", "one_body", "two_body"):
+            if comparison[rank]["max_abs"] > algebra_tolerance:
                 return False
     return True
 
