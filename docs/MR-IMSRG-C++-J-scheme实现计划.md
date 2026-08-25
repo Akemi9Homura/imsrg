@@ -295,6 +295,13 @@ RDM/波函数校验和以标识固定参考态来源，不把 embedding 记作�
 优化对象。机器记录见 `docs/MR-IMSRG-Jscheme-large-space.json`；这仍是
 RHS/短流门禁，不冒充 emax4 完整收敛流。
 
+VI 的首轮机械优化已完成：把与外部 `(one,two,J1)` 无关的 `(J2,w)`
+有限迹预计算为 `ly_trace/lx_trace`，不改任何 channel、相位或系数。emax4
+VI 从 `0.492 s` 降至 `0.022 s`，单线程短流从 `1.37 s` 降至 `0.88 s`；
+优化前后 J64 逐元素为零，1/64 线程最坏仍为 `4.44e-16 MeV`。emax2 对
+Python oracle 的 RHS 误差保持 `3.11e-12 MeV`，完整相关参考 CTest 用时
+`350.07 s` 并通过。当前真实主瓶颈已收敛到 V 的 ordered Pandya 块。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和

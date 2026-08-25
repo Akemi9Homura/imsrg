@@ -412,3 +412,9 @@ NCSM reader。每核比较三条最低能级，12 个差值中的最大值为 Be
 `4.44e-16 MeV`；运行未构造稠密 m-scheme Hamiltonian。V/VI 两项是实测
 主要瓶颈，详见
 [`MR-IMSRG-Jscheme-large-space.json`](MR-IMSRG-Jscheme-large-space.json)。
+
+随后先对 VI 做严格等价的有限求和重排：预计算其 `(J2,w)` 迹后，emax4
+VI 用时由 `0.492 s` 降至 `0.022 s`，整个短流由 `1.37 s` 降至 `0.88 s`；
+优化前后 J64 逐元素无差，emax2 Python oracle 和完整相关参考 CTest 均
+保持通过。V 的 ordered Pandya 块现为下一主瓶颈，本报告未把这一阶段写成
+性能优化完成。

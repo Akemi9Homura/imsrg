@@ -12,7 +12,7 @@
   "omp_num_threads": 1,
   "repetitions": 3,
   "rhs_max_abs_mev": 3.105959933691338e-12,
-  "schema": "mrimsrg_jscheme_performance_v1",
+  "schema": "mrimsrg_jscheme_performance_v2",
   "storage_scaling": [
     {
       "dense_m_two_body_bytes": 20480000,
@@ -86,8 +86,14 @@
     }
   ],
   "timing_seconds_median": {
-    "cpp_jscheme": 0.0068755639949813485,
-    "python_dense_mscheme": 1.765959877986461,
-    "speedup": 256.8458208338226
+    "cpp_jscheme": 0.004598542989697307,
+    "python_dense_mscheme": 1.7544659370032605,
+    "speedup": 381.5264837001656
+  },
+  "vi_trace_factorization": {
+    "commit": "f9a18abcb6ab26c08094025035721ef2708f29d1",
+    "baseline_cpp_jscheme_seconds": 0.0068755639949813485,
+    "optimized_cpp_jscheme_seconds": 0.004598542989697307,
+    "rhs_max_abs_vs_python_mev": 3.105959933691338e-12
   }
 }

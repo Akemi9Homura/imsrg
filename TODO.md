@@ -158,6 +158,10 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       分别占 `0.628/0.492 s`，见 `docs/MR-IMSRG-Jscheme-large-space.json`。
 - [ ] 根据 emax4 profiler 优化真实瓶颈；每次优化必须先过 emax2 的 SR、
       相关参考逐项、完整流和 NCSM 回归，再重跑 emax4 门禁。
+      第一步已把 VI 的独立 `(J2,w)` 迹提出循环，emax4 VI 从 `0.492 s`
+      降至 `0.022 s`，短流从 `1.37 s` 降至 `0.88 s`；输出相对优化前逐元素
+      为零，emax2 Python oracle 仍为 `3.11e-12 MeV`，完整相关参考 CTest
+      通过。V 仍占 `0.616 s`，本项在 V 优化和完整流/NCSM 回归前不勾选。
 - [ ] 只有验证 emax6 interaction 的来源、header 和校验和后，才重复
       emax6 RHS/短流；不得使用文件名含 `candidate` 的核力产生验收结果。
 - [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
