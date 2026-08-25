@@ -232,8 +232,8 @@ namespace
     return products;
   }
 
-  std::array<double, 3> PandyaElements(
-      const Operator &X, const Operator &Y, const MRReference &reference,
+  std::array<double, 2> PandyaElements(
+      const Operator &X, const Operator &Y,
       int J, index_t a, index_t b, index_t c, index_t d)
   {
     ModelSpace &modelspace = *X.modelspace;
@@ -245,7 +245,7 @@ namespace
                                 std::abs(oc.j2 - ob.j2)) /
                        2;
     const int Jp_max = std::min(oa.j2 + od.j2, oc.j2 + ob.j2) / 2;
-    std::array<double, 3> values{0.0, 0.0, 0.0};
+    std::array<double, 2> values{0.0, 0.0};
     for (int Jp = Jp_min; Jp <= Jp_max; ++Jp)
     {
       // All three tensors have exactly the same recoupling coefficient.  The
@@ -259,9 +259,52 @@ namespace
       X.TwoBody.GetTBME_J_twoOps(Y.TwoBody, Jp, Jp, a, d, c, b, x, y);
       values[0] -= weight * x;
       values[1] -= weight * y;
-      values[2] -= weight * reference.Lambda2.GetTBME_J(Jp, Jp, a, d, c, b);
     }
     return values;
+  }
+
+  double PandyaElement(const TwoBodyME &tensor, ModelSpace &modelspace,
+                       int J, index_t a, index_t b, index_t c, index_t d)
+  {
+    const Orbit &oa = modelspace.GetOrbit(a);
+    const Orbit &ob = modelspace.GetOrbit(b);
+    const Orbit &oc = modelspace.GetOrbit(c);
+    const Orbit &od = modelspace.GetOrbit(d);
+    const int Jp_min = std::max(std::abs(oa.j2 - od.j2),
+                                std::abs(oc.j2 - ob.j2)) /
+                       2;
+    const int Jp_max = std::min(oa.j2 + od.j2, oc.j2 + ob.j2) / 2;
+    double value = 0.0;
+    for (int Jp = Jp_min; Jp <= Jp_max; ++Jp)
+      value -= (2 * Jp + 1.0) *
+               modelspace.GetCachedSixJ(oa.j2, ob.j2, J,
+                                        oc.j2, od.j2, Jp) *
+               tensor.GetTBME_J(Jp, Jp, a, d, c, b);
+    return value;
+  }
+
+  std::vector<bool> FindLambdaActiveOrbits(const MRReference &reference)
+  {
+    ModelSpace &modelspace = *reference.modelspace;
+    std::vector<bool> active(modelspace.GetNumberOrbits(), false);
+    for (size_t ch = 0; ch < modelspace.GetNumberTwoBodyChannels(); ++ch)
+    {
+      const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
+      const arma::mat &lambda = reference.Lambda2.GetMatrix(ch);
+      for (size_t ibra = 0; ibra < channel.GetNumberKets(); ++ibra)
+        for (size_t iket = 0; iket < channel.GetNumberKets(); ++iket)
+        {
+          if (lambda(ibra, iket) == 0.0)
+            continue;
+          const Ket &bra = channel.GetKet(ibra);
+          const Ket &ket = channel.GetKet(iket);
+          active[bra.p] = true;
+          active[bra.q] = true;
+          active[ket.p] = true;
+          active[ket.q] = true;
+        }
+    }
+    return active;
   }
 
   struct OrderedCrossBlock
@@ -272,6 +315,7 @@ namespace
     size_t norbits;
     std::vector<std::array<index_t, 2>> pairs;
     std::vector<int> pair_index;
+    arma::uvec active_pair_indices;
     arma::mat X;
     arma::mat Y;
     arma::mat Lambda;
@@ -284,13 +328,15 @@ namespace
 
   OrderedCrossBlock BuildOrderedCrossBlock(
       const Operator &X, const Operator &Y, const MRReference &reference,
+      const std::vector<bool> &lambda_active_orbits,
       int J, int parity, int delta_tz)
   {
     ModelSpace &modelspace = *X.modelspace;
     const size_t norbits = modelspace.GetNumberOrbits();
     OrderedCrossBlock block{J, parity, delta_tz, norbits, {},
                             std::vector<int>(norbits * norbits, -1),
-                            {}, {}, {}};
+                            {}, {}, {}, {}};
+    std::vector<arma::uword> active_pair_indices;
     for (index_t a : modelspace.all_orbits)
       for (index_t b : modelspace.all_orbits)
       {
@@ -302,21 +348,32 @@ namespace
           continue;
         block.pair_index[a * norbits + b] = block.pairs.size();
         block.pairs.push_back({a, b});
+        if (lambda_active_orbits[a] && lambda_active_orbits[b])
+          active_pair_indices.push_back(block.pairs.size() - 1);
       }
     const size_t dimension = block.pairs.size();
+    block.active_pair_indices = arma::conv_to<arma::uvec>::from(active_pair_indices);
     block.X.zeros(dimension, dimension);
     block.Y.zeros(dimension, dimension);
-    block.Lambda.zeros(dimension, dimension);
+    block.Lambda.zeros(active_pair_indices.size(), active_pair_indices.size());
     for (size_t i = 0; i < dimension; ++i)
       for (size_t j = 0; j < dimension; ++j)
       {
         const auto bra = block.pairs[i];
         const auto ket = block.pairs[j];
-        const std::array<double, 3> values = PandyaElements(
-            X, Y, reference, J, bra[0], bra[1], ket[0], ket[1]);
+        const std::array<double, 2> values = PandyaElements(
+            X, Y, J, bra[0], bra[1], ket[0], ket[1]);
         block.X(i, j) = values[0];
         block.Y(i, j) = values[1];
-        block.Lambda(i, j) = values[2];
+      }
+    for (size_t i = 0; i < active_pair_indices.size(); ++i)
+      for (size_t j = 0; j < active_pair_indices.size(); ++j)
+      {
+        const auto bra = block.pairs[active_pair_indices[i]];
+        const auto ket = block.pairs[active_pair_indices[j]];
+        block.Lambda(i, j) = PandyaElement(
+            reference.Lambda2, modelspace, J,
+            bra[0], bra[1], ket[0], ket[1]);
       }
     return block;
   }
@@ -406,6 +463,8 @@ namespace MRCommutator
 
     // V: full ordered particle-hole pairs keep the sign of tz_a-tz_b.
     section_start = omp_get_wtime();
+    const std::vector<bool> lambda_active_orbits =
+        FindLambdaActiveOrbits(reference);
     double v_build_seconds = 0.0;
     double v_blas_seconds = 0.0;
     double v_trace_seconds = 0.0;
@@ -415,13 +474,23 @@ namespace MRCommutator
         {
           double v_part_start = omp_get_wtime();
           const OrderedCrossBlock block = BuildOrderedCrossBlock(
-              X, Y, reference, J, parity, delta_tz);
+              X, Y, reference, lambda_active_orbits,
+              J, parity, delta_tz);
           v_build_seconds += omp_get_wtime() - v_part_start;
-          if (block.pairs.empty())
+          if (block.pairs.empty() || block.active_pair_indices.empty())
             continue;
           v_part_start = omp_get_wtime();
-          const arma::mat xly = block.X * block.Lambda * block.Y;
-          const arma::mat ylx = block.Y * block.Lambda * block.X;
+          // Lambda has exact support only on pairs whose two orbits occur in
+          // at least one nonzero standard-coupled lambda2 element.  Restricting
+          // the intermediate index to that principal submatrix therefore
+          // preserves X*Lambda*Y exactly while bounding the correlated-reference
+          // work by its active space instead of the full single-particle space.
+          const arma::mat xly =
+              (block.X.cols(block.active_pair_indices) * block.Lambda) *
+              block.Y.rows(block.active_pair_indices);
+          const arma::mat ylx =
+              (block.Y.cols(block.active_pair_indices) * block.Lambda) *
+              block.X.rows(block.active_pair_indices);
           v_blas_seconds += omp_get_wtime() - v_part_start;
           const double angular_weight = 2 * block.J + 1.0;
           v_part_start = omp_get_wtime();
