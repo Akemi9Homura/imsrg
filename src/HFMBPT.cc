@@ -184,6 +184,9 @@ void HFMBPT::DiagonalizeRho()
 //*********************************************************************
 Operator HFMBPT::TransformHFToNATBasis( Operator& OpHF)
 {
+  if (OpHF.IsNumberConserving() and OpHF.GetParticleRank() <= 2)
+    return OpHF.TransformOneAndTwoBody(C_HF2NAT);
+
   Operator OpNAT(OpHF);
   OpNAT.OneBody = C_HF2NAT.t() * OpHF.OneBody * C_HF2NAT;
 
@@ -248,6 +251,9 @@ Operator HFMBPT::TransformHFToNATBasis( Operator& OpHF)
 //*********************************************************************
 Operator HFMBPT::TransformHOToNATBasis( Operator& OpHO)
 {
+  if (OpHO.IsNumberConserving() and OpHO.GetParticleRank() <= 2)
+    return OpHO.TransformOneAndTwoBody(C_HO2NAT);
+
   Operator OpNAT(OpHO);
   OpNAT.OneBody = C_HO2NAT.t() * OpHO.OneBody * C_HO2NAT;
 
@@ -987,5 +993,4 @@ arma::vec HFMBPT::GetMP2_Impacts(Operator& OpIn) const
    IMSRGProfiler::timer[__func__] += omp_get_wtime() - t_start;
    return orbit_impacts;
 }
-
 

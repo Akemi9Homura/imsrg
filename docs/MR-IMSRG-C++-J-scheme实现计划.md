@@ -170,7 +170,13 @@ J-coupled 恒等式检查、正规序往返及 `mrimsrg_jref_v1` 文件 reader �
 `Delta e != 0` 掩码也已完成并对 Python m-scheme 验证。当前不得跳到
 完整流出数；步骤 6 的 solver 显式 MR context 和直接 RK4/ODE RHS 接线
 已完成，剩余边界是 `imsrg++` driver 参数、自然基 Hamiltonian 变换及真实
-体系 `s=0`/short-flow 验收。
+体系 `s=0`/short-flow 验收。随后已把 HF/HFMBPT 原有 normalized-pair
+变换抽成 `Operator::TransformOneAndTwoBody()`：它验证正交性与球形 block，
+拒绝 3B/非粒子数守恒输入，并由 HF、HFMBPT 与 MR 共用。真实
+`He4 Nrefmax=2` 自然轨道下，随机标量 NN/NO2B 算符的 HO→NAT→HO 总误差
+`<2e-11`，NAT 一体和完整 m-scheme 二体张量分别以 `2e-11`、`3e-11`
+绝对容差通过独立四指标协变对照。当前步骤 6 只剩 driver 参数接线与真实
+NNLOopt 的 `E/f/Gamma`、`s=0`/short-flow 门禁。
 
 ## 7. 错误定位原则
 

@@ -228,6 +228,8 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("DoNormalOrderingFilledValence", &Operator::DoNormalOrderingFilledValence)
           .def("UndoNormalOrdering", &Operator::UndoNormalOrdering)
           .def("UndoNormalOrderingCore", &Operator::UndoNormalOrderingCore)
+          .def("TransformOneAndTwoBody", &Operator::TransformOneAndTwoBody,
+               py::arg("C"), py::arg("validation_tolerance") = 1e-10)
           .def("DoNormalOrdering", &Operator::UndoNormalOrdering)
           .def("SetModelSpace", &Operator::SetModelSpace)
           .def("Truncate", &Operator::Truncate)

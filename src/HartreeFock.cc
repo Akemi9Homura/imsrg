@@ -914,6 +914,11 @@ void HartreeFock::ReorderCoefficients()
 Operator HartreeFock::TransformToHFBasis( Operator& OpHO)
 {
 
+   // Keep the established NN/NO2B transformation in one implementation.  The
+   // legacy code below remains for three-body and number-changing operators.
+   if (OpHO.IsNumberConserving() and OpHO.GetParticleRank() <= 2)
+     return OpHO.TransformOneAndTwoBody(C);
+
    Operator OpHF(OpHO);
    // Easy part:
    //Update the one-body part by multiplying by the matrix C(i,a) = <i|a>
@@ -1718,4 +1723,3 @@ double HartreeFock::GetTransformed3bme( Operator& OpIn, int Jab, int Jde, int J2
   } // for alpha
   return V_hf;
 }
-

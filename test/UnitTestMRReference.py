@@ -16,7 +16,10 @@ from prototype.mrimsrg.jcoupling import (  # noqa: E402
     mr_lambda2_one_body_coupled,
     reconstruct_scalar_two_body,
 )
-from prototype.mrimsrg.basis import prepare_natural_basis  # noqa: E402
+from prototype.mrimsrg.basis import (  # noqa: E402
+    prepare_natural_basis,
+    transform_hamiltonian,
+)
 from prototype.mrimsrg.densities import compute_densities  # noqa: E402
 from prototype.mrimsrg.export_jref import export_reference  # noqa: E402
 from prototype.mrimsrg.generator import (  # noqa: E402
@@ -26,6 +29,7 @@ from prototype.mrimsrg.generator import (  # noqa: E402
 )
 from prototype.mrimsrg.normal_order import MRHamiltonian  # noqa: E402
 from prototype.mrimsrg.reference_io import load_reference  # noqa: E402
+from prototype.mrimsrg.sr_imsrgpp_check import operator_to_mscheme  # noqa: E402
 
 
 def max_operator_difference(left, right):
@@ -400,6 +404,7 @@ assert max_operator_difference(rk4_solver.GetH_s(), rk4_expected) < 3e-11
 # temporary natural-orbit rotation, including radial mixing in fixed (l,j,tz)
 # blocks.  It must survive the same bridge without being mistaken for HO basis.
 he4_nref2_path = repository_root / "prototype/mrimsrg/data/He4_Nrefmax2"
+he4_nref2_data = load_reference(he4_nref2_path)
 he4_nref2_ms = pyIMSRG.ModelSpace(2, "He4", "He4")
 with tempfile.TemporaryDirectory() as temporary_directory:
     bridge_path = Path(temporary_directory) / "He4_Nrefmax2.jref"
@@ -421,5 +426,68 @@ maximum_off_diagonal_transformation = max(
     if i != j
 )
 assert maximum_off_diagonal_transformation > 1e-3
+
+# The reusable J-scheme 0/1/2B basis transformation must agree tensor by
+# tensor with the independent m-scheme covariance helper.  Use the physical
+# He4 Nrefmax=2 natural orbitals so this exercises actual radial mixing rather
+# than an artificial permutation.  Production stores only the J-scheme result;
+# the dense tensors below exist solely as a small-space test oracle.
+he4_transform_test = pyIMSRG.UnitTest(he4_nref2_ms)
+he4_transform_test.SetRandomSeed(424242)
+he4_ho_operator = he4_transform_test.RandomOp(
+    he4_nref2_ms, 0, 0, 0, 2, +1
+)
+he4_U_j = np.asarray(
+    [
+        [
+            he4_nref2_reference.NaturalOrbitTransformation(i, j)
+            for j in range(he4_nref2_ms.GetNumberOrbits())
+        ]
+        for i in range(he4_nref2_ms.GetNumberOrbits())
+    ]
+)
+he4_nat_operator = he4_ho_operator.TransformOneAndTwoBody(
+    he4_nref2_reference.NaturalOrbitTransformation
+)
+he4_round_trip = he4_nat_operator.TransformOneAndTwoBody(
+    he4_nref2_reference.NaturalOrbitTransformation.t()
+)
+assert max_operator_difference(he4_round_trip, he4_ho_operator) < 2e-11
+
+he4_U_m = np.zeros((he4_nref2_data.norb, he4_nref2_data.norb))
+for p, old_orbit in enumerate(he4_nref2_data.orbits):
+    old_parent, _, old_l, old_j2, old_m2, old_tz2 = (
+        int(value) for value in old_orbit
+    )
+    for q, new_orbit in enumerate(he4_nref2_data.orbits):
+        new_parent, _, new_l, new_j2, new_m2, new_tz2 = (
+            int(value) for value in new_orbit
+        )
+        if (old_l, old_j2, old_m2, old_tz2) == (
+            new_l,
+            new_j2,
+            new_m2,
+            new_tz2,
+        ):
+            he4_U_m[p, q] = he4_U_j[old_parent, new_parent]
+he4_ho_m = operator_to_mscheme(he4_ho_operator, he4_nref2_data.orbits)
+he4_expected_nat_m = transform_hamiltonian(
+    he4_ho_m, he4_U_m, to_natural=True
+)
+he4_actual_nat_m = operator_to_mscheme(
+    he4_nat_operator, he4_nref2_data.orbits
+)
+np.testing.assert_allclose(
+    he4_actual_nat_m.one_body,
+    he4_expected_nat_m.one_body,
+    atol=2e-11,
+    rtol=0,
+)
+np.testing.assert_allclose(
+    he4_actual_nat_m.two_body,
+    he4_expected_nat_m.two_body,
+    atol=3e-11,
+    rtol=0,
+)
 
 print("MRReference tests passed")

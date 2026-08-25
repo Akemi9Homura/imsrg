@@ -195,6 +195,13 @@ class Operator
 
   Operator Truncate(ModelSpace& ms_new); ///< Returns the operator trunacted to the new model space
 
+  /// Transform a number-conserving NN/NO2B operator with a real spherical
+  /// one-body basis matrix C whose columns are the new orbitals in the old
+  /// basis.  The two-body transformation uses the normalized antisymmetric
+  /// J-coupled pair convention already used by HartreeFock and HFMBPT.
+  Operator TransformOneAndTwoBody(const arma::mat& C,
+                                  double validation_tolerance = 1e-10) const;
+
   Operator DoIsospinAveraging() const;
 
   // In principle, these methods should probably be factorized out, but I don't know where to put them...
@@ -235,4 +242,3 @@ Operator operator*(const double lhs, const Operator&& rhs);
 
 
 #endif
-

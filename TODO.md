@@ -33,8 +33,13 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       占据与 J-coupled `lambda2`，不把相关密度隐藏成全局状态。
 - [x] 读入时验证标量性、Hermiticity、pair antisymmetry、`Tr(gamma1)=A`
       和 `gamma2 -> (A-1)gamma1` 收缩，拒绝 `Jref!=0` 或非自然基密度。
-- [ ] 复用生产正规序/反变换路径，只增加 `lambda2` 必需的 MR 收缩；
-      与 Python 的 `E/f/Gamma` 和真空往返逐元素比较。
+- [x] 复用生产正规序/反变换路径，只增加 `lambda2` 必需的 MR 收缩；
+      随机 J-scheme 算符真空往返误差 `<1e-10`。
+- [x] 抽取并复用 HF/HFMBPT 的 normalized-pair J-scheme 0/1/2B 基变换，
+      用真实 `He4 Nrefmax=2` 非单位自然轨道验证 HO→NAT→HO，并对独立
+      m-scheme 四指标变换逐元素比较。
+- [ ] 对真实 NNLOopt Hamiltonian 与 Python 比较自然基 `E/f/Gamma`，并
+      比较最终真空反变换的全部矩阵元。
 
 ### C. J-scheme MR-IMSRG(2) commutator
 

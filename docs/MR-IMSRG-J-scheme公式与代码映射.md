@@ -218,6 +218,26 @@ solver 一步与手工逐 stage 的 White-NCSM/MR commutator 结果在完整
 0B/1B/2B 上相差 `<3e-11`。这一测试只验收 solver 路由；物理 NNLOopt 的
 共同 Euler/RK checkpoints 仍属于后续 driver 门禁。
 
+## 9. HO/NAT 的 J-scheme 算符变换
+
+`Operator::TransformOneAndTwoBody(C)` 统一承接现有 HF、HFMBPT 与 MR 的
+NN/NO2B 基变换。矩阵 `C` 的列是新轨道在旧球形基中的展开，因此
+`f' = C^T f C`。二体部分沿用原 `HartreeFock::TransformToHFBasis()` 的
+归一化反对称 pair 矩阵
+
+```text
+D^J_(ab,alpha beta) = sqrt[(1+delta_ab)/(1+delta_alpha_beta)]
+  [C_(a,alpha) C_(b,beta)
+   + delta_(a!=b) phase_J(ab) C_(b,alpha) C_(a,beta)],
+Gamma'^J = (D^J)^T Gamma^J D^J.
+```
+
+入口要求 `C^T C=1` 且只混合相同 `(l,j,tz)` 的径向轨道，防止把一般
+稠密变换误塞进标量 J-coupled storage。`He4 Nrefmax=2` 实际自然轨道的
+非单位 s-wave 混合已通过 HO→NAT→HO 往返，并把变换后的 J blocks 展开为
+完整 m-scheme 张量，与 Python 对每个二体指标依次作用同一正交矩阵的结果
+逐元素符合到 `3e-11`。生产流中不建立 m-scheme 张量。
+
 随机严格标量张量要求 J/m 转换 `<=1e-12`；真实 RDM 的输入标量投影
 残差单独报告并暂以 `1e-10` 为拒绝阈值。所有能量/RHS contraction 的
 coupled 对 m-scheme 误差仍要求 `<=1e-10 MeV`。
