@@ -1,0 +1,72 @@
+{
+  "case": "He4_Nrefmax2_NNLOopt_hw20_emax2_e2max4",
+  "input_storage_bytes": {
+    "cpp_reference": 14016,
+    "cpp_total": 41872,
+    "cpp_two_operators": 27856,
+    "python_reference_gamma1_lambda2": 20492800,
+    "python_total": 61478400,
+    "python_two_operators": 40985600,
+    "ratio": 1468.2460833014902
+  },
+  "omp_num_threads": 1,
+  "repetitions": 3,
+  "rhs_max_abs_mev": 3.105959933691338e-12,
+  "schema": "mrimsrg_jscheme_performance_v1",
+  "storage_scaling": [
+    {
+      "dense_m_two_body_bytes": 20480000,
+      "emax": 2,
+      "j_operator_bytes": 13928,
+      "j_orbits": 12,
+      "m_orbits": 40
+    },
+    {
+      "dense_m_two_body_bytes": 3073280000,
+      "emax": 4,
+      "j_operator_bytes": 544456,
+      "j_orbits": 30,
+      "m_orbits": 140
+    },
+    {
+      "dense_m_two_body_bytes": 101964054528,
+      "emax": 6,
+      "j_operator_bytes": 7446536,
+      "j_orbits": 56,
+      "m_orbits": 336
+    },
+    {
+      "dense_m_two_body_bytes": 1517978880000,
+      "emax": 8,
+      "j_operator_bytes": 56333448,
+      "j_orbits": 90,
+      "m_orbits": 660
+    },
+    {
+      "dense_m_two_body_bytes": 13702319341568,
+      "emax": 10,
+      "j_operator_bytes": 293272808,
+      "j_orbits": 132,
+      "m_orbits": 1144
+    },
+    {
+      "dense_m_two_body_bytes": 87775950080000,
+      "emax": 12,
+      "j_operator_bytes": 1180884360,
+      "j_orbits": 182,
+      "m_orbits": 1820
+    },
+    {
+      "dense_m_two_body_bytes": 437890580480000,
+      "emax": 14,
+      "j_operator_bytes": 3942107400,
+      "j_orbits": 240,
+      "m_orbits": 2720
+    }
+  ],
+  "timing_seconds_median": {
+    "cpp_jscheme": 0.0068755639949813485,
+    "python_dense_mscheme": 1.765959877986461,
+    "speedup": 256.8458208338226
+  }
+}

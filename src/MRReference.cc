@@ -380,6 +380,12 @@ double MRReference::ContractLambda2(const TwoBodyME &two_body) const
   return contraction;
 }
 
+size_t MRReference::DataSize() const
+{
+  return occupations.size() * sizeof(double) +
+         NaturalOrbitTransformation.n_elem * sizeof(double) + Lambda2.size();
+}
+
 void MRReference::CheckCompatibleOperator(const Operator &op) const
 {
   if (op.modelspace != modelspace)

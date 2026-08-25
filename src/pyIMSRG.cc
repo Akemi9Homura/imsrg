@@ -318,6 +318,7 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("MaximumContractionViolation", &MRReference::MaximumContractionViolation)
           .def("Validate", &MRReference::Validate, py::arg("tolerance") = 1e-10)
           .def("ContractLambda2", &MRReference::ContractLambda2)
+          .def("DataSize", &MRReference::DataSize)
           .def("NormalOrder", &MRReference::NormalOrder)
           .def("UndoNormalOrder", &MRReference::UndoNormalOrder);
 

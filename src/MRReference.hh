@@ -57,6 +57,9 @@ class MRReference
   /// 1/4 sum_abcd O_abcd lambda_abcd.
   double ContractLambda2(const TwoBodyME &two_body) const;
 
+  /// Bytes in the dense numerical reference payload (occupations, NAT and lambda2).
+  size_t DataSize() const;
+
   /// Normal order an NN/NO2B vacuum operator with gamma1 and lambda2.
   Operator NormalOrder(const Operator &vacuum_operator) const;
 
