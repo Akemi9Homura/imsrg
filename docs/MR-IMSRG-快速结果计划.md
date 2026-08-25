@@ -109,13 +109,15 @@ double-precision J-coupled 输入，不使用 float32 `no2bpack`；完整流后�
 做普通 Hamiltonian/NCSM/no2bpack 验收。最终能量相近不能替代逐矩阵元
 核对。
 
-截至 2026-08-25，四个相关参考测试点的 `ds=1e-3` RK4 已逐点通过
-`s=0.001,0.002,0.003` 的 `H/eta/RHS` J/m 对照；同一 J 输入的全局
-最坏 H/RHS 为 `1.279e-13/2.665e-14 MeV`。显式 Euler 与逐命名项报告
-也已通过，命名项全局相对 Frobenius 为 `1.380e-15`。下一门禁是 EN
-分母逐项报告和统一完整直接流，然后进入普通真空输出与 NCSM 谱验收。
-其中相关参考四点的 2832 条被选 EN 分母现已全部通过，max-abs
-`1.421e-14 MeV`；当前转入完整直接流门禁，同时继续补齐独立 SR 逐项表。
+截至 2026-08-25，四个相关参考测试点已完成逐命名项、2832 条 EN 分母、
+Euler、共同 RK4 checkpoints 和 `s=100` 完整直接流。逐命名项全局相对
+Frobenius 为 `1.380e-15`，EN 分母 max-abs `1.421e-14 MeV`，完整流
+`H/eta/RHS/vacuum H` 的四核最坏值为 `6.88e-8 MeV`。流后的普通真空
+Hamiltonian 已同时以 float64 J64 和 float32 `no2bpack` 交给独立 NCSM
+reader；四核全部完成对角化，格式打包导致的基态差不超过
+`1.225e-6 MeV`。机器记录见 `MR-IMSRG-Jscheme-full-flow.json`。当前剩余
+门禁是补齐独立 SR 逐项机器表，并以收紧十倍 ODE 容差的后 NCSM 谱确认
+`<1 keV` 稳定性。
 
 ### M0：冻结普通 Hamiltonian 和基准
 

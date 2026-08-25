@@ -111,13 +111,19 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 - [x] 增加相关参考固定-s 完整流验收器：按生产顺序执行
       HO→NAT→MR flow→反正规序→HO，并比较终点 `H/eta/RHS/vacuum H`；
       He4 Nrefmax=2 本地 `s=0.01` 烟雾流最坏 `4.24e-11 MeV`。
-- [ ] 统一生成元/cutoff/停止条件/容差后比较完整流、真空
-      `E0+t+V` 与 NCSM 谱；float32 `no2bpack` 只做下游格式验收。
+- [x] 统一生成元/cutoff/停止条件/容差后比较 `s=100` 完整流、真空
+      `E0+t+V` 与 NCSM 谱；四体系全流 max-abs 为
+      `4.40e-9--6.88e-8 MeV`。float64 J64 与 float32 `no2bpack`
+      均由独立 NCSM reader 对角化，打包引起的基态差不超过
+      `1.225e-6 MeV`；见 `docs/MR-IMSRG-Jscheme-full-flow.json`。
 
 ### G. 性能与完成定义
 
-- [ ] J-scheme MR RHS 的主存储不随 m-substate 数量增长，主收缩使用块稀疏
-      矩阵/现有 channel 索引，并给出相对 Python m-scheme 的时间和内存比较。
+- [x] J-scheme MR RHS 的主存储不随 m-substate 数量增长，主收缩使用块稀疏
+      矩阵/现有 channel 索引。真实 `He4 Nrefmax=2` 单线程 RHS 比 Python
+      m-scheme 快 `256.8` 倍，输入主数组小 `1468` 倍；解析存储估算可到
+      `emax=14` 且不分配稠密 m-scheme 张量。见
+      `docs/MR-IMSRG-Jscheme-performance.json`。
 - [ ] `He4/O16 Nrefmax=0`、`Be8/C12 Nrefmax=0` 和 `He4/O16 Nrefmax=2`
       按 E--F 门禁通过。
 - [ ] 四核完成流和 NCSM/no2bpack 读回通过，命令、commit、环境、

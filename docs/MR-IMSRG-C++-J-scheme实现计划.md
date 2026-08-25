@@ -223,7 +223,26 @@ Frobenius 为 `1.380e-15`；最坏索引已持久化。共同
 `1.279e-13/2.665e-14 MeV`，四核 2832 条 EN 分母最坏
 `1.421e-14 MeV`。当前 Gate 5 已增加相关参考固定-s Python/C++ 验收器，
 本地 He4 Nrefmax=2 `s=0.01` 烟雾流的最终 H/eta/RHS/vacuum 全局最坏
-`4.24e-11 MeV`；point7 正在运行四核共同 `s=100` 正式比较输入。
+`4.24e-11 MeV`。point7 上统一 `rtol=atol=1e-9`、`s=100` 的正式比较现已
+完成：`Be8/C12 Nrefmax=0` 与 `He4/O16 Nrefmax=2` 的终点
+`H/eta/RHS/vacuum H` 全局 max-abs 分别为
+`4.40e-9/6.88e-8/1.87e-8/1.04e-8 MeV`，机器记录见
+`docs/MR-IMSRG-Jscheme-full-flow.json`。流后的 float64 J64 已按显式轨道
+量子数和 `(a,b,c,d,J)` 记录映射到独立 `shell-model-obs` channel 顺序；
+四核 NCSM 均完成读回。再转成下游 float32 `no2bpack` 后，基态相对 J64
+的最大差为 `1.225e-6 MeV`（`0.001225 keV`）。因此 Gate 5 的相关参考
+完整流、真空物化和谱闭环已经通过，剩余严格门禁是把现有 SR 逐项证据
+汇总为与 MR 报告同结构的机器表，以及做 ODE 容差收紧的后 NCSM 检查。
+
+Gate 6 的首个可复现基准也已完成。真实 `He4 Nrefmax=2`、单线程、三次
+中位数下，C++ J-scheme MR RHS 为 `6.88e-3 s`，Python dense m-scheme 为
+`1.766 s`，快 `256.8` 倍；两个输入算符加参考密度的主数值存储分别为
+`41,872` 与 `61,478,400 bytes`，相差 `1468` 倍。只构造 ModelSpace 并
+解析 channel 尺寸的外推表显示，`emax=14` 一个 J-scheme 0/1/2B 算符约
+`3.94 GB`，相应稠密 m-scheme 二体张量约 `438 TB`。完整命令和数据见
+`prototype/mrimsrg/benchmark_jscheme.py` 与
+`docs/MR-IMSRG-Jscheme-performance.json`；这证明存储结构能外推，不等于
+已经完成 `emax=14` 的物理流。
 
 ## 7. 错误定位原则
 
