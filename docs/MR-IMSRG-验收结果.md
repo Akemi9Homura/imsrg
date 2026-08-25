@@ -361,3 +361,9 @@ O16 `s=0.001` 的 `1.279e-13 MeV`，最坏 RHS 为 O16 `s=0.002` 的
 包含 max-abs、绝对/相对 Frobenius、最坏 m-scheme 索引及该处两边数值。
 全局 max-abs 为 `1.954e-14 MeV`，全局相对 Frobenius 为
 `1.380e-15`。
+
+White-NCSM 的 EN 分母另由 CTest `MRDenominators` 逐条核对生产
+`Generator::Get1b/2bDenominatorWhiteNCSM` 与 Python 论文公式。每核覆盖
+4 个 1B 和 704 个 2B 正/反向 `Delta e != 0` 通道，四核共 2832 条，
+全局 max-abs `1.421e-14 MeV`。紧凑机器表及列定义见
+[`MR-IMSRG-Jscheme-denominators.json`](MR-IMSRG-Jscheme-denominators.json)。

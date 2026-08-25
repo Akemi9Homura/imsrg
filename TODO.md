@@ -97,6 +97,10 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 - [x] 为四体系各命名项生成机器可读误差表，补齐相对 Frobenius 与最坏
       J/m 元素索引；40 个命名项/体系项组合的全局相对 Frobenius
       `1.380e-15`，见 `docs/MR-IMSRG-Jscheme-contractions.json`。
+- [x] 对四个相关参考测试点逐条比较 White-NCSM 生成元实际选中的 EN
+      分母：每核 4 个 1B 与 704 个 2B 正/反向通道，四核 2832 条全部
+      通过，全局 max-abs `1.421e-14 MeV`；完整表见
+      `docs/MR-IMSRG-Jscheme-denominators.json`。
 - [x] 比较共同固定步 RK4 checkpoints：四体系用 `ds=1e-3` 到
       `s=0.001,0.002,0.003`，每点从 driver 的 HO 真空 J64 输出读回、
       HO→NAT 并 MR 正规序后重新比较 `H/eta/RHS`；同 J 输入的全局最坏

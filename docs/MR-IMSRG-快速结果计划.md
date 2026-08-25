@@ -114,6 +114,8 @@ double-precision J-coupled 输入，不使用 float32 `no2bpack`；完整流后�
 最坏 H/RHS 为 `1.279e-13/2.665e-14 MeV`。显式 Euler 与逐命名项报告
 也已通过，命名项全局相对 Frobenius 为 `1.380e-15`。下一门禁是 EN
 分母逐项报告和统一完整直接流，然后进入普通真空输出与 NCSM 谱验收。
+其中相关参考四点的 2832 条被选 EN 分母现已全部通过，max-abs
+`1.421e-14 MeV`；当前转入完整直接流门禁，同时继续补齐独立 SR 逐项表。
 
 ### M0：冻结普通 Hamiltonian 和基准
 

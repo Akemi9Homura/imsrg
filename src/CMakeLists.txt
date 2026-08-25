@@ -810,3 +810,5 @@ add_test(NAME MRSRDriver COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRSRDr
 add_test(NAME MRCorrelatedDriver
          COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRCorrelatedDriver.py
                  $<TARGET_FILE:imsrg++>)
+add_test(NAME MRDenominators
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRDenominators.py)
