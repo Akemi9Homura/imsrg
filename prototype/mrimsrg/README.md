@@ -160,7 +160,8 @@ by both NCSM and FCIQMC:
 prototype/mrimsrg/build/mrimsrg_export_no2bpack \
   --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack \
   --flow-output prototype/mrimsrg/data/He4_flow_rtol1e-6 \
-  --output He4_mrimsrg.no2bpack --Z 2 --N 2
+  --output He4_mrimsrg.no2bpack --Z 2 --N 2 \
+  --diagnostic-jcoupled64 /tmp/He4_mrimsrg.jcoupled64
 ```
 
 The exporter uses the fixed interaction only for the verified HO orbit table.
@@ -172,12 +173,30 @@ write unless the maximum discrepancy is below `--scalar-tolerance` (default
 `1e-9 MeV`). A checkpoint directory containing `vacuum_mscheme.bin` can be
 passed in place of the final flow directory.
 
+The optional `--diagnostic-jcoupled64` output stores the same J-coupled OBMEs
+and TBMEs as float64, with an identifying magic header. It is an acceptance
+format, not a downstream interaction format and must not be passed to a
+`no2bpack` reader. Read it back, reconstruct m-scheme matrix elements from the
+serialized J-coupled values, and diagonalize with the same NCSM solver using:
+
+```bash
+prototype/mrimsrg/build/mrimsrg_validate \
+  --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack \
+  --jcoupled64 /tmp/He4_mrimsrg.jcoupled64 \
+  --Z 2 --N 2 --nmax 8 --states 3
+```
+
 As an end-to-end rotational-symmetry regression, a fresh He4 flow to
 `s=0.001` reconstructs both the one- and two-body m-scheme tensors from the
 projected J-coupled data with maximum errors `3.55e-15 MeV`.  At `Nmax=8`,
 the direct double-precision dense path gives `-20.3396323958 MeV` and the
 packed reader gives `-20.3396333376 MeV`; their `0.942 keV` difference is the
 measured float32 OBME/TBME packing effect.
+The float64 J-coupled readback differs from the direct dense energies by at
+most `1.8e-14 MeV` across the three printed states. Thus the
+Clebsch--Gordan phases, identical-pair normalization, channel ordering and
+inverse coupling pass the spectral check at double-precision numerical noise;
+production output remains the existing float32 `no2bpack`.
 The independent `/home/mengziyan/fciqmc/fciqmc-mpi` production reader also
 completed a one-step He4 FCIQMC initialization from this exact file with
 `int_format=no2bpack`.  Its native NCSM executable reproduced the same three

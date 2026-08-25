@@ -1,6 +1,7 @@
 #include "Hamiltonian.hpp"
 #include "HarmonicOscillator.hpp"
 #include "fixed_interaction.hpp"
+#include "jcoupled64_io.hpp"
 #include "util.hpp"
 #include "vacuum_mscheme_io.hpp"
 
@@ -27,6 +28,7 @@ using nucleus::HarmonicOscillator;
 using nucleus::JBasisSet;
 using nucleus::MBasisSet;
 using nucleus::Orbit;
+using mrimsrg::CoupledHamiltonian;
 
 namespace
 {
@@ -35,18 +37,10 @@ struct Options
     fs::path interaction;
     fs::path flow_output;
     fs::path output;
+    fs::path diagnostic_jcoupled64;
     int Z = -1;
     int N = -1;
     double scalar_tolerance = 1e-9;
-};
-
-struct CoupledHamiltonian
-{
-    double zero_body = 0.0;
-    Eigen::MatrixXd one_body;
-    std::vector<Eigen::MatrixXd> two_body;
-    double one_body_projection_error = 0.0;
-    double two_body_projection_error = 0.0;
 };
 
 [[noreturn]] void usage_error(const std::string &message)
@@ -54,7 +48,7 @@ struct CoupledHamiltonian
     throw std::invalid_argument(
         message +
         "\nusage: mrimsrg_export_no2bpack --interaction FILE --flow-output DIR_OR_PAYLOAD "
-        "--output FILE --Z Z --N N [--scalar-tolerance X]");
+        "--output FILE --Z Z --N N [--diagnostic-jcoupled64 FILE] [--scalar-tolerance X]");
 }
 
 Options parse_options(int argc, char **argv)
@@ -72,6 +66,8 @@ Options parse_options(int argc, char **argv)
             options.flow_output = value;
         else if (key == "--output")
             options.output = value;
+        else if (key == "--diagnostic-jcoupled64")
+            options.diagnostic_jcoupled64 = value;
         else if (key == "--Z")
             options.Z = std::stoi(value);
         else if (key == "--N")
@@ -87,6 +83,10 @@ Options parse_options(int argc, char **argv)
         usage_error("--Z and --N are required");
     if (!(options.scalar_tolerance > 0.0) || !std::isfinite(options.scalar_tolerance))
         usage_error("--scalar-tolerance must be finite and positive");
+    if (!options.diagnostic_jcoupled64.empty() &&
+        fs::absolute(options.output).lexically_normal() ==
+            fs::absolute(options.diagnostic_jcoupled64).lexically_normal())
+        usage_error("--output and --diagnostic-jcoupled64 must name different files");
     return options;
 }
 
@@ -156,61 +156,6 @@ double project_two_body(const mrimsrg::VacuumMScheme &dense,
     const double pair_normalization = std::sqrt(a == b ? 2.0 : 1.0) *
                                       std::sqrt(c == d ? 2.0 : 1.0);
     return sum / (pair_normalization * (2 * J + 1));
-}
-
-double reconstruct_two_body(const std::vector<Eigen::MatrixXd> &coupled,
-                            const JBasisSet &jbasis,
-                            const MBasisSet &mbasis,
-                            int p, int q, int r, int s)
-{
-    if (p == q || r == s)
-        return 0.0;
-    const Orbit &op = mbasis.morbit(p);
-    const Orbit &oq = mbasis.morbit(q);
-    const Orbit &orr = mbasis.morbit(r);
-    const Orbit &os = mbasis.morbit(s);
-    if (!nucleus::check_symmetry_2b_mptz(op, oq, orr, os))
-        return 0.0;
-
-    const int ja = op.j;
-    const int jb = oq.j;
-    const int jc = orr.j;
-    const int jd = os.j;
-    const int jmin = std::max(std::abs(ja - jb), std::abs(jc - jd)) / 2;
-    const int jmax = std::min(ja + jb, jc + jd) / 2;
-    int a = op.index;
-    int b = oq.index;
-    int c = orr.index;
-    int d = os.index;
-    const bool swap_ab = a > b;
-    const bool swap_cd = c > d;
-    if (swap_ab)
-        std::swap(a, b);
-    if (swap_cd)
-        std::swap(c, d);
-
-    double value = 0.0;
-    for (int J = jmin; J <= jmax; ++J)
-    {
-        if (a == b && nucleus::isodd(J))
-            continue;
-        if (c == d && nucleus::isodd(J))
-            continue;
-        double phase = 1.0;
-        if (a == b)
-            phase *= nucleus::sqrt_2;
-        if (c == d)
-            phase *= nucleus::sqrt_2;
-        if (swap_ab)
-            phase *= nucleus::iphase((ja + jb) / 2 - J + 1);
-        if (swap_cd)
-            phase *= nucleus::iphase((jc + jd) / 2 - J + 1);
-        const auto [channel, bra, ket] = jbasis.jvmat_index(a, b, c, d, J);
-        value += phase * coupled[channel](bra, ket) *
-                 util::CGfast(ja, jb, 2 * J, op.m, oq.m) *
-                 util::CGfast(jc, jd, 2 * J, orr.m, os.m);
-    }
-    return value;
 }
 
 CoupledHamiltonian couple_to_j_scheme(const mrimsrg::VacuumMScheme &dense,
@@ -295,8 +240,8 @@ CoupledHamiltonian couple_to_j_scheme(const mrimsrg::VacuumMScheme &dense,
                 for (int s = 0; s < norb; ++s)
                     result.two_body_projection_error = std::max(
                         result.two_body_projection_error,
-                        std::abs(reconstruct_two_body(result.two_body, jbasis, mbasis,
-                                                      p, q, r, s) -
+                        std::abs(mrimsrg::reconstruct_two_body(result.two_body, jbasis, mbasis,
+                                                               p, q, r, s) -
                                  dense.two(p, q, r, s)));
     return result;
 }
@@ -426,6 +371,13 @@ int main(int argc, char **argv)
             throw std::runtime_error(
                 "m-scheme Hamiltonian is not representable as a scalar J-coupled operator within tolerance");
 
+        if (!options.diagnostic_jcoupled64.empty())
+        {
+            mrimsrg::write_jcoupled64(
+                options.diagnostic_jcoupled64, basis_source.get_jbasis(), coupled);
+            std::cout << "wrote diagnostic_jcoupled64="
+                      << fs::absolute(options.diagnostic_jcoupled64) << "\n";
+        }
         write_no2bpack(options.output, basis_source.get_jbasis(), coupled);
         std::cout << "wrote no2bpack=" << fs::absolute(options.output)
                   << " zero_body=" << coupled.zero_body
