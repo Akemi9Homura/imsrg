@@ -120,6 +120,54 @@ normalized-pair block 形成 `X*lambda*Y`，其中对中间相同粒子 pair 的
 不同，因此重复调用比较使用 `1e-11` 门槛；MR 入口本身仍没有执行或加回
 任何零值修正。
 
+### 3.1 QCombo 重新生成审计（2026-08-25）
+
+本轮没有依赖 notebook 中历史保存的图片或摘要。使用隔离的
+`refs/qcombo/.venv`，以 Python 3.13.12、QCombo 0.2.0（commit
+`94afe77f7e6c53592f241b451f47f365dfc45bfb`）、SymPy 1.14.0 和
+nbconvert 7.17.1 完整重新执行 `examples/MR_IMSRG2.ipynb`。源 notebook
+SHA-256 为
+`24a08dfbc984a6977956f31ccf63af642cb1126896e8e99720df981315dabad0`；
+重生文件保存在被忽略的
+`refs/qcombo/results/MR_IMSRG2-regenerated.ipynb`。去掉执行时间和 cell
+计数后，原保存输出与重生输出的 17 个 LaTeX display 逐字一致，规范化
+输出 SHA-256 均为
+`431b893e1baa45a3220267083316d92dbcbd34b36aed0a2aa4c5eb1f1a629a57`。
+
+QCombo 反对称化并合并相同矩阵元后的顶层加法项数为：
+
+| 输出 | contraction | density rank | 项数 |
+|---|---|---:|---:|
+| 0B | 1B--1B | 1 | 1 |
+| 0B | 1B--2B / 2B--1B | 2 | 2 / 2 |
+| 0B | 2B--2B | 1 / 2 / 3 | 1 / 3 / 2 |
+| 1B | 1B--1B | 1 | 2 |
+| 1B | 1B--2B / 2B--1B | 1 | 1 / 1 |
+| 1B | 2B--2B | 1 / 2 | 2 / 8 |
+| 2B | 1B--2B / 2B--1B / 2B--2B | 1 | 4 / 4 / 6 |
+
+逐项核对结论如下：
+
+- QCombo 的八个 1B--`lambda2` 顶层项与 Hergert Eq. (50) 的四个
+  `X-Y` 括号逐指标重命名相同。Python oracle 中它们就是四组
+  `einsum` 及各自的 `X<->Y` 差；J-coupling 后第一组成为 IV，第二组
+  成为 V，后两组共同成为 VI。C++ 没有漏掉“第四个”拓扑。
+- QCombo 分列的 0B `[1,2]`、`[2,1]` 和 `[2,2] lambda2` 项，合并后
+  正是 Hergert Eq. (49) 的
+  `1/4 (d Gamma/ds) lambda2`。因此生产代码必须收缩已经完成的
+  `result.TwoBody`；当前 `ContractLambda2(result.TwoBody)` 正是这一
+  结构，不能改成只收缩 2B--2B 子项。
+- 重生的 2B 方程不含显式 `lambda2`，与生产代码完全复用既有
+  `comm122ss/comm222_pp_hhss/comm222_phss` 一致。
+- QCombo 仍生成两个线性 `lambda3` 的 0B 项；当前实现明确采用
+  `lambda3=0`，所以这是记录过的物理截断，不是漏项。
+
+该符号审计还不是单独的正确性凭据。上述映射继续受三条数值门约束：
+`UnitTestMRReference.py` 的 IV/V/VI 慢/快 J-scheme 逐拓扑比较、
+`UnitTestMRCorrelatedDriver.py` 的十个命名项对 Python m-scheme 比较，
+以及 `lambda2=0` 时直接返回原 `Commutator::Commutator()` 的 SR 门禁。
+符号、J-coupling 和独立数值展开三者当前一致。
+
 ## 4. 现有代码可直接复用的边界
 
 - `ModelSpace::SetupKets()` 已根据 orbit `occ` 构造分数占据的 pp/hh/ph

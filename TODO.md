@@ -17,8 +17,11 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 - [x] 逐篇阅读 `refs/` 中 Hergert 2016、Gebrerufael/Vobig/Mongelli 学位
       论文和 IM-NCSM 系列论文，建立 m-scheme 公式、J-scheme 张量约定与
       `lambda3=0` 截断表；见 `docs/MR-IMSRG-J-scheme公式与代码映射.md`。
-- [ ] 重生并核对 QCombo `MR_IMSRG2.ipynb`，固定指标方向、反对称、
-      组合系数和每个命名 contraction。
+- [x] 重生并核对 QCombo `MR_IMSRG2.ipynb`，固定指标方向、反对称、
+      组合系数和每个命名 contraction。QCombo 0.2.0 / SymPy 1.14.0
+      的 17 个 LaTeX display 与保存输出逐字一致；1B `lambda2` 八项、
+      0B `1/4 C2 lambda2` 和无显式 `lambda2` 的 2B 方程均已逐项映射到
+      Python oracle 与 C++ IV--VI，见公式映射文档 Sec. 3.1。
 - [x] 逐文件审读 `Operator`/`TwoBodyME`/`TwoBodyChannel`/`ModelSpace`、
       `Commutator.cc`、`Generator.cc`、`IMSRGSolver.cc` 和现有测试，确定哪些
       SR contractions 在分数占据下已等于 MR 公式的公共部分；公共 2B/1B
@@ -225,8 +228,27 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       (`354.53 s`) 均通过。point7 generator jobs
       `100401/100403/100405/100407` 完成四核 full-flow；新旧 J64 全局
       max-abs `9.308e-13 MeV`，12 条低能谱最大变化 `1.137e-13 MeV`。
-- [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
-      Magnus/重启策略；登录节点禁止重计算，统一由 point7 Slurm 运行。
+- [x] 在当前 Python/QCombo 环境重新执行
+      `refs/qcombo/examples/MR_IMSRG2.ipynb`，把重生的 0B/1B/2B 项数、
+      系数和指标序与 `MRCommutator.cc` 的命名项逐项记录。规范化 LaTeX
+      输出 SHA-256 为 `431b893e...1a629a57`，完整环境、项数和映射见
+      `docs/MR-IMSRG-J-scheme公式与代码映射.md` Sec. 3.1。
+- [ ] 在根目录生产 `gen_job.py` 增加显式、一次只生成一个参数点的
+      `--mr-jscheme` 模式；冻结 C++ direct-flow 参数、输入/reference
+      SHA-256、累计 `start_s/target_s`、该段 `smax`、J64/no2bpack 输出和
+      point7 Slurm 环境。既有 SR/VS 参数路径不得改变。
+- [ ] 用同一 emax2/4 Hamiltonian 验证 direct flow 的连续运行与 J64
+      分段重启：比较终点完整 vacuum 0B/1B/2B、流诊断和输出校验和；只有
+      数值等价通过后，J64 才能称为 Hamiltonian checkpoint/restart。
+- [ ] 用 `gen_job.py --mr-jscheme` 在 point7 提交 `He4 Nrefmax=2, emax=4`
+      完整收敛流；先 `sbatch --test-only`，再检查队列和日志。记录步数、
+      终止原因、wall/RSS、`eta`/被选中解耦残差、Hermiticity 和输出哈希。
+- [ ] 对 emax4 流后 J64 与 no2bpack 做独立 NCSM 读回，比较 float64/float32
+      谱，并把 ODE 容差收紧十倍后最低能级变化控制在 `<1 keV`。
+- [ ] 根据 emax4 全流的实测步数、峰值内存和 checkpoint 体积决定是否直接
+      启动 emax6 完整 direct flow；若分段重启仍不足，再单独设计并验收
+      MR Magnus/restart。不得在没有同一 RHS/短流/谱回归时把 Magnus 接入
+      生产结果。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

@@ -247,6 +247,41 @@ point7 jobs `100401/100403/100405/100407` 又完成四核全流；C++/Python
 `0.725 s` 和现有 SR commutator `0.611 s`，足以进入大空间完整流与
 积分/Magnus/重启策略的实测门禁。
 
+### 5.1 当前下一阶段：大空间 direct flow 与可恢复运行
+
+下一阶段不直接跳到 Magnus。先把现有、已经在 emax2 验收的 direct ODE
+路径变成一条可复现的单参数生产作业，并用 emax4 实测回答是否真的需要
+Magnus。执行顺序固定为：
+
+1. 在当前环境重新执行 QCombo `MR_IMSRG2.ipynb`，把输出的 0B/1B/2B
+   contractions 与生产 `MRCommutator.cc`、慢速 J-scheme reference 和
+   Python m-scheme oracle 三方核对。该步骤只重生独立证据，不修改已经
+   通过数值门禁的公式来迎合 notebook 输出。
+2. 根目录 `gen_job.py` 增加独立 `--mr-jscheme` 模式；每次只接受一个核、
+   一个 `Nrefmax`、一个 `emax` 和一个累计目标 `s`。脚本必须记录 git
+   commit、输入/reference SHA-256、ODE 控制、point7 资源以及两种物化
+   输出，且拒绝覆盖现有结果目录。
+3. direct flow 的恢复语义冻结为 Hamiltonian 分段：上一段导出的 vacuum
+   J64 作为下一段 `fmt2=jcoupled64` 输入；同一 reference 重新执行
+   HO→NAT→MR 正规序后积分 `target_s-start_s`。`start_s/target_s` 只记录
+   累计物理流参数，solver 收到的 `smax` 是本段长度。先在 emax2，再在
+   emax4 比较 `0→S` 与 `0→S1→S` 的完整 0B/1B/2B，而不是只比能量。
+4. 通过连续/分段等价后，由 `gen_job.py` 在 point7 提交
+   `He4 Nrefmax=2, emax=4` 完整 direct flow。提交前执行
+   `sbatch --test-only` 并逐项检查 interaction/reference、commit、
+   `fmt2/3bme`、截断、生成元、`BetaCM`、ODE 容差、partition、线程和
+   输出路径；提交后检查队列及日志已经越过 module/reader 初始化。
+5. emax4 终点必须同时通过 lossless J64 和 float32 no2bpack 的独立 NCSM
+   读回，并重复一次十倍更严 ODE 容差。只有收敛残差、谱稳定性、wall、
+   峰值 RSS 和 checkpoint 体积都有实测记录，才外推 emax6 完整流。
+6. 若 emax6 direct flow 可由分段 checkpoint 安全完成，则暂不实现 Magnus；
+   若 wall/checkpoint 证明确有必要，再把 MR Magnus 当成新门禁，从同一
+   RHS、短流、真空物化和后 NCSM 谱逐层验收，不能只比较零体项。
+
+这条路径不改变既有 SR/VS `gen_job.py` 默认参数，也不把 J64 checkpoint
+当成严格的 ODE 内部状态恢复：它是从物化后的 Hamiltonian 开始下一段自主
+流。连续/分段差异必须作为 ODE 误差单独量化并随结果保存。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；
@@ -257,6 +292,8 @@ point7 jobs `100401/100403/100405/100407` 又完成四核全流；C++/Python
 6. solver/driver 集成和真实体系 `s=0`/short-flow 验收；
 7. 完整流、物化、NCSM 与性能验收。
 8. reference embedding、真实 emax4/6 RHS/短流和 profiler 驱动优化。
+9. QCombo 再审计、单点 Slurm 生成器、direct-flow 分段等价和 emax4
+   完整流/NCSM；依据实测再决定 emax6 direct flow 或 MR Magnus。
 
 每个边界在自身测试通过后立即独立 commit。任何一个未通过 Gate 1--4
 的中间实现都不能用于新物理结果。
