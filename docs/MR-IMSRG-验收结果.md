@@ -474,3 +474,20 @@ emax4/emax6 短流相对 `cef4fce6` 均逐字节相同，墙钟降为
 `1.990e-13 MeV`。所以 `dea9125b` 已通过完整流、真空物化和后 NCSM 谱
 三层验收；后续性能工作应转向现有 White-NCSM generator，而不是继续改写
 已经不再主导耗时的 MR V contraction。
+
+White-NCSM generator 随后按 Vobig Eqs. (6.5.31--34) 做了纯缓存优化：
+每个 RHS 只跨 J 计算一次完整有序轨道对的 `Gamma_ijij` monopole 表，原
+分母表达式、算术次序、`Delta e` 掩码、占据权重和 cutoff 均不变。
+commit `6e02676c` 的 emax4/emax6 短流相对 `dea9125b` 逐字节相同；
+generator update 由 `0.1112/2.191 s` 降至 `0.00324/0.0426 s`，总时由
+`0.312/4.15 s` 降至 `0.222/1.98 s`。分母逐项、SR/MR driver、emax2
+Python oracle (`3.106e-12 MeV`) 和随机全活跃相关参考 CTest
+(`354.53 s`) 全部通过。
+
+point7 generator jobs `100401/100403/100405/100407` 随后重复四核
+`s=100, rtol=atol=1e-10` 全流。He4/Be8/C12/O16 的 C++/Python 最坏差
+为 `2.212e-8/3.898e-8/8.871e-10/1.071e-9 MeV`；相对 skinny 版 J64
+的 0B/1B/2B 全局最坏差为 `9.308e-13/2.895e-13/6.484e-14 MeV`。
+`simpleFCI` 按 `Nmax=8/0/0/2` 重算 12 条低能谱，最大变化
+`1.137e-13 MeV`。因此 monopole 缓存通过完整流、真空物化和后 NCSM 谱
+三层验收。

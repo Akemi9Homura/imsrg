@@ -215,6 +215,16 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `cef4fce6` 的 J64 全局 max-abs 为 `8.527e-13 MeV`，12 条低能谱
       全局最坏变化 `1.990e-13 MeV`，因此 skinny 构造已通过完整流、
       真空物化和后 NCSM 三层门禁。
+- [x] 复用 White-NCSM 分母中每个 RHS 内不变的有序轨道对 monopole，
+      避免每个 2B bra/ket、正反方向重复跨 J 求和；保持 Vobig
+      Eqs. (6.5.31--34) 的算术次序、`Delta e` 掩码、权重和 cutoff 不变。
+      commit `6e02676c` 的 emax4/emax6 短流均与 `dea9125b` 逐字节相同，
+      generator 分别由 `0.1112 -> 0.00324 s`、`2.191 -> 0.0426 s`，总时
+      由 `0.312 -> 0.222 s`、`4.15 -> 1.98 s`。分母逐项、SR/MR driver、
+      emax2 Python oracle (`3.106e-12 MeV`) 和随机全活跃参考 CTest
+      (`354.53 s`) 均通过。point7 generator jobs
+      `100401/100403/100405/100407` 完成四核 full-flow；新旧 J64 全局
+      max-abs `9.308e-13 MeV`，12 条低能谱最大变化 `1.137e-13 MeV`。
 - [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
       Magnus/重启策略；登录节点禁止重计算，统一由 point7 Slurm 运行。
 

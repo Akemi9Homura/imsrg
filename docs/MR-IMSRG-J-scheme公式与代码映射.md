@@ -204,6 +204,13 @@ cutoff，再作 `eta=D/Delta-(D/Delta)^dagger`；不能先反厄米化分子再�
 `<1e-12`；分数占据 Be8 随机算符对 Python m-scheme 的全部 1B/J-coupled
 2B block 误差 `<2e-11`。
 
+实现 commit `6e02676c` 只缓存上述公式反复使用的
+`GammaMono(a,b)=GammaMono(a,b,a,b)`：每次 `Generator::Update()` 针对
+当前 Hamiltonian 构造一次完整有序轨道对表，随后 1B/2B 的正反方向分母
+按原表达式查表。缓存不跨 RHS 复用，因此不会把随流变化的二体矩阵元冻结；
+它也不改变方向权重、`Delta e` 掩码、cutoff 或反厄米化顺序。emax4/6
+短流相对未缓存实现逐字节相同，且分母 Python oracle 与四核完整流门均通过。
+
 ## 8. 直接流 solver 接线
 
 `IMSRGSolver::SetMRReference()` 显式保存调用方拥有的 reference context；

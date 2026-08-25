@@ -233,6 +233,20 @@ He4/Be8/C12/O16 的 C++/Python 全流最坏差依次为
 不再继续改 MR V 项，而是先剖析和复用现有 White-NCSM generator 路径，
 再根据 emax4/6 实测外推决定大空间完整流及 Magnus/重启策略。
 
+这一步现已在 commit `6e02676c` 完成。Vobig Eqs. (6.5.31--34) 只依赖
+随当前 Hamiltonian 更新、但在一次生成元构造内反复复用的对角 monopole
+`Gamma_ijij`；实现每个 RHS 先构造一次完整有序轨道对表，再让原分母公式
+按原算术次序查表，不改变 `Delta e` 掩码、占据权重、cutoff 或分子。
+emax4/emax6 短流相对 `dea9125b` 均逐字节相同，generator update 从
+`0.1112/2.191 s` 降到 `0.00324/0.0426 s`，总墙钟从 `0.312/4.15 s`
+降到 `0.222/1.98 s`。随机全活跃参考长门用时 `354.53 s` 并通过。
+point7 jobs `100401/100403/100405/100407` 又完成四核全流；C++/Python
+最坏差保持为 `2.212e-8/3.898e-8/8.871e-10/1.071e-9 MeV`，新旧 J64
+全局 max-abs `9.308e-13 MeV`，12 条 NCSM 低能谱最大变化
+`1.137e-13 MeV`。该瓶颈已消除；emax6 当前主要耗时转为 MR addon
+`0.725 s` 和现有 SR commutator `0.611 s`，足以进入大空间完整流与
+积分/Magnus/重启策略的实测门禁。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；

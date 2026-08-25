@@ -1,5 +1,5 @@
 {
-  "schema": "mrimsrg_jscheme_full_flow_acceptance_v5",
+  "schema": "mrimsrg_jscheme_full_flow_acceptance_v6",
   "flow_commit": "d5cf2877594a856387f1179204ffad090867b54c",
   "validation": {
     "cpp_ode": "boost::odeint runge_kutta_dopri5",
@@ -310,6 +310,58 @@
         "nmax": 2,
         "ncsm_energies_mev": [-63.800524329407317, -55.634822811504939, -55.214536909283538],
         "ncsm_max_abs_vs_previous_mev": 1.9895196601282805e-13
+      }
+    ]
+  },
+  "performance_regression_after_white_ncsm_monopole_cache": {
+    "implementation_commit": "6e02676ce00e237efdbf6cb71df9315f7c576143",
+    "point7_checkout_commit": "6e02676ce00e237efdbf6cb71df9315f7c576143",
+    "target_s": 100.0,
+    "ode_tolerance": 1e-10,
+    "maximum_allowed_cpp_python_abs_mev": 1e-5,
+    "maximum_vacuum_h_abs_vs_previous_mev": 9.308109838457312e-13,
+    "maximum_ncsm_spectral_abs_vs_previous_mev": 1.1368683772161603e-13,
+    "passed": true,
+    "cases": [
+      {
+        "nucleus": "He4",
+        "nrefmax": 2,
+        "slurm_cpp_validation_job": 100401,
+        "cpp_python_max_abs_mev": 2.2121837122223343e-08,
+        "vacuum_h_max_abs_vs_previous_mev": {"zero_body": 5.3290705182007514e-14, "one_body": 1.5276668818842154e-13, "two_body": 3.6415315207705135e-14},
+        "nmax": 8,
+        "ncsm_energies_mev": [-20.490380467859811, -19.26106870651396, -19.20570286374495],
+        "ncsm_max_abs_vs_previous_mev": 1.1368683772161603e-13
+      },
+      {
+        "nucleus": "Be8",
+        "nrefmax": 0,
+        "slurm_cpp_validation_job": 100403,
+        "cpp_python_max_abs_mev": 3.898388312206044e-08,
+        "vacuum_h_max_abs_vs_previous_mev": {"zero_body": 9.308109838457312e-13, "one_body": 2.646771690706373e-13, "two_body": 4.707345624410664e-14},
+        "nmax": 0,
+        "ncsm_energies_mev": [-27.94059886415825, -23.308509007685284, -12.635185398541269],
+        "ncsm_max_abs_vs_previous_mev": 8.171241461241152e-14
+      },
+      {
+        "nucleus": "C12",
+        "nrefmax": 0,
+        "slurm_cpp_validation_job": 100405,
+        "cpp_python_max_abs_mev": 8.870841838870547e-10,
+        "vacuum_h_max_abs_vs_previous_mev": {"zero_body": 1.9184653865522705e-13, "one_body": 1.2168044349891716e-13, "two_body": 6.483702463810914e-14},
+        "nmax": 0,
+        "ncsm_energies_mev": [-43.5307894415402, -38.654833895790617, -27.775535036192657],
+        "ncsm_max_abs_vs_previous_mev": 1.1368683772161603e-13
+      },
+      {
+        "nucleus": "O16",
+        "nrefmax": 2,
+        "slurm_cpp_validation_job": 100407,
+        "cpp_python_max_abs_mev": 1.0712284392866422e-09,
+        "vacuum_h_max_abs_vs_previous_mev": {"zero_body": 2.6645352591003757e-13, "one_body": 2.8954616482224083e-13, "two_body": 6.217248937900877e-14},
+        "nmax": 2,
+        "ncsm_energies_mev": [-63.800524329407288, -55.634822811504982, -55.214536909283574],
+        "ncsm_max_abs_vs_previous_mev": 4.263256414560601e-14
       }
     ]
   }
