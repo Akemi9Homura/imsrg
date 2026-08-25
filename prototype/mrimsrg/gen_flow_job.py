@@ -488,7 +488,6 @@ def main() -> int:
                 ode_tolerance=ode_tolerance,
                 initial_step=args.sr_check_initial_step,
                 flow_tolerance=args.sr_check_flow_tolerance,
-                python_executable=args.mr_check_python,
             ),
         )
     else:
@@ -514,6 +513,7 @@ def main() -> int:
                 ode_tolerance=ode_tolerance,
                 initial_step=args.sr_check_initial_step,
                 flow_tolerance=args.sr_check_flow_tolerance,
+                python_executable=args.mr_check_python,
             ),
         )
     print(f"generated {script}")

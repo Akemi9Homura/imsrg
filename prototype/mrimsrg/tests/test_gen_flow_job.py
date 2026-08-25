@@ -12,10 +12,56 @@ from gen_flow_job import (
     generate_job,
     generate_mr_check_job,
     generate_sr_check_job,
+    main,
 )
 
 
 class FlowJobTests(unittest.TestCase):
+    def test_cli_routes_python_executable_to_correlated_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            reference = root / "prototype/mrimsrg/data/He4_Nrefmax2"
+            reference.mkdir(parents=True)
+            (reference / "metadata.json").write_text("{}\n", encoding="utf-8")
+            interaction = root / "interaction.minipack"
+            interaction.write_bytes(b"test")
+            flow = root / "flow"
+            flow.mkdir()
+            (flow / "metadata.json").write_text("{}\n", encoding="utf-8")
+            pyimsrg = root / "pyimsrg"
+            pyimsrg.mkdir()
+            (pyimsrg / "pyIMSRG.so").write_bytes(b"test")
+            python = root / "python3"
+            python.write_bytes(b"test")
+            result = root / "result"
+            arguments = [
+                "gen_flow_job.py",
+                "--nucleus",
+                "He4",
+                "--nrefmax",
+                "2",
+                "--interaction",
+                str(interaction),
+                "--mr-check-flow",
+                str(flow),
+                "--pyimsrg-dir",
+                str(pyimsrg),
+                "--mr-check-python",
+                str(python),
+                "--repo-root",
+                str(root),
+                "--result-root",
+                str(result),
+            ]
+            saved_arguments = sys.argv
+            try:
+                sys.argv = arguments
+                self.assertEqual(main(), 0)
+            finally:
+                sys.argv = saved_arguments
+            script = next(result.glob("*/job_*.sh"))
+            self.assertIn(f"{python} -u", script.read_text(encoding="utf-8"))
+
     def test_generates_one_correlated_full_flow_check(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
