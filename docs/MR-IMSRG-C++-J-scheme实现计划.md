@@ -247,6 +247,12 @@ Gate 6 的首个可复现基准也已完成。真实 `He4 Nrefmax=2`、单线程
 `docs/MR-IMSRG-Jscheme-performance.json`；这证明存储结构能外推，不等于
 已经完成 `emax=14` 的物理流。
 
+生产 `lambda2` 的 ordered particle-hole 收缩原先会同时保留所有
+J/parity/Tz 块的 `X/Y/Lambda` scratch；现改为逐块构造、BLAS 收缩后立即
+释放。解析峰值估算在 `emax=14` 由 `48.46 GB` 降为 `2.87 GB`，而真实
+He4(ref2) RHS 与 Python oracle 的 max-abs 仍为 `3.11e-12 MeV`。该数字只
+计算这项主要 cross-block scratch，不冒充整个进程的峰值 RSS。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和

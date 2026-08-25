@@ -53,12 +53,34 @@ def storage_row(pyimsrg, emax: int) -> dict[str, int]:
         modelspace.GetTwoBodyChannel(channel).GetNumberKets() ** 2
         for channel in range(modelspace.GetNumberTwoBodyChannels())
     )
+    orbits = [modelspace.GetOrbit(i) for i in range(j_orbits)]
+    max_j = max((first.j2 + second.j2) // 2 for first in orbits for second in orbits)
+    ordered_cross_dimensions = []
+    for angular_momentum in range(max_j + 1):
+        for parity in range(2):
+            for delta_tz in (-1, 0, 1):
+                dimension = sum(
+                    (first.l + second.l) % 2 == parity
+                    and first.tz2 - second.tz2 == 2 * delta_tz
+                    and abs(first.j2 - second.j2) <= 2 * angular_momentum
+                    and first.j2 + second.j2 >= 2 * angular_momentum
+                    for first in orbits
+                    for second in orbits
+                )
+                if dimension:
+                    ordered_cross_dimensions.append(dimension)
+    cross_elements_sum = sum(dimension**2 for dimension in ordered_cross_dimensions)
+    cross_elements_max = max(ordered_cross_dimensions) ** 2
     return {
         "emax": emax,
         "j_orbits": j_orbits,
         "m_orbits": m_orbits,
         "j_operator_bytes": 8 * (1 + j_orbits**2 + two_body_elements),
         "dense_m_two_body_bytes": 8 * m_orbits**4,
+        "ordered_cross_block_count": len(ordered_cross_dimensions),
+        "old_all_blocks_cross_scratch_peak_bytes": 8
+        * (3 * cross_elements_sum + 2 * cross_elements_max),
+        "one_block_cross_scratch_peak_bytes": 8 * 5 * cross_elements_max,
     }
 
 

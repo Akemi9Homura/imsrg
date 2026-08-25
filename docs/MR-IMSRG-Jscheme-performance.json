@@ -19,49 +19,70 @@
       "emax": 2,
       "j_operator_bytes": 13928,
       "j_orbits": 12,
-      "m_orbits": 40
+      "m_orbits": 40,
+      "old_all_blocks_cross_scratch_peak_bytes": 167872,
+      "one_block_cross_scratch_peak_bytes": 40960,
+      "ordered_cross_block_count": 33
     },
     {
       "dense_m_two_body_bytes": 3073280000,
       "emax": 4,
       "j_operator_bytes": 544456,
       "j_orbits": 30,
-      "m_orbits": 140
+      "m_orbits": 140,
+      "old_all_blocks_cross_scratch_peak_bytes": 6899040,
+      "one_block_cross_scratch_peak_bytes": 1128960,
+      "ordered_cross_block_count": 57
     },
     {
       "dense_m_two_body_bytes": 101964054528,
       "emax": 6,
       "j_operator_bytes": 7446536,
       "j_orbits": 56,
-      "m_orbits": 336
+      "m_orbits": 336,
+      "old_all_blocks_cross_scratch_peak_bytes": 93611968,
+      "one_block_cross_scratch_peak_bytes": 11236000,
+      "ordered_cross_block_count": 81
     },
     {
       "dense_m_two_body_bytes": 1517978880000,
       "emax": 8,
       "j_operator_bytes": 56333448,
       "j_orbits": 90,
-      "m_orbits": 660
+      "m_orbits": 660,
+      "old_all_blocks_cross_scratch_peak_bytes": 702458784,
+      "one_block_cross_scratch_peak_bytes": 67184640,
+      "ordered_cross_block_count": 105
     },
     {
       "dense_m_two_body_bytes": 13702319341568,
       "emax": 10,
       "j_operator_bytes": 293272808,
       "j_orbits": 132,
-      "m_orbits": 1144
+      "m_orbits": 1144,
+      "old_all_blocks_cross_scratch_peak_bytes": 3634028928,
+      "one_block_cross_scratch_peak_bytes": 287724960,
+      "ordered_cross_block_count": 129
     },
     {
       "dense_m_two_body_bytes": 87775950080000,
       "emax": 12,
       "j_operator_bytes": 1180884360,
       "j_orbits": 182,
-      "m_orbits": 1820
+      "m_orbits": 1820,
+      "old_all_blocks_cross_scratch_peak_bytes": 14565848608,
+      "one_block_cross_scratch_peak_bytes": 986446240,
+      "ordered_cross_block_count": 153
     },
     {
       "dense_m_two_body_bytes": 437890580480000,
       "emax": 14,
       "j_operator_bytes": 3942107400,
       "j_orbits": 240,
-      "m_orbits": 2720
+      "m_orbits": 2720,
+      "old_all_blocks_cross_scratch_peak_bytes": 48456392704,
+      "one_block_cross_scratch_peak_bytes": 2868280960,
+      "ordered_cross_block_count": 177
     }
   ],
   "timing_seconds_median": {

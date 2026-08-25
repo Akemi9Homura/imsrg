@@ -269,57 +269,44 @@ namespace
     }
   };
 
-  std::vector<OrderedCrossBlock> BuildOrderedCrossBlocks(
-      const Operator &X, const Operator &Y, const MRReference &reference)
+  OrderedCrossBlock BuildOrderedCrossBlock(
+      const Operator &X, const Operator &Y, const MRReference &reference,
+      int J, int parity, int delta_tz)
   {
     ModelSpace &modelspace = *X.modelspace;
     const size_t norbits = modelspace.GetNumberOrbits();
-    int max_J = 0;
+    OrderedCrossBlock block{J, parity, delta_tz, norbits, {},
+                            std::vector<int>(norbits * norbits, -1),
+                            {}, {}, {}};
     for (index_t a : modelspace.all_orbits)
       for (index_t b : modelspace.all_orbits)
-        max_J = std::max(max_J,
-                         (modelspace.GetOrbit(a).j2 + modelspace.GetOrbit(b).j2) / 2);
-    std::vector<OrderedCrossBlock> blocks;
-    for (int J = 0; J <= max_J; ++J)
-      for (int parity = 0; parity <= 1; ++parity)
-        for (int delta_tz = -1; delta_tz <= 1; ++delta_tz)
-        {
-          OrderedCrossBlock block{J, parity, delta_tz, norbits, {},
-                                  std::vector<int>(norbits * norbits, -1),
-                                  {}, {}, {}};
-          for (index_t a : modelspace.all_orbits)
-            for (index_t b : modelspace.all_orbits)
-            {
-              const Orbit &oa = modelspace.GetOrbit(a);
-              const Orbit &ob = modelspace.GetOrbit(b);
-              if ((oa.l + ob.l) % 2 != parity ||
-                  oa.tz2 - ob.tz2 != 2 * delta_tz ||
-                  std::abs(oa.j2 - ob.j2) > 2 * J || oa.j2 + ob.j2 < 2 * J)
-                continue;
-              block.pair_index[a * norbits + b] = block.pairs.size();
-              block.pairs.push_back({a, b});
-            }
-          if (block.pairs.empty())
-            continue;
-          const size_t dimension = block.pairs.size();
-          block.X.zeros(dimension, dimension);
-          block.Y.zeros(dimension, dimension);
-          block.Lambda.zeros(dimension, dimension);
-          for (size_t i = 0; i < dimension; ++i)
-            for (size_t j = 0; j < dimension; ++j)
-            {
-              const auto bra = block.pairs[i];
-              const auto ket = block.pairs[j];
-              block.X(i, j) = PandyaElement(X.TwoBody, modelspace, J,
-                                            bra[0], bra[1], ket[0], ket[1]);
-              block.Y(i, j) = PandyaElement(Y.TwoBody, modelspace, J,
-                                            bra[0], bra[1], ket[0], ket[1]);
-              block.Lambda(i, j) = PandyaElement(reference.Lambda2, modelspace, J,
-                                                 bra[0], bra[1], ket[0], ket[1]);
-            }
-          blocks.push_back(std::move(block));
-        }
-    return blocks;
+      {
+        const Orbit &oa = modelspace.GetOrbit(a);
+        const Orbit &ob = modelspace.GetOrbit(b);
+        if ((oa.l + ob.l) % 2 != parity ||
+            oa.tz2 - ob.tz2 != 2 * delta_tz ||
+            std::abs(oa.j2 - ob.j2) > 2 * J || oa.j2 + ob.j2 < 2 * J)
+          continue;
+        block.pair_index[a * norbits + b] = block.pairs.size();
+        block.pairs.push_back({a, b});
+      }
+    const size_t dimension = block.pairs.size();
+    block.X.zeros(dimension, dimension);
+    block.Y.zeros(dimension, dimension);
+    block.Lambda.zeros(dimension, dimension);
+    for (size_t i = 0; i < dimension; ++i)
+      for (size_t j = 0; j < dimension; ++j)
+      {
+        const auto bra = block.pairs[i];
+        const auto ket = block.pairs[j];
+        block.X(i, j) = PandyaElement(X.TwoBody, modelspace, J,
+                                      bra[0], bra[1], ket[0], ket[1]);
+        block.Y(i, j) = PandyaElement(Y.TwoBody, modelspace, J,
+                                      bra[0], bra[1], ket[0], ket[1]);
+        block.Lambda(i, j) = PandyaElement(reference.Lambda2, modelspace, J,
+                                           bra[0], bra[1], ket[0], ket[1]);
+      }
+    return block;
   }
 
   MRCommutator::MR1BResult CompleteOneBodyParts(const arma::cube &raw,
@@ -401,31 +388,35 @@ namespace MRCommutator
     }
 
     // V: full ordered particle-hole pairs keep the sign of tz_a-tz_b.
-    const std::vector<OrderedCrossBlock> cross_blocks =
-        BuildOrderedCrossBlocks(X, Y, reference);
-    for (const OrderedCrossBlock &block : cross_blocks)
-    {
-      const arma::mat xly = block.X * block.Lambda * block.Y;
-      const arma::mat ylx = block.Y * block.Lambda * block.X;
-      const double angular_weight = 2 * block.J + 1.0;
-      for (index_t one : modelspace.all_orbits)
-        for (index_t two : modelspace.all_orbits)
+    for (int J = 0; J <= max_J; ++J)
+      for (int parity = 0; parity <= 1; ++parity)
+        for (int delta_tz = -1; delta_tz <= 1; ++delta_tz)
         {
-          const Orbit &o1 = modelspace.GetOrbit(one);
-          const Orbit &o2 = modelspace.GetOrbit(two);
-          if (o1.l != o2.l || o1.j2 != o2.j2 || o1.tz2 != o2.tz2)
+          const OrderedCrossBlock block = BuildOrderedCrossBlock(
+              X, Y, reference, J, parity, delta_tz);
+          if (block.pairs.empty())
             continue;
-          for (index_t t : modelspace.all_orbits)
-          {
-            const int ibra = block.Find(one, t);
-            const int iket = block.Find(two, t);
-            if (ibra < 0 || iket < 0)
-              continue;
-            raw(one, two, 1) += 0.5 * angular_weight / (o1.j2 + 1.0) *
-                                (xly(ibra, iket) - ylx(ibra, iket));
-          }
+          const arma::mat xly = block.X * block.Lambda * block.Y;
+          const arma::mat ylx = block.Y * block.Lambda * block.X;
+          const double angular_weight = 2 * block.J + 1.0;
+          for (index_t one : modelspace.all_orbits)
+            for (index_t two : modelspace.all_orbits)
+            {
+              const Orbit &o1 = modelspace.GetOrbit(one);
+              const Orbit &o2 = modelspace.GetOrbit(two);
+              if (o1.l != o2.l || o1.j2 != o2.j2 || o1.tz2 != o2.tz2)
+                continue;
+              for (index_t t : modelspace.all_orbits)
+              {
+                const int ibra = block.Find(one, t);
+                const int iket = block.Find(two, t);
+                if (ibra < 0 || iket < 0)
+                  continue;
+                raw(one, two, 1) += 0.5 * angular_weight / (o1.j2 + 1.0) *
+                                    (xly(ibra, iket) - ylx(ibra, iket));
+              }
+            }
         }
-    }
 
     // VI: lambda*Y and lambda*X remove the innermost (r,v) sum by BLAS.
     for (index_t one : modelspace.all_orbits)

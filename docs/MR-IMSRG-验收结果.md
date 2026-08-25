@@ -395,3 +395,6 @@ Hamiltonian。四核全局 max-abs 依次为
 尺寸而不分配算符的存储表延伸到 `emax=14`，证明生产主存储按 J-channel
 而非完整 magnetic-substate 四指标张量增长。复现命令和机器数据见
 [`MR-IMSRG-Jscheme-performance.json`](MR-IMSRG-Jscheme-performance.json)。
+同一解析还发现 ordered particle-hole 收缩不应同时保留全部 J/parity/Tz
+块；改成逐块构造和释放后，该项 `emax=14` scratch 估算由 `48.46 GB`
+降到 `2.87 GB`，公式与数值结果不变。
