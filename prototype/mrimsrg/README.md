@@ -11,7 +11,8 @@ Build the input bridge:
 cmake -S prototype/mrimsrg -B prototype/mrimsrg/build \
   -DSHELL_MODEL_OBS_ROOT=/home/mengziyan/shell-model-obs \
   -DCMAKE_BUILD_TYPE=Release
-cmake --build prototype/mrimsrg/build --target mrimsrg_prepare mrimsrg_validate -j2
+cmake --build prototype/mrimsrg/build \
+  --target mrimsrg_prepare mrimsrg_validate mrimsrg_export_no2bpack -j2
 ```
 
 Prepare and check the first He4 reference:
@@ -145,6 +146,41 @@ reproduces the complete 3060-dimensional He4 result as
 lowest states (or the complete space when its dimension is smaller) and
 prints each energy, excitation energy, and `2J`; `--states` changes that
 small readback list without introducing another solver.
+
+Export the same vacuum Hamiltonian in the packed J-coupled format understood
+by both NCSM and FCIQMC:
+
+```bash
+prototype/mrimsrg/build/mrimsrg_export_no2bpack \
+  --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack \
+  --flow-output prototype/mrimsrg/data/He4_flow_rtol1e-6 \
+  --output He4_mrimsrg.no2bpack --Z 2 --N 2
+```
+
+The exporter uses the fixed interaction only for the verified HO orbit table.
+It projects the final vacuum m-scheme one- and two-body tensors onto scalar
+J-coupled matrix elements with the same `shell-model-obs` Clebsch--Gordan,
+pair normalization, phase and channel conventions used in the forward
+coupling. It then reconstructs the complete m-scheme tensors and refuses to
+write unless the maximum discrepancy is below `--scalar-tolerance` (default
+`1e-9 MeV`). A checkpoint directory containing `vacuum_mscheme.bin` can be
+passed in place of the final flow directory.
+
+Read the exported file through the independent native `no2bpack` reader and
+the same NCSM solver with:
+
+```bash
+prototype/mrimsrg/build/mrimsrg_validate \
+  --no2bpack He4_mrimsrg.no2bpack \
+  --Z 2 --N 2 --nmax 8 --states 3
+```
+
+Use `beta_cm=0` in downstream NCSM/FCIQMC calculations. The format stores its
+zero-body term as `double`, but OBMEs and TBMEs as `float`; retain the original
+NPY/dense payload as the internal double-precision result and use spectral
+readback to quantify the expected packed-format rounding. Every nucleus has
+an A-dependent intrinsic Hamiltonian, so files exported for different nuclei
+must not be interchanged.
 
 The bridge requires NumPy and SciPy on the Python side.  The first checked
 integration run used `shell-model-obs` revision `1687f16` and reproduced the

@@ -3,11 +3,9 @@
 #include "fci_util.hpp"
 #include "fixed_interaction.hpp"
 #include "util.hpp"
+#include "vacuum_mscheme_io.hpp"
 
-#include <array>
-#include <cstdint>
 #include <filesystem>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
@@ -26,6 +24,7 @@ struct Options
 {
     fs::path interaction;
     fs::path flow_output;
+    fs::path no2bpack;
     int Z = -1;
     int N = -1;
     int nmax = 0;
@@ -37,7 +36,8 @@ struct Options
 {
     throw std::invalid_argument(
         message +
-        "\nusage: mrimsrg_validate --interaction FILE --flow-output DIR --Z Z --N N "
+        "\nusage: mrimsrg_validate (--interaction FILE --flow-output DIR | --no2bpack FILE) "
+        "--Z Z --N N "
         "[--nmax N] [--max-iter N] [--states N]");
 }
 
@@ -54,6 +54,8 @@ Options parse_options(int argc, char **argv)
             options.interaction = value;
         else if (key == "--flow-output")
             options.flow_output = value;
+        else if (key == "--no2bpack")
+            options.no2bpack = value;
         else if (key == "--Z")
             options.Z = std::stoi(value);
         else if (key == "--N")
@@ -67,19 +69,19 @@ Options parse_options(int argc, char **argv)
         else
             usage_error("unknown option " + key);
     }
-    if (options.interaction.empty() || options.flow_output.empty() || options.Z < 0 || options.N < 0)
-        usage_error("--interaction, --flow-output, --Z and --N are required");
+    const bool dense_input = !options.interaction.empty() || !options.flow_output.empty();
+    const bool packed_input = !options.no2bpack.empty();
+    if (dense_input == packed_input)
+        usage_error("select exactly one input: --interaction/--flow-output or --no2bpack");
+    if (dense_input && (options.interaction.empty() || options.flow_output.empty()))
+        usage_error("dense input requires both --interaction and --flow-output");
+    if (options.Z < 0 || options.N < 0)
+        usage_error("--Z and --N are required");
     if (options.nmax < 0 || options.max_iter <= 0 || options.states <= 0)
         usage_error("invalid Nmax, iteration limit, or state count");
     return options;
 }
 
-template <typename T> void read_exact(std::ifstream &stream, T *destination, std::size_t count, const char *field)
-{
-    stream.read(reinterpret_cast<char *>(destination), static_cast<std::streamsize>(count * sizeof(T)));
-    if (!stream)
-        throw std::runtime_error(std::string("truncated bridge payload while reading ") + field);
-}
 } // namespace
 
 int main(int argc, char **argv)
@@ -89,37 +91,24 @@ int main(int argc, char **argv)
         nucleus::log_init(nucleus::LogLevel::Info);
         const Options options = parse_options(argc, argv);
         const int A = options.Z + options.N;
-        mrimsrg::require_fixed_interaction(options.interaction);
         Hamiltonian hamiltonian;
-        hamiltonian.read_minipack(options.interaction.string(), A, 0.0);
-        hamiltonian.init_mscheme();
-
-        const fs::path payload_path = options.flow_output / "vacuum_mscheme.bin";
-        std::ifstream payload(payload_path, std::ios::binary);
-        if (!payload)
-            throw std::runtime_error("cannot open bridge payload: " + payload_path.string());
-        std::array<char, 16> magic{};
-        read_exact(payload, magic.data(), magic.size(), "magic");
-        const std::array<char, 16> expected = {'m', 'r', 'i', 'm', 's', 'r', 'g', '_',
-                                               'm', '_', 'v', '1', 0,   0,   0,   0};
-        if (magic != expected)
-            throw std::runtime_error("unsupported MR-IMSRG bridge payload");
-        std::uint64_t norb_file = 0;
-        double zero_body = 0.0;
-        read_exact(payload, &norb_file, 1, "norb");
-        read_exact(payload, &zero_body, 1, "zero body");
-        const std::size_t norb = hamiltonian.get_mbasis().m_orbit_number();
-        if (norb_file != norb)
-            throw std::runtime_error("bridge payload orbit count does not match interaction basis");
-        Eigen::MatrixXd one_body(norb, norb);
-        for (std::size_t p = 0; p < norb; ++p)
-            for (std::size_t q = 0; q < norb; ++q)
-                read_exact(payload, &one_body(p, q), 1, "one body");
-        std::vector<double> two_body(norb * norb * norb * norb);
-        read_exact(payload, two_body.data(), two_body.size(), "two body");
-        if (payload.peek() != std::ifstream::traits_type::eof())
-            throw std::runtime_error("bridge payload contains trailing data");
-        hamiltonian.replace_mscheme(zero_body, one_body, two_body);
+        if (!options.no2bpack.empty())
+        {
+            hamiltonian.read_no2bpack(options.no2bpack.string(), A, 0.0);
+            hamiltonian.init_mscheme();
+        }
+        else
+        {
+            mrimsrg::require_fixed_interaction(options.interaction);
+            hamiltonian.read_minipack(options.interaction.string(), A, 0.0);
+            hamiltonian.init_mscheme();
+            const auto dense = mrimsrg::read_vacuum_mscheme(
+                mrimsrg::resolve_vacuum_payload(options.flow_output));
+            const std::size_t norb = hamiltonian.get_mbasis().m_orbit_number();
+            if (dense.norb != norb)
+                throw std::runtime_error("bridge payload orbit count does not match interaction basis");
+            hamiltonian.replace_mscheme(dense.zero_body, dense.one_body, dense.two_body);
+        }
 
         CI_truncation truncation;
         truncation.hw_trunc.hw = hamiltonian.get_jbasis().min_2n_l(options.Z, options.N) + options.nmax;
