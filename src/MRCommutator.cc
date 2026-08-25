@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include <omp.h>
+
 namespace
 {
   int Hermiticity(const Operator &op)
@@ -351,6 +353,7 @@ namespace MRCommutator
   MR1BResult comm221_lambda2(const Operator &X, const Operator &Y,
                              const MRReference &reference)
   {
+    const double total_start = omp_get_wtime();
     if (X.modelspace != Y.modelspace || X.modelspace != reference.modelspace)
       throw std::invalid_argument("MR lambda2 commutator inputs use different ModelSpace objects");
     if (X.GetJRank() != 0 || Y.GetJRank() != 0 || X.GetTRank() != 0 ||
@@ -364,10 +367,13 @@ namespace MRCommutator
       for (index_t b : modelspace.all_orbits)
         max_J = std::max(max_J,
                          (modelspace.GetOrbit(a).j2 + modelspace.GetOrbit(b).j2) / 2);
+    double section_start = omp_get_wtime();
     const StandardProducts products = BuildStandardProducts(X, Y, reference);
     arma::cube raw(norbits, norbits, 3, arma::fill::zeros);
+    X.profiler.timer["MR comm221 lambda2 setup"] += omp_get_wtime() - section_start;
 
     // IV: ordinary pair-coupled X lambda Y products.
+    section_start = omp_get_wtime();
     const size_t nch = modelspace.GetNumberTwoBodyChannels();
     for (size_t ch = 0; ch < nch; ++ch)
     {
@@ -386,8 +392,10 @@ namespace MRCommutator
                                  MatrixElement(products.YLX[ch], channel, one, t, two, t));
         }
     }
+    X.profiler.timer["MR comm221 lambda2 IV"] += omp_get_wtime() - section_start;
 
     // V: full ordered particle-hole pairs keep the sign of tz_a-tz_b.
+    section_start = omp_get_wtime();
     for (int J = 0; J <= max_J; ++J)
       for (int parity = 0; parity <= 1; ++parity)
         for (int delta_tz = -1; delta_tz <= 1; ++delta_tz)
@@ -417,8 +425,10 @@ namespace MRCommutator
               }
             }
         }
+    X.profiler.timer["MR comm221 lambda2 V"] += omp_get_wtime() - section_start;
 
     // VI: lambda*Y and lambda*X remove the innermost (r,v) sum by BLAS.
+    section_start = omp_get_wtime();
     for (index_t one : modelspace.all_orbits)
       for (index_t two : modelspace.all_orbits)
       {
@@ -462,7 +472,10 @@ namespace MRCommutator
             }
           }
       }
-    return CompleteOneBodyParts(raw, output_hermiticity);
+    X.profiler.timer["MR comm221 lambda2 VI"] += omp_get_wtime() - section_start;
+    MR1BResult result = CompleteOneBodyParts(raw, output_hermiticity);
+    X.profiler.timer["MR comm221 lambda2 total"] += omp_get_wtime() - total_start;
+    return result;
   }
 
   Operator Commutator(const Operator &X, const Operator &Y,
@@ -474,11 +487,14 @@ namespace MRCommutator
     if (reference.Lambda2.Norm() == 0.0)
       return result;
 
+    const double addon_start = omp_get_wtime();
     const MR1BResult lambda2_one_body = comm221_lambda2(X, Y, reference);
     result.OneBody += lambda2_one_body.Total();
     // Hergert Eq. (49): contract lambda2 with the completed 2B commutator,
     // including 1B--2B as well as both 2B--2B topologies.
     result.ZeroBody += reference.ContractLambda2(result.TwoBody);
+    X.profiler.timer["MR lambda2 commutator addons"] +=
+        omp_get_wtime() - addon_start;
     return result;
   }
 }
