@@ -807,3 +807,6 @@ add_test(NAME MRDriver COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRDriver
                                --imsrg-executable $<TARGET_FILE:imsrg++>)
 add_test(NAME MRSRDriver COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRSRDriver.py
                                  $<TARGET_FILE:imsrg++>)
+add_test(NAME MRCorrelatedDriver
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRCorrelatedDriver.py
+                 $<TARGET_FILE:imsrg++>)

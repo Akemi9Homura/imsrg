@@ -88,9 +88,11 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 
 - [x] 先用随机 `Jref=0` 标量 Hamiltonian 和合法 `lambda2` 比较每个
       新 J-scheme MR contraction 展开后的完整 m-scheme 张量。
-- [ ] 对 `Be8/C12, Nrefmax=0` 与 `He4/O16, Nrefmax=2` 使用同一份
-      float64 Hamiltonian/RDM，比较 `E/f/Gamma`、生成元、每个 RHS
-      contraction 和总 RHS。
+- [x] 对 `Be8/C12, Nrefmax=0` 与 `He4/O16, Nrefmax=2` 使用同一份
+      float64 Hamiltonian/RDM，比较 `E/f/Gamma`、生成元和总 RHS；四体系
+      max-abs 上界分别为 `6.51e-11/9.98e-13/7.06e-11 MeV`。
+- [ ] 把上述四个真实点的总 RHS 继续拆为每个命名 SR contraction 与
+      `mr_lambda2_one_body/zero_body`，记录 max-abs/Frobenius/最坏元素。
 - [ ] 比较 `ds=1e-4` Euler 一步与 `s=0.001,0.002,0.003` 共同固定步
       RK4 checkpoints，每点重新比较 `H/eta/RHS`。
 - [ ] 统一生成元/cutoff/停止条件/容差后比较完整流、真空

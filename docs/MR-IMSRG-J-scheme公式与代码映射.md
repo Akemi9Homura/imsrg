@@ -259,6 +259,13 @@ dispatcher 结果，不执行 MR 浮点加法。真实 `He4/O16 Nrefmax=0` 进�
 闭壳层 `Delta e` 选择相同时，`s=0` 和一完整 RK4 步后的真空 Hamiltonian
 0/1/2B 逐元素完全一致。
 
+同一验证框架已用于四个非零 cumulant reference：`He4/O16 Nrefmax=2`、
+`Be8/C12 Nrefmax=0`。先由 J64 读取同一 float64 vacuum Hamiltonian，再在
+C++ 与 Python 各自完成自然变换、MR 正规序、White-NCSM 和总 commutator。
+四体系合并的 `E/f/Gamma`、`eta`、总 RHS max-abs 分别不超过
+`6.51e-11`、`9.98e-13`、`7.06e-11 MeV`。因此当前 J-coupled 公式在真实
+输入上也通过总和门禁；命名项的真实误差表仍单独保留为下一验收边界。
+
 随机严格标量张量要求 J/m 转换 `<=1e-12`；真实 RDM 的输入标量投影
 残差单独报告并暂以 `1e-10` 为拒绝阈值。所有能量/RHS contraction 的
 coupled 对 m-scheme 误差仍要求 `<=1e-10 MeV`。

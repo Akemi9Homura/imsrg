@@ -210,6 +210,14 @@ vacuum 0/1/2B float64 矩阵元全部逐元素为零。这一回归通过 refere
 内容判断零 cumulant，不含 He4/O16 核名分支。下一层仍需单独报告真实
 denominator/eta/named RHS 的误差表，并扩展到相关 Be8/C12/O16 reference。
 
+相关 reference 的同层真实门禁现已扩展到 `He4/O16 Nrefmax=2` 与
+`Be8/C12 Nrefmax=0`。相对 Python m-scheme，四体系自然基 `E/f/Gamma`、
+`eta(s=0)`、总 `RHS(s=0)` 的全局 max-abs 上界依次为
+`6.51e-11/9.98e-13/7.06e-11 MeV`，均通过 `1e-10 MeV` 门槛。每个体系的
+主 driver 在 `s=0` 和 `ds=1e-4` RK4 后又分别与直接 C++ 路径逐元素为零。
+尚未勾销的是把这些真实 RHS 进一步拆成每个命名 contraction，以及共同
+`s=0.001,0.002,0.003` checkpoints；不能用当前总 RHS 结果替代这两项。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和
