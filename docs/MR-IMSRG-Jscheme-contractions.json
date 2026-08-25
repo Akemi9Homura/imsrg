@@ -1,0 +1,1383 @@
+{
+  "comparison_input": "the same float64 J-representable Hamiltonian and RDM expanded independently to m-scheme",
+  "schema": "mrimsrg_named_contractions_v1",
+  "systems": {
+    "Be8": {
+      "fixture": "Be8_Nrefmax0_final",
+      "named_contractions": {
+        "comm110ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": -0.03345963704589371,
+            "expected_at_worst_mev": -0.03345963704589371,
+            "expected_frobenius_mev": 0.03345963704589371,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm111ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.5750308217218808,
+            "expected_at_worst_mev": 0.5750308217218809,
+            "expected_frobenius_mev": 1.2204405672970717,
+            "frobenius_mev": 2.220717083251841e-16,
+            "max_abs_mev": 1.1102230246251565e-16,
+            "relative_frobenius": 1.8196028080008001e-16,
+            "worst_mscheme_index": [
+              2,
+              38
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm121ss": {
+          "one_body": {
+            "actual_at_worst_mev": -0.2309483288075342,
+            "expected_at_worst_mev": -0.23094832880753427,
+            "expected_frobenius_mev": 0.8333986774417771,
+            "frobenius_mev": 1.3539527842893048e-16,
+            "max_abs_mev": 8.326672684688674e-17,
+            "relative_frobenius": 1.6246159502501667e-16,
+            "worst_mscheme_index": [
+              1,
+              1
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm122ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": -4.270869109993889,
+            "expected_at_worst_mev": -4.270869109993891,
+            "expected_frobenius_mev": 97.46946180542355,
+            "frobenius_mev": 2.2186163145412202e-14,
+            "max_abs_mev": 1.7763568394002505e-15,
+            "relative_frobenius": 2.2762168513561735e-16,
+            "worst_mscheme_index": [
+              0,
+              2,
+              28,
+              39
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm220ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": -18.199664331357315,
+            "expected_at_worst_mev": -18.199664331357315,
+            "expected_frobenius_mev": 18.199664331357315,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm221ss": {
+          "one_body": {
+            "actual_at_worst_mev": -6.100454488203896,
+            "expected_at_worst_mev": -6.100454488203901,
+            "expected_frobenius_mev": 14.561818294728363,
+            "frobenius_mev": 8.070565735577245e-15,
+            "max_abs_mev": 5.329070518200751e-15,
+            "relative_frobenius": 5.542278836495943e-16,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm222_phss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": -1.1903033638700582,
+            "expected_at_worst_mev": -1.1903033638700595,
+            "expected_frobenius_mev": 43.62864247075161,
+            "frobenius_mev": 2.7156209744866135e-14,
+            "max_abs_mev": 1.3322676295501878e-15,
+            "relative_frobenius": 6.224399432797274e-16,
+            "worst_mscheme_index": [
+              10,
+              15,
+              15,
+              10
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm222_pp_hhss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": -2.4325058886951947,
+            "expected_at_worst_mev": -2.4325058886951956,
+            "expected_frobenius_mev": 27.770462009218768,
+            "frobenius_mev": 7.471045812943885e-15,
+            "max_abs_mev": 8.881784197001252e-16,
+            "relative_frobenius": 2.6902850267538846e-16,
+            "worst_mscheme_index": [
+              0,
+              2,
+              0,
+              2
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "mr_lambda2_one_body": {
+          "one_body": {
+            "actual_at_worst_mev": -2.2263000524162964,
+            "expected_at_worst_mev": -2.2263000524162972,
+            "expected_frobenius_mev": 5.045115000348796,
+            "frobenius_mev": 2.0374342160666623e-15,
+            "max_abs_mev": 8.881784197001252e-16,
+            "relative_frobenius": 4.038429680841376e-16,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          }
+        },
+        "mr_lambda2_zero_body": {
+          "zero_body": {
+            "actual_at_worst_mev": -8.34193900673441,
+            "expected_at_worst_mev": -8.341939006734417,
+            "expected_frobenius_mev": 8.341939006734417,
+            "frobenius_mev": 7.105427357601002e-15,
+            "max_abs_mev": 7.105427357601002e-15,
+            "relative_frobenius": 8.517716746507995e-16,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        }
+      }
+    },
+    "C12": {
+      "fixture": "C12_Nrefmax0_final",
+      "named_contractions": {
+        "comm110ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": -0.08986172552958742,
+            "expected_at_worst_mev": -0.08986172552958742,
+            "expected_frobenius_mev": 0.08986172552958742,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm111ss": {
+          "one_body": {
+            "actual_at_worst_mev": -0.007542654278369718,
+            "expected_at_worst_mev": -0.007542654278369718,
+            "expected_frobenius_mev": 2.21921467453465,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm121ss": {
+          "one_body": {
+            "actual_at_worst_mev": -0.2580160501218896,
+            "expected_at_worst_mev": -0.25801605012188955,
+            "expected_frobenius_mev": 1.248433781899424,
+            "frobenius_mev": 1.5104558976358925e-16,
+            "max_abs_mev": 5.551115123125783e-17,
+            "relative_frobenius": 1.2098806677097572e-16,
+            "worst_mscheme_index": [
+              2,
+              38
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm122ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": -4.245208831934125,
+            "expected_at_worst_mev": -4.245208831934127,
+            "expected_frobenius_mev": 88.45711925750875,
+            "frobenius_mev": 1.90417576150558e-14,
+            "max_abs_mev": 1.7763568394002505e-15,
+            "relative_frobenius": 2.1526540514645379e-16,
+            "worst_mscheme_index": [
+              0,
+              2,
+              28,
+              39
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm220ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": -20.107413996436524,
+            "expected_at_worst_mev": -20.107413996436524,
+            "expected_frobenius_mev": 20.107413996436524,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm221ss": {
+          "one_body": {
+            "actual_at_worst_mev": -4.0662499159118815,
+            "expected_at_worst_mev": -4.066249915911885,
+            "expected_frobenius_mev": 13.633067334463838,
+            "frobenius_mev": 7.098415972406706e-15,
+            "max_abs_mev": 3.552713678800501e-15,
+            "relative_frobenius": 5.20676367119687e-16,
+            "worst_mscheme_index": [
+              3,
+              3
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm222_phss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": -0.6408312170481809,
+            "expected_at_worst_mev": -0.6408312170481816,
+            "expected_frobenius_mev": 34.40795730137625,
+            "frobenius_mev": 2.2165583480606882e-14,
+            "max_abs_mev": 6.661338147750939e-16,
+            "relative_frobenius": 6.441993427991234e-16,
+            "worst_mscheme_index": [
+              9,
+              14,
+              14,
+              9
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm222_pp_hhss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": -0.6662433191880822,
+            "expected_at_worst_mev": -0.6662433191880819,
+            "expected_frobenius_mev": 21.19240448694524,
+            "frobenius_mev": 4.3624530013678895e-15,
+            "max_abs_mev": 3.3306690738754696e-16,
+            "relative_frobenius": 2.058498366268542e-16,
+            "worst_mscheme_index": [
+              4,
+              11,
+              4,
+              11
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "mr_lambda2_one_body": {
+          "one_body": {
+            "actual_at_worst_mev": -0.8865783889694553,
+            "expected_at_worst_mev": -0.8865783889694563,
+            "expected_frobenius_mev": 2.0264768475458523,
+            "frobenius_mev": 1.696132890813094e-15,
+            "max_abs_mev": 9.992007221626409e-16,
+            "relative_frobenius": 8.369860691313505e-16,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          }
+        },
+        "mr_lambda2_zero_body": {
+          "zero_body": {
+            "actual_at_worst_mev": -3.60201555196158,
+            "expected_at_worst_mev": -3.602015551961582,
+            "expected_frobenius_mev": 3.602015551961582,
+            "frobenius_mev": 1.7763568394002505e-15,
+            "max_abs_mev": 1.7763568394002505e-15,
+            "relative_frobenius": 4.93156349209232e-16,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        }
+      }
+    },
+    "He4": {
+      "fixture": "He4_Nrefmax2",
+      "named_contractions": {
+        "comm110ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": -0.061917153830589496,
+            "expected_at_worst_mev": -0.06191715383058949,
+            "expected_frobenius_mev": 0.06191715383058949,
+            "frobenius_mev": 6.938893903907228e-18,
+            "max_abs_mev": 6.938893903907228e-18,
+            "relative_frobenius": 1.1206739125788345e-16,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm111ss": {
+          "one_body": {
+            "actual_at_worst_mev": -0.014806155231853312,
+            "expected_at_worst_mev": -0.01480615523185331,
+            "expected_frobenius_mev": 1.4817210624410961,
+            "frobenius_mev": 3.469446951953614e-18,
+            "max_abs_mev": 1.734723475976807e-18,
+            "relative_frobenius": 2.341498032185486e-18,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm121ss": {
+          "one_body": {
+            "actual_at_worst_mev": -0.3173392897423442,
+            "expected_at_worst_mev": -0.3173392897423443,
+            "expected_frobenius_mev": 1.2475864390710765,
+            "frobenius_mev": 2.933552580554247e-16,
+            "max_abs_mev": 1.1102230246251565e-16,
+            "relative_frobenius": 2.351382227862705e-16,
+            "worst_mscheme_index": [
+              0,
+              36
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm122ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": -6.558817186098245,
+            "expected_at_worst_mev": -6.5588171860982465,
+            "expected_frobenius_mev": 59.06689436353581,
+            "frobenius_mev": 1.0797816203611002e-14,
+            "max_abs_mev": 1.7763568394002505e-15,
+            "relative_frobenius": 1.8280656736672608e-16,
+            "worst_mscheme_index": [
+              14,
+              12,
+              2,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm220ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": -9.88646516104493,
+            "expected_at_worst_mev": -9.886465161044931,
+            "expected_frobenius_mev": 9.886465161044931,
+            "frobenius_mev": 1.7763568394002505e-15,
+            "max_abs_mev": 1.7763568394002505e-15,
+            "relative_frobenius": 1.7967562829225625e-16,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm221ss": {
+          "one_body": {
+            "actual_at_worst_mev": -4.8486229319861955,
+            "expected_at_worst_mev": -4.848622931986199,
+            "expected_frobenius_mev": 10.710566215928976,
+            "frobenius_mev": 4.3755890415866414e-15,
+            "max_abs_mev": 3.552713678800501e-15,
+            "relative_frobenius": 4.0853013308289665e-16,
+            "worst_mscheme_index": [
+              3,
+              3
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm222_phss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 1.0472291775531635,
+            "expected_at_worst_mev": 1.0472291775531621,
+            "expected_frobenius_mev": 23.476766708003197,
+            "frobenius_mev": 1.1084912431766264e-14,
+            "max_abs_mev": 1.3322676295501878e-15,
+            "relative_frobenius": 4.721652078259751e-16,
+            "worst_mscheme_index": [
+              14,
+              15,
+              2,
+              3
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm222_pp_hhss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": -1.722781875485148,
+            "expected_at_worst_mev": -1.7227818754851487,
+            "expected_frobenius_mev": 23.85991842220068,
+            "frobenius_mev": 5.131936324374849e-15,
+            "max_abs_mev": 6.661338147750939e-16,
+            "relative_frobenius": 2.1508608007644287e-16,
+            "worst_mscheme_index": [
+              0,
+              3,
+              0,
+              3
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "mr_lambda2_one_body": {
+          "one_body": {
+            "actual_at_worst_mev": 0.7451267800080406,
+            "expected_at_worst_mev": 0.7451267800080419,
+            "expected_frobenius_mev": 2.3211867459730837,
+            "frobenius_mev": 2.1536059765482202e-15,
+            "max_abs_mev": 1.3322676295501878e-15,
+            "relative_frobenius": 9.278038401194599e-16,
+            "worst_mscheme_index": [
+              3,
+              3
+            ]
+          }
+        },
+        "mr_lambda2_zero_body": {
+          "zero_body": {
+            "actual_at_worst_mev": 4.478138099064872,
+            "expected_at_worst_mev": 4.478138099064872,
+            "expected_frobenius_mev": 4.478138099064872,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        }
+      }
+    },
+    "O16": {
+      "fixture": "O16_Nrefmax2",
+      "named_contractions": {
+        "comm110ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": -0.010884751734462164,
+            "expected_at_worst_mev": -0.010884751734462163,
+            "expected_frobenius_mev": 0.010884751734462163,
+            "frobenius_mev": 1.734723475976807e-18,
+            "max_abs_mev": 1.734723475976807e-18,
+            "relative_frobenius": 1.5937189182592994e-16,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm111ss": {
+          "one_body": {
+            "actual_at_worst_mev": -0.00398640174423722,
+            "expected_at_worst_mev": -0.00398640174423722,
+            "expected_frobenius_mev": 0.8277456559440846,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm121ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.12393251803776427,
+            "expected_at_worst_mev": 0.12393251803776434,
+            "expected_frobenius_mev": 0.4179387026460484,
+            "frobenius_mev": 1.3625934454980407e-16,
+            "max_abs_mev": 6.938893903907228e-17,
+            "relative_frobenius": 3.2602710322619224e-16,
+            "worst_mscheme_index": [
+              2,
+              38
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm122ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 2.402715215068511,
+            "expected_at_worst_mev": 2.4027152150685103,
+            "expected_frobenius_mev": 85.26571950315656,
+            "frobenius_mev": 1.671695098271445e-14,
+            "max_abs_mev": 8.881784197001252e-16,
+            "relative_frobenius": 1.9605711509999727e-16,
+            "worst_mscheme_index": [
+              0,
+              2,
+              29,
+              38
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm220ss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": -25.19661497157896,
+            "expected_at_worst_mev": -25.19661497157896,
+            "expected_frobenius_mev": 25.19661497157896,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm221ss": {
+          "one_body": {
+            "actual_at_worst_mev": -4.561897629012063,
+            "expected_at_worst_mev": -4.5618976290120585,
+            "expected_frobenius_mev": 17.218112482863305,
+            "frobenius_mev": 7.343467147072276e-15,
+            "max_abs_mev": 4.440892098500626e-15,
+            "relative_frobenius": 4.264966415094e-16,
+            "worst_mscheme_index": [
+              14,
+              14
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm222_phss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": -0.4722904780234187,
+            "expected_at_worst_mev": -0.4722904780234193,
+            "expected_frobenius_mev": 32.72036806786747,
+            "frobenius_mev": 1.755460181864397e-14,
+            "max_abs_mev": 5.551115123125783e-16,
+            "relative_frobenius": 5.365038003922455e-16,
+            "worst_mscheme_index": [
+              4,
+              8,
+              28,
+              32
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "comm222_pp_hhss": {
+          "one_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          },
+          "two_body": {
+            "actual_at_worst_mev": -0.939197456526324,
+            "expected_at_worst_mev": -0.9391974565263245,
+            "expected_frobenius_mev": 23.705933459735505,
+            "frobenius_mev": 5.94518036063682e-15,
+            "max_abs_mev": 4.440892098500626e-16,
+            "relative_frobenius": 2.5078870531441848e-16,
+            "worst_mscheme_index": [
+              14,
+              15,
+              14,
+              15
+            ]
+          },
+          "zero_body": {
+            "actual_at_worst_mev": 0.0,
+            "expected_at_worst_mev": 0.0,
+            "expected_frobenius_mev": 0.0,
+            "frobenius_mev": 0.0,
+            "max_abs_mev": 0.0,
+            "relative_frobenius": 0.0,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        },
+        "mr_lambda2_one_body": {
+          "one_body": {
+            "actual_at_worst_mev": 0.6235314100222344,
+            "expected_at_worst_mev": 0.623531410022236,
+            "expected_frobenius_mev": 2.866288040960859,
+            "frobenius_mev": 3.726669107559586e-15,
+            "max_abs_mev": 1.5543122344752192e-15,
+            "relative_frobenius": 1.3001725766229353e-15,
+            "worst_mscheme_index": [
+              0,
+              0
+            ]
+          }
+        },
+        "mr_lambda2_zero_body": {
+          "zero_body": {
+            "actual_at_worst_mev": 14.16040817058992,
+            "expected_at_worst_mev": 14.1604081705899,
+            "expected_frobenius_mev": 14.1604081705899,
+            "frobenius_mev": 1.9539925233402755e-14,
+            "max_abs_mev": 1.9539925233402755e-14,
+            "relative_frobenius": 1.3798984462881309e-15,
+            "worst_mscheme_index": [
+              0
+            ]
+          }
+        }
+      }
+    }
+  },
+  "tolerance_max_abs_mev": 1e-10
+}

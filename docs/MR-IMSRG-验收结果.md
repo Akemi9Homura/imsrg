@@ -344,12 +344,20 @@ RDM、White-NCSM 生成元和 `ds=1e-3` RK4。对 `He4/O16 Nrefmax=2`、
 `Be8/C12 Nrefmax=0` 分别积分到 `s=0.001,0.002,0.003`。每一点均从
 driver 写出的 HO 真空 `jcoupled64` 重新读入，再做 HO→NAT 与 MR 正规序，
 随后逐元素比较 `H`、重新计算的 `eta` 和 `RHS=[eta,H]`。36 个对象比较
-全部通过 `2e-10 MeV` 门槛，全局最坏误差为 O16 `s=0.001` 的 RHS
-`7.043e-11 MeV`。
+全部通过 `2e-10 MeV` 门槛；同一 J 可表示输入展开后，全局最坏 H 为
+O16 `s=0.001` 的 `1.279e-13 MeV`，最坏 RHS 为 O16 `s=0.002` 的
+`2.665e-14 MeV`。原始 m-scheme 张量投影到严格旋转标量 J 表示的独立
+输入门禁最坏为 `6.506e-11 MeV`，不与代数误差混算。
 
 另以 `ds=1e-4` 显式构造 `H_1=H_0+ds RHS(H_0)`，四体系 J/m Euler
-一步的全局最坏误差为 `6.506e-11 MeV`。`IMSRGSolver` 中历史名称
+一步的全局最坏误差为 `1.776e-15 MeV`。`IMSRGSolver` 中历史名称
 `flow_euler` 实际使用 Boost `runge_kutta4`，故本门禁没有借用该名称。
 
 完整数值见 [`MR-IMSRG-Jscheme-checkpoints.json`](MR-IMSRG-Jscheme-checkpoints.json)；
 自动门禁为 CTest `MRCorrelatedDriver`，本次完整运行耗时约 250 秒。
+
+同一门禁还把四体系各 10 个命名 contraction 的 0/1/2B 有效输出写入
+[`MR-IMSRG-Jscheme-contractions.json`](MR-IMSRG-Jscheme-contractions.json)，
+包含 max-abs、绝对/相对 Frobenius、最坏 m-scheme 索引及该处两边数值。
+全局 max-abs 为 `1.954e-14 MeV`，全局相对 Frobenius 为
+`1.380e-15`。

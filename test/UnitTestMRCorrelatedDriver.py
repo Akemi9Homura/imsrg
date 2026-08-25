@@ -2,6 +2,7 @@
 
 """Real correlated-reference E/f/Gamma and short-flow driver gates."""
 
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -20,7 +21,7 @@ from prototype.mrimsrg.basis import (  # noqa: E402
     prepare_natural_basis,
     transform_array,
 )
-from prototype.mrimsrg.densities import compute_densities  # noqa: E402
+from prototype.mrimsrg.densities import Densities, compute_densities  # noqa: E402
 from prototype.mrimsrg.commutator import (  # noqa: E402
     commutator,
     commutator_contributions,
@@ -49,6 +50,67 @@ def mr_operator_errors(operator, expected, orbits):
         abs(expected.zero_body - actual.zero_body),
         float(np.max(np.abs(expected.one_body - actual.one_body))),
         float(np.max(np.abs(expected.two_body - actual.two_body))),
+    )
+
+
+def array_metrics(actual, expected):
+    actual_array = np.asarray(actual, dtype=np.float64)
+    expected_array = np.asarray(expected, dtype=np.float64)
+    difference = actual_array - expected_array
+    flat_worst = int(np.argmax(np.abs(difference)))
+    worst_index = [
+        int(index) for index in np.unravel_index(flat_worst, difference.shape)
+    ]
+    frobenius = float(np.linalg.norm(difference.ravel()))
+    expected_frobenius = float(np.linalg.norm(expected_array.ravel()))
+    return {
+        "max_abs_mev": float(np.max(np.abs(difference))),
+        "frobenius_mev": frobenius,
+        "expected_frobenius_mev": expected_frobenius,
+        "relative_frobenius": frobenius / max(expected_frobenius, 1e-30),
+        "worst_mscheme_index": worst_index,
+        "actual_at_worst_mev": float(actual_array.flat[flat_worst]),
+        "expected_at_worst_mev": float(expected_array.flat[flat_worst]),
+    }
+
+
+def operator_metrics(operator, expected, orbits):
+    actual = operator_to_mscheme(operator, orbits)
+    return {
+        "zero_body": array_metrics(
+            np.asarray([actual.zero_body]), np.asarray([expected.zero_body])
+        ),
+        "one_body": array_metrics(actual.one_body, expected.one_body),
+        "two_body": array_metrics(actual.two_body, expected.two_body),
+    }
+
+
+def one_body_array(matrix, data):
+    result = np.zeros_like(data.one_body)
+    for p, row_p in enumerate(data.orbits):
+        a, _, lp, jp, mp, tzp = (int(value) for value in row_p)
+        for q, row_q in enumerate(data.orbits):
+            b, _, lq, jq, mq, tzq = (int(value) for value in row_q)
+            if (lp, jp, mp, tzp) == (lq, jq, mq, tzq):
+                result[p, q] = matrix(a, b)
+    return result
+
+
+def projected_reference_densities(reference, modelspace, data):
+    gamma1 = np.zeros_like(data.one_body)
+    for p, row in enumerate(data.orbits):
+        spherical_orbit = int(row[0])
+        gamma1[p, p] = reference.occupations[spherical_orbit]
+    lambda_operator = pyIMSRG.Operator(modelspace)
+    lambda_operator.TwoBody = reference.Lambda2
+    lambda2 = operator_to_mscheme(lambda_operator, data.orbits).two_body
+    disconnected = np.einsum("pr,qs->pqrs", gamma1, gamma1) - np.einsum(
+        "ps,qr->pqrs", gamma1, gamma1
+    )
+    return Densities(
+        gamma1=gamma1,
+        gamma2=lambda2 + disconnected,
+        lambda2=lambda2,
     )
 
 
@@ -98,11 +160,21 @@ def one_body_matrix_error(matrix, expected, data):
 
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3):
         raise SystemExit(
-            "usage: UnitTestMRCorrelatedDriver.py /path/to/imsrg++"
+            "usage: UnitTestMRCorrelatedDriver.py /path/to/imsrg++ [report.json]"
         )
     executable = Path(sys.argv[1]).resolve()
+    report_path = Path(sys.argv[2]).resolve() if len(sys.argv) == 3 else None
+    report = {
+        "schema": "mrimsrg_named_contractions_v1",
+        "comparison_input": (
+            "the same float64 J-representable Hamiltonian and RDM expanded "
+            "independently to m-scheme"
+        ),
+        "tolerance_max_abs_mev": 1e-10,
+        "systems": {},
+    }
     fixtures = (
         ("He4", "He4_Nrefmax2"),
         ("Be8", "Be8_Nrefmax0_final"),
@@ -185,9 +257,17 @@ def main():
             )
             assert max(initial_errors) < 2e-10
 
+            # Algebra comparisons must start from the exact same J-representable
+            # Hamiltonian and RDM.  The raw m-scheme conversion error above is a
+            # separate input gate and must not contaminate contraction errors.
+            oracle_initial = actual_initial
+            oracle_densities = projected_reference_densities(
+                reference, modelspace, data
+            )
+
             expected_eta = white_generator(
-                expected_initial,
-                natural.densities,
+                oracle_initial,
+                oracle_densities,
                 oscillator_quanta_from_orbits(data.orbits),
                 spherical_orbit_groups=spherical_orbit_groups_from_orbits(
                     data.orbits
@@ -219,7 +299,7 @@ def main():
             assert max(eta_errors) < 2e-10
 
             expected_rhs = commutator(
-                expected_eta, expected_initial, natural.densities
+                expected_eta, oracle_initial, oracle_densities
             )
             actual_rhs = pyIMSRG.MR_Commutator(
                 actual_eta, initial, reference
@@ -245,9 +325,10 @@ def main():
             assert max(rhs_errors) < 1e-10
 
             expected_terms = commutator_contributions(
-                expected_eta, expected_initial, natural.densities
+                expected_eta, oracle_initial, oracle_densities
             )
             named_maximum = 0.0
+            named_report = {}
             for name in (
                 "comm110ss",
                 "comm220ss",
@@ -265,6 +346,9 @@ def main():
                     term, expected_terms[name], data, modelspace
                 )
                 named_maximum = max(named_maximum, *errors)
+                named_report[name] = operator_metrics(
+                    term, expected_terms[name], data.orbits
+                )
 
             mr_one_body = pyIMSRG.MR_comm221_lambda2(
                 actual_eta, initial, reference
@@ -277,24 +361,47 @@ def main():
                     data,
                 ),
             )
+            named_report["mr_lambda2_one_body"] = {
+                "one_body": array_metrics(
+                    one_body_array(mr_one_body, data),
+                    expected_terms["mr_lambda2_one_body"].one_body,
+                )
+            }
             sr_rhs = pyIMSRG.Commutator.Commutator(actual_eta, initial)
+            actual_mr_zero = reference.ContractLambda2(sr_rhs.TwoBody)
             named_maximum = max(
                 named_maximum,
                 abs(
-                    reference.ContractLambda2(sr_rhs.TwoBody)
+                    actual_mr_zero
                     - expected_terms["mr_lambda2_zero_body"].zero_body
                 ),
             )
+            named_report["mr_lambda2_zero_body"] = {
+                "zero_body": array_metrics(
+                    np.asarray([actual_mr_zero]),
+                    np.asarray(
+                        [expected_terms["mr_lambda2_zero_body"].zero_body]
+                    ),
+                )
+            }
+            report["systems"][nucleus] = {
+                "fixture": fixture,
+                "named_contractions": named_report,
+            }
+            for contraction in named_report.values():
+                for metrics in contraction.values():
+                    assert metrics["max_abs_mev"] < 1e-10
+                    assert metrics["relative_frobenius"] < 1e-10
             print(f"{nucleus} named RHS max={named_maximum:.3e}")
             assert named_maximum < 1e-10
 
             euler_step = 1e-4
-            expected_euler = type(expected_initial)(
-                expected_initial.zero_body
+            expected_euler = type(oracle_initial)(
+                oracle_initial.zero_body
                 + euler_step * expected_rhs.zero_body,
-                expected_initial.one_body
+                oracle_initial.one_body
                 + euler_step * expected_rhs.one_body,
-                expected_initial.two_body
+                oracle_initial.two_body
                 + euler_step * expected_rhs.two_body,
             )
             actual_euler = initial + euler_step * actual_rhs
@@ -349,14 +456,14 @@ def main():
             def expected_rhs_at(hamiltonian):
                 eta = white_generator(
                     hamiltonian,
-                    natural.densities,
+                    oracle_densities,
                     quanta,
                     spherical_orbit_groups=groups,
                 )
-                return commutator(eta, hamiltonian, natural.densities)
+                return commutator(eta, hamiltonian, oracle_densities)
 
             checkpoint_step = 1e-3
-            expected_checkpoint = expected_initial
+            expected_checkpoint = oracle_initial
             for checkpoint_index in range(1, 4):
                 expected_checkpoint = _mr_rk4_step(
                     expected_checkpoint, checkpoint_step, expected_rhs_at
@@ -388,7 +495,7 @@ def main():
 
                 expected_checkpoint_eta = white_generator(
                     expected_checkpoint,
-                    natural.densities,
+                    oracle_densities,
                     quanta,
                     spherical_orbit_groups=groups,
                 )
@@ -404,7 +511,7 @@ def main():
                 expected_checkpoint_rhs = commutator(
                     expected_checkpoint_eta,
                     expected_checkpoint,
-                    natural.densities,
+                    oracle_densities,
                 )
                 actual_checkpoint_rhs = pyIMSRG.MR_Commutator(
                     actual_checkpoint_eta, actual_checkpoint, reference
@@ -423,6 +530,12 @@ def main():
                 assert max(h_errors) < 2e-10
                 assert max(eta_checkpoint_errors) < 2e-10
                 assert max(rhs_checkpoint_errors) < 2e-10
+
+    if report_path is not None:
+        report_path.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
 
 if __name__ == "__main__":
