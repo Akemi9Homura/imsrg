@@ -213,6 +213,18 @@ m-scheme (`3.106e-12 MeV`) 及 emax4/6 短流。两份短流 J64 均与优化前
 活跃支撑优化已通过完整流和 NCSM 门禁；下一步才是根据 emax6 外推规划
 更大空间的完整流、Magnus 或重启策略。
 
+对 `cef4fce6` 的 profiler 再检查发现，`Lambda(A,A)` 已经很小，但 X/Y
+仍先按完整 `d*d` Pandya 块构造再取活跃行列。commit `dea9125b` 把 partial
+support 分支改为直接形成 `X/Y(:,A)` 与 `X/Y(A,:)`；只有 `A=d` 的一般
+全空间相关参考才继续一次性形成完整 X/Y，因而不会用四个 skinny 矩阵把
+全活跃工作翻倍。emax4/emax6 短流与上一版 J64 逐字节相同，墙钟分别
+`0.408 -> 0.312 s` 和 `6.81 -> 4.15 s`；emax6 V/build 降为
+`0.170/0.111 s`，相对上一版快 `16.76/25.00` 倍。随机全活跃参考和四核
+checkpoint 的长 CTest 在 `352.52 s` 后通过。此时 emax6 的
+MR `lambda2` addon 为 `0.717 s`，既有 White-NCSM generator update 为
+`2.191 s`，主瓶颈已经跨到公共生成元路径。该结论在 point7 对
+`dea9125b` 再完成四核 full-flow/NCSM 回归前仍标为本地性能门通过。
+
 ## 6. 实现顺序与 commit 边界
 
 1. 文献/C++ 调研表与 J-coupled density 约定；

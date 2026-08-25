@@ -456,3 +456,11 @@ V 的第三轮优化只利用 `lambda2` 的精确轨道支撑域，把
 全局 max-abs `8.384e-13 MeV`。下载后由现有 `simpleFCI` 按
 `Nmax=8/0/0/2` 重算 12 条低能谱，最大变化 `1.741e-13 MeV`。因此本轮
 性能变换已通过完整流、真空物化和后 NCSM 谱三层验收。
+
+随后 commit `dea9125b` 继续避免构造不会进入乘法的 X/Y Pandya 元素，
+partial-support 分支只形成活跃列和活跃行，全活跃参考仍保留原完整块。
+emax4/emax6 短流相对 `cef4fce6` 均逐字节相同，墙钟降为
+`0.312/4.15 s`；emax6 V/build 为 `0.170/0.111 s`。emax2 Python oracle
+仍为 `3.106e-12 MeV`，随机全活跃参考和四核 checkpoint CTest 用时
+`352.52 s` 并通过。该阶段 point7 四核完整流/NCSM 复验尚未完成，因此
+这里只记录本地性能门，不提前覆盖上一段完整验收结论。

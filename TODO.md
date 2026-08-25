@@ -182,6 +182,15 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       oracle 仍为 `3.106e-12 MeV`；随机全活跃参考及四核 checkpoint 的
       `MRCorrelatedDriver` 用时 `350.49 s` 并通过。实现 commit
       `cef4fce6`。
+- [x] 在活跃支撑域上继续只构造 V 真正进入乘法的
+      `X/Y(:,A)` 与 `X/Y(A,:)`，不再先生成完整 `d*d` Pandya X/Y 后切片；
+      全空间活跃参考保留原完整分支。emax4/emax6 短流相对 `cef4fce6`
+      仍逐字节相同，总时分别 `0.408 -> 0.312 s`、`6.81 -> 4.15 s`；
+      emax6 V/build 为 `0.170/0.111 s`，相对上一版快 `16.76/25.00` 倍。
+      emax2 Python oracle 为 `3.106e-12 MeV`，随机全活跃参考与四核
+      checkpoint 的 `MRCorrelatedDriver` 用时 `352.52 s` 并通过。实现
+      commit `dea9125b`。当前 emax6 主瓶颈已转为既有 White-NCSM generator
+      (`2.191 s`)，不是 MR `lambda2` addon (`0.717 s`)。
 - [x] 只有验证 emax6 interaction 的来源、header 和校验和后，才重复
       emax6 RHS/短流；不得使用文件名含 `candidate` 的核力产生验收结果。
       输入前置现已通过：从冻结 emax14 母文件
@@ -198,6 +207,8 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       为 `2.212e-8/3.898e-8/8.871e-10/1.071e-9 MeV`。新旧 J64 的全局
       max-abs 为 `8.384e-13 MeV`，`Nmax=8/0/0/2` 的 12 条 simpleFCI
       低能谱全局最坏变化 `1.741e-13 MeV`。
+- [ ] 对 `dea9125b` 的 skinny Pandya 构造重新执行 point7 四核
+      `s=100, rtol=atol=1e-10` 和 `Nmax=8/0/0/2` simpleFCI 谱回归。
 - [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和
       Magnus/重启策略；登录节点禁止重计算，统一由 point7 Slurm 运行。
 

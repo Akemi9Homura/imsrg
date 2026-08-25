@@ -1,6 +1,6 @@
 {
-  "schema": "mrimsrg_jscheme_large_space_acceptance_v4",
-  "implementation_commit": "cef4fce6d94132c20d0dce939297b45041f7645a",
+  "schema": "mrimsrg_jscheme_large_space_acceptance_v5",
+  "implementation_commit": "dea9125bb734b195c2237d6b96ab96c4e42042db",
   "baseline_profiler_commit": "1f02961a2c8ab9560ece346284ab4dd2d7a25337",
   "shell_model_obs_commit": "4b10afab0218711b0278ef66ad73e88bc7791c34",
   "host": "DESKTOP-EIV63LR",
@@ -128,6 +128,31 @@
     "whole_short_flow_speedup_vs_pandya_reuse": 1.474611957107183,
     "whole_short_flow_speedup_vs_baseline": 3.3557753513195907
   },
+  "single_thread_after_skinny_pandya_build": {
+    "implementation_commit": "dea9125bb734b195c2237d6b96ab96c4e42042db",
+    "omp_num_threads": 1,
+    "openblas_num_threads": 1,
+    "wall_seconds": 0.31187,
+    "maximum_rss_kib": 54200,
+    "output_bitwise_equal_to_previous": true,
+    "profiler_seconds": {
+      "mr_comm221_lambda2_setup": 0.00626,
+      "mr_comm221_lambda2_iv": 0.00843,
+      "mr_comm221_lambda2_v": 0.04127,
+      "mr_comm221_lambda2_v_build": 0.03444,
+      "mr_comm221_lambda2_v_blas": 0.00486,
+      "mr_comm221_lambda2_v_partial_trace": 0.00154,
+      "mr_comm221_lambda2_vi": 0.02265,
+      "mr_comm221_lambda2_vi_trace": 0.00264,
+      "mr_comm221_lambda2_total": 0.07872,
+      "mr_lambda2_commutator_addons": 0.07901,
+      "existing_sr_commutator": 0.04528,
+      "generator_update": 0.11116
+    },
+    "v_speedup_vs_active_support": 3.567967046280591,
+    "whole_short_flow_speedup_vs_active_support": 1.3097123801583994,
+    "whole_short_flow_speedup_vs_baseline": 4.39510052265367
+  },
   "thread_reproducibility": {
     "compared_threads": [1, 64],
     "thread64_wall_seconds": 1.10230,
@@ -215,6 +240,29 @@
       "v_blas_speedup": 25.984045504994448,
       "whole_short_flow_speedup": 1.7180616740088106
     },
+    "single_thread_after_skinny_pandya_build": {
+      "implementation_commit": "dea9125bb734b195c2237d6b96ab96c4e42042db",
+      "wall_seconds": 4.15,
+      "maximum_rss_kib": 281244,
+      "output_bitwise_equal_to_previous": true,
+      "profiler_seconds": {
+        "mr_comm221_lambda2_setup": 0.25217,
+        "mr_comm221_lambda2_iv": 0.05714,
+        "mr_comm221_lambda2_v": 0.17009,
+        "mr_comm221_lambda2_v_build": 0.11056,
+        "mr_comm221_lambda2_v_blas": 0.04772,
+        "mr_comm221_lambda2_v_partial_trace": 0.00614,
+        "mr_comm221_lambda2_vi": 0.23371,
+        "mr_comm221_lambda2_vi_trace": 0.02233,
+        "mr_comm221_lambda2_total": 0.71329,
+        "mr_lambda2_commutator_addons": 0.71716,
+        "existing_sr_commutator": 0.61893,
+        "generator_update": 2.19142
+      },
+      "v_speedup_vs_active_support": 16.763301781409844,
+      "v_build_speedup_vs_active_support": 25.004974674384947,
+      "whole_short_flow_speedup_vs_active_support": 1.6409638554216865
+    },
     "thread_reproducibility": {
       "compared_threads": [1, 64],
       "thread64_wall_seconds": 14.20,
@@ -253,7 +301,9 @@
     "lambda_active_support_point7_full_flow_pending": false,
     "point7_maximum_vacuum_h_abs_vs_previous_mev": 8.384404281969182e-13,
     "maximum_ncsm_spectral_abs_vs_previous_mev": 1.7408297026122455e-13,
+    "skinny_pandya_mr_correlated_driver_seconds": 352.52,
+    "skinny_pandya_point7_full_flow_pending": true,
     "local_regression_passed": true,
-    "passed": true
+    "passed": false
   }
 }
