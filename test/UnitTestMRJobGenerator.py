@@ -11,7 +11,12 @@ import tempfile
 REPOSITORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY))
 
-from gen_job import MRJschemeSettings, generate_mr_jscheme_slurm  # noqa: E402
+from gen_job import (  # noqa: E402
+    MRJschemeSettings,
+    MRNCSMReadbackSettings,
+    generate_mr_jscheme_slurm,
+    generate_mr_ncsm_readback_slurm,
+)
 
 
 def require(condition, message):
@@ -109,6 +114,55 @@ def main():
             pass
         else:
             raise AssertionError("unsupported Be8 Nrefmax=2 was accepted")
+
+        packed = root / "flow.no2bpack"
+        packed.write_bytes(b"packed Hamiltonian\n")
+        ncsm_settings = MRNCSMReadbackSettings(
+            no2bpack=packed,
+            proton_number=2,
+            neutron_number=2,
+            nmax=10,
+            states=3,
+            max_iter=400,
+            partition="compute_C",
+            cpus=64,
+            label="flow_s0p02",
+            result_root=root / "ncsm-result",
+            executable=executable,
+        )
+        ncsm_script = generate_mr_ncsm_readback_slurm(ncsm_settings)
+        ncsm_contents = ncsm_script.read_text(encoding="utf-8")
+        ncsm_metadata = json.loads(
+            (ncsm_script.parent / "metadata.json").read_text(encoding="utf-8")
+        )
+        require(ncsm_metadata["schema"] == "mrimsrg_ncsm_readback_slurm_v1",
+                "unexpected NCSM manifest schema")
+        for token in (
+            "#SBATCH --partition=compute_C",
+            "#SBATCH --cpus-per-task=64",
+            "/usr/bin/time -v",
+            "--no2bpack",
+            "--Z 2",
+            "--N 2",
+            "--nmax 10",
+            "--states 3",
+            "--max-iter 400",
+            "sha256sum -c -",
+            "ldd ",
+        ):
+            require(token in ncsm_contents,
+                    "generated NCSM script is missing: " + token)
+        require(len(ncsm_metadata["no2bpack_sha256"]) == 64,
+                "NCSM input SHA-256 was not recorded")
+        require(len(ncsm_metadata["executable_sha256"]) == 64,
+                "NCSM executable SHA-256 was not recorded")
+
+        try:
+            generate_mr_ncsm_readback_slurm(ncsm_settings)
+        except FileExistsError:
+            pass
+        else:
+            raise AssertionError("NCSM generator silently overwrote an existing result")
 
     print("MR J-scheme job-generator regression passed")
 

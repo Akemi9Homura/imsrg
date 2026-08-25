@@ -186,6 +186,23 @@ class MRJschemeSettings:
     executable: Path = REPO_ROOT / "build" / "src" / "imsrg++"
 
 
+@dataclass(frozen=True)
+class MRNCSMReadbackSettings:
+    no2bpack: Path
+    proton_number: int
+    neutron_number: int
+    nmax: int
+    states: int = 3
+    max_iter: int = 300
+    partition: str = "c128m512"
+    qos: str = "low"
+    cpus: int = 64
+    nodelist: Optional[str] = None
+    label: Optional[str] = None
+    result_root: Path = REPO_ROOT / "result" / "mr-ncsm-readback"
+    executable: Path = REPO_ROOT / "prototype" / "mrimsrg" / "build-emax6" / "mrimsrg_validate"
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -375,6 +392,110 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
     return script_file
 
 
+def generate_mr_ncsm_readback_slurm(settings: MRNCSMReadbackSettings) -> Path:
+    """Generate one hashed downstream NCSM/no2bpack readback job."""
+    if min(settings.proton_number, settings.neutron_number, settings.nmax) < 0:
+        raise ValueError("MR NCSM particle numbers and Nmax must be nonnegative")
+    if settings.proton_number + settings.neutron_number < 2:
+        raise ValueError("MR NCSM readback requires at least two particles")
+    if settings.nmax % 2:
+        raise ValueError("MR NCSM readback currently requires even Nmax")
+    if min(settings.states, settings.max_iter, settings.cpus) < 1:
+        raise ValueError("MR NCSM states, iterations, and cpus must be positive")
+    if settings.partition not in ("c128m1024", "c128m512", "compute_C", "compute_A"):
+        raise ValueError("unsupported point7 partition")
+    if settings.qos != "low":
+        raise ValueError("MR NCSM production requires qos=low")
+    for value, field in ((settings.nodelist, "nodelist"), (settings.label, "label")):
+        if value is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+            raise ValueError(f"{field} contains unsupported characters")
+    if not settings.no2bpack.is_file():
+        raise FileNotFoundError(f"no2bpack is unavailable: {settings.no2bpack}")
+    if not settings.executable.is_file():
+        raise FileNotFoundError(f"NCSM validator is unavailable: {settings.executable}")
+    environment_script = (REPO_ROOT / "sourceme.sh").resolve()
+    if not environment_script.is_file():
+        raise FileNotFoundError("repository sourceme.sh is unavailable")
+
+    no2bpack = settings.no2bpack.resolve()
+    executable = settings.executable.resolve()
+    result_root = settings.result_root.resolve()
+    repository_commit = _repository_commit(REPO_ROOT)
+    no2bpack_sha256 = _sha256(no2bpack)
+    executable_sha256 = _sha256(executable)
+    environment_script_sha256 = _sha256(environment_script)
+    tag = (
+        f"Z{settings.proton_number}_N{settings.neutron_number}"
+        f"_Nmax{settings.nmax}_states{settings.states}"
+    )
+    if settings.label:
+        tag += f"_{settings.label}"
+    result_dir = result_root / tag
+    if result_dir.exists():
+        raise FileExistsError(f"refusing to overwrite existing MR NCSM readback: {result_dir}")
+    result_dir.mkdir(parents=True)
+    script_file = result_dir / f"run_{tag}.sh"
+    log_file = result_dir / f"log_{tag}_%j.txt"
+    manifest = result_dir / "metadata.json"
+    command = shlex.join([
+        "/usr/bin/time", "-v", str(executable),
+        "--no2bpack", str(no2bpack),
+        "--Z", str(settings.proton_number),
+        "--N", str(settings.neutron_number),
+        "--nmax", str(settings.nmax),
+        "--states", str(settings.states),
+        "--max-iter", str(settings.max_iter),
+    ])
+    nodelist_line = (
+        f"#SBATCH --nodelist={settings.nodelist}\n" if settings.nodelist else ""
+    )
+    contents = f"""#!/bin/bash -l
+#SBATCH --partition={settings.partition}
+#SBATCH --qos={settings.qos}
+#SBATCH -J mr_ncsm_A{settings.proton_number + settings.neutron_number}
+{nodelist_line}#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task={settings.cpus}
+#SBATCH -o {log_file}
+
+set -eo pipefail
+cd {REPO_ROOT}
+source ./sourceme.sh
+export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
+export OPENBLAS_NUM_THREADS=1
+
+echo repository_commit={repository_commit}
+echo '{no2bpack_sha256}  {no2bpack}' | sha256sum -c -
+echo '{executable_sha256}  {executable}' | sha256sum -c -
+echo '{environment_script_sha256}  {environment_script}' | sha256sum -c -
+if ldd {shlex.quote(str(executable))} | grep 'not found'; then
+  exit 1
+fi
+{command}
+"""
+    script_file.write_text(contents, encoding="utf-8")
+    script_file.chmod(0o755)
+    metadata = {
+        "schema": "mrimsrg_ncsm_readback_slurm_v1",
+        "repository_commit": repository_commit,
+        "settings": {
+            **asdict(settings),
+            "no2bpack": str(no2bpack),
+            "result_root": str(result_root),
+            "executable": str(executable),
+        },
+        "no2bpack_sha256": no2bpack_sha256,
+        "executable_sha256": executable_sha256,
+        "environment_script": str(environment_script),
+        "environment_script_sha256": environment_script_sha256,
+        "script": str(script_file),
+        "log_pattern": str(log_file),
+    }
+    manifest.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8")
+    return script_file
+
+
 def generate_slurm(params: dict):
     file = params["2bme"]
     file3 = params["3bme"]
@@ -448,6 +569,10 @@ def parse_args():
         "--mr-jscheme", action="store_true",
         help="generate one production C++ J-scheme MR direct-flow job",
     )
+    parser.add_argument(
+        "--mr-ncsm-readback", action="store_true",
+        help="generate one downstream NCSM/no2bpack readback job",
+    )
     parser.add_argument("--mr-nucleus", choices=("He4", "Be8", "C12", "O16"))
     parser.add_argument("--mr-nrefmax", type=int, choices=(0, 2))
     parser.add_argument("--mr-emax", type=int)
@@ -473,6 +598,13 @@ def parse_args():
     parser.add_argument("--mr-label")
     parser.add_argument("--mr-result-root", type=Path)
     parser.add_argument("--mr-executable", type=Path)
+    parser.add_argument("--mr-ncsm-no2bpack", type=Path)
+    parser.add_argument("--mr-z", type=int)
+    parser.add_argument("--mr-n", type=int)
+    parser.add_argument("--mr-nmax", type=int)
+    parser.add_argument("--mr-states", type=int, default=3)
+    parser.add_argument("--mr-max-iter", type=int, default=300)
+    parser.add_argument("--mr-ncsm-executable", type=Path)
     return parser.parse_args()
 
 
@@ -480,6 +612,8 @@ if __name__ == "__main__":
     args = parse_args()
     if args.generate_only and args.submit:
         raise SystemExit("--generate-only and --submit are mutually exclusive")
+    if args.mr_jscheme and args.mr_ncsm_readback:
+        raise SystemExit("--mr-jscheme and --mr-ncsm-readback are mutually exclusive")
     check_and_make_dir(REPO_ROOT / "result")
 
     if args.smoke_test:
@@ -528,6 +662,57 @@ if __name__ == "__main__":
                     args.mr_executable
                     if args.mr_executable is not None
                     else default_executable
+                ),
+            )
+        )
+        print(script_file)
+        if args.generate_only:
+            exit(0)
+        if args.submit:
+            result = subprocess.run(
+                ["sbatch", str(script_file)], capture_output=True, text=True, check=True
+            )
+            if result.stdout.strip():
+                print(result.stdout.strip())
+            exit(0)
+        run_mode = input("submit job: y/n\n")
+        if run_mode.lower()[0] == "y":
+            subprocess.run(["sbatch", str(script_file)], check=True)
+        else:
+            subprocess.run(["bash", str(script_file)], check=True)
+        exit(0)
+
+    if args.mr_ncsm_readback:
+        required = {
+            "--mr-ncsm-no2bpack": args.mr_ncsm_no2bpack,
+            "--mr-z": args.mr_z,
+            "--mr-n": args.mr_n,
+            "--mr-nmax": args.mr_nmax,
+        }
+        missing = [name for name, value in required.items() if value is None]
+        if missing:
+            raise SystemExit("--mr-ncsm-readback requires " + ", ".join(missing))
+        script_file = generate_mr_ncsm_readback_slurm(
+            MRNCSMReadbackSettings(
+                no2bpack=args.mr_ncsm_no2bpack,
+                proton_number=args.mr_z,
+                neutron_number=args.mr_n,
+                nmax=args.mr_nmax,
+                states=args.mr_states,
+                max_iter=args.mr_max_iter,
+                partition=args.mr_partition,
+                cpus=args.mr_cpus,
+                nodelist=args.mr_nodelist,
+                label=args.mr_label,
+                result_root=(
+                    args.mr_result_root
+                    if args.mr_result_root is not None
+                    else REPO_ROOT / "result" / "mr-ncsm-readback"
+                ),
+                executable=(
+                    args.mr_ncsm_executable
+                    if args.mr_ncsm_executable is not None
+                    else REPO_ROOT / "prototype" / "mrimsrg" / "build-emax6" / "mrimsrg_validate"
                 ),
             )
         )
