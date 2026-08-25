@@ -14,8 +14,10 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <set>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -241,28 +243,42 @@ inline CoupledHamiltonian read_jcoupled64(const fs::path &path,
         obme_count != orbit_count * (orbit_count + 1) / 2 ||
         tbme_count != jcoupled_tbme_count(jbasis))
         throw std::runtime_error("jcoupled64 header does not match the active interaction basis");
-    for (int a = 0; a < static_cast<int>(orbit_count); ++a)
+    std::vector<int> file_to_active(orbit_count, -1);
+    std::vector<bool> active_orbit_seen(orbit_count, false);
+    for (int file_orbit = 0; file_orbit < static_cast<int>(orbit_count); ++file_orbit)
     {
-        const nucleus::Orbit &orbit = jbasis.orbit(a);
-        const std::array<int, 4> expected_qn = {orbit.n, orbit.l, orbit.j, orbit.tz};
-        for (int expected_value : expected_qn)
-        {
-            std::int32_t value = 0;
+        std::array<std::int32_t, 4> quantum_numbers{};
+        for (std::int32_t &value : quantum_numbers)
             read_j64_value(input, value, "orbit table");
-            if (value != expected_value)
-                throw std::runtime_error("jcoupled64 orbit table does not match the active basis");
+        int active_orbit = -1;
+        for (int candidate = 0; candidate < static_cast<int>(orbit_count); ++candidate)
+        {
+            const nucleus::Orbit &orbit = jbasis.orbit(candidate);
+            if (quantum_numbers ==
+                std::array<std::int32_t, 4>{orbit.n, orbit.l, orbit.j, orbit.tz})
+            {
+                active_orbit = candidate;
+                break;
+            }
         }
+        if (active_orbit < 0 || active_orbit_seen[active_orbit])
+            throw std::runtime_error(
+                "jcoupled64 orbit table does not map one-to-one to the active basis");
+        file_to_active[file_orbit] = active_orbit;
+        active_orbit_seen[active_orbit] = true;
     }
 
     CoupledHamiltonian result;
     read_j64_value(input, result.zero_body, "zero body");
     result.one_body = Eigen::MatrixXd::Zero(
         static_cast<Eigen::Index>(orbit_count), static_cast<Eigen::Index>(orbit_count));
-    for (int a = 0; a < static_cast<int>(orbit_count); ++a)
-        for (int b = a; b < static_cast<int>(orbit_count); ++b)
+    for (int a_file = 0; a_file < static_cast<int>(orbit_count); ++a_file)
+        for (int b_file = a_file; b_file < static_cast<int>(orbit_count); ++b_file)
         {
             double value = 0.0;
             read_j64_value(input, value, "OBME");
+            const int a = file_to_active[a_file];
+            const int b = file_to_active[b_file];
             result.one_body(a, b) = value;
             result.one_body(b, a) = value;
         }
@@ -272,27 +288,78 @@ inline CoupledHamiltonian read_jcoupled64(const fs::path &path,
     {
         const auto &channel = jbasis.j2b_channel(channel_index);
         result.two_body[channel_index] = Eigen::MatrixXd::Zero(channel.size(), channel.size());
-        for (int bra = 0; bra < static_cast<int>(channel.size()); ++bra)
-        {
-            const auto [a, b] = channel[bra];
-            for (int ket = bra; ket < static_cast<int>(channel.size()); ++ket)
-            {
-                const auto [c, d] = channel[ket];
-                const std::array<int, 5> expected_indices = {a, b, c, d, channel.J};
-                for (int expected_value : expected_indices)
-                {
-                    std::int32_t value = 0;
-                    read_j64_value(input, value, "TBME index");
-                    if (value != expected_value)
-                        throw std::runtime_error("jcoupled64 TBME ordering does not match the active basis");
-                }
-                double value = 0.0;
-                read_j64_value(input, value, "TBME");
-                result.two_body[channel_index](bra, ket) = value;
-                result.two_body[channel_index](ket, bra) = value;
-            }
-        }
     }
+    std::set<std::tuple<int, int, int>> seen_tbmes;
+    for (std::uint64_t record = 0; record < tbme_count; ++record)
+    {
+        std::array<std::int32_t, 5> file_indices{};
+        for (std::int32_t &value : file_indices)
+            read_j64_value(input, value, "TBME index");
+        double value = 0.0;
+        read_j64_value(input, value, "TBME");
+        const int J = file_indices[4];
+        const bool valid_file_indices =
+            J >= 0 && std::all_of(file_indices.begin(), file_indices.begin() + 4,
+                                  [orbit_count](std::int32_t index)
+                                  {
+                                      return index >= 0 &&
+                                             static_cast<std::uint64_t>(index) < orbit_count;
+                                  });
+        if (!valid_file_indices)
+            throw std::runtime_error("jcoupled64 contains an invalid TBME index");
+        int a = file_to_active[file_indices[0]];
+        int b = file_to_active[file_indices[1]];
+        int c = file_to_active[file_indices[2]];
+        int d = file_to_active[file_indices[3]];
+        double phase = 1.0;
+        auto canonicalize_pair = [&](int &first, int &second)
+        {
+            if (first <= second)
+                return;
+            const int j_first = jbasis.orbit(first).j;
+            const int j_second = jbasis.orbit(second).j;
+            phase *= nucleus::iphase((j_first + j_second) / 2 - J + 1);
+            std::swap(first, second);
+        };
+        canonicalize_pair(a, b);
+        canonicalize_pair(c, d);
+        const nucleus::Orbit &oa = jbasis.orbit(a);
+        const nucleus::Orbit &ob = jbasis.orbit(b);
+        const nucleus::Orbit &oc = jbasis.orbit(c);
+        const nucleus::Orbit &od = jbasis.orbit(d);
+        const auto pair_is_allowed = [J](const nucleus::Orbit &first,
+                                         const nucleus::Orbit &second,
+                                         int first_index,
+                                         int second_index)
+        {
+            return 2 * J >= std::abs(first.j - second.j) &&
+                   2 * J <= first.j + second.j &&
+                   !(first_index == second_index && nucleus::isodd(J));
+        };
+        if (!pair_is_allowed(oa, ob, a, b) || !pair_is_allowed(oc, od, c, d) ||
+            nucleus::isodd(oa.l + ob.l) != nucleus::isodd(oc.l + od.l) ||
+            oa.tz + ob.tz != oc.tz + od.tz)
+            throw std::runtime_error("jcoupled64 TBME violates an active-basis channel");
+        const auto bra_label = jbasis.j2b_channel_label(a, b, J);
+        const auto ket_label = jbasis.j2b_channel_label(c, d, J);
+        if (bra_label.index != ket_label.index || bra_label.index < 0 ||
+            bra_label.index >= static_cast<int>(result.two_body.size()))
+            throw std::runtime_error("jcoupled64 TBME does not belong to a scalar channel");
+        const int channel_index = bra_label.index;
+        const int bra = bra_label.position;
+        const int ket = ket_label.position;
+        const int row = std::min(bra, ket);
+        const int column = std::max(bra, ket);
+        const auto &channel = jbasis.j2b_channel(channel_index);
+        if (bra < 0 || ket < 0 || bra >= static_cast<int>(channel.size()) ||
+            ket >= static_cast<int>(channel.size()) ||
+            !seen_tbmes.emplace(channel_index, row, column).second)
+            throw std::runtime_error("jcoupled64 contains a duplicate or invalid TBME");
+        result.two_body[channel_index](bra, ket) = phase * value;
+        result.two_body[channel_index](ket, bra) = phase * value;
+    }
+    if (seen_tbmes.size() != tbme_count)
+        throw std::runtime_error("jcoupled64 TBME payload is incomplete");
     if (input.peek() != std::ifstream::traits_type::eof())
         throw std::runtime_error("jcoupled64 payload contains trailing data");
     if (!std::isfinite(result.zero_body) || !result.one_body.allFinite())

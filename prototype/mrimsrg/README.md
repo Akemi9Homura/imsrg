@@ -233,19 +233,24 @@ by both NCSM and FCIQMC:
 ```bash
 prototype/mrimsrg/build/mrimsrg_export_no2bpack \
   --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack \
-  --flow-output prototype/mrimsrg/data/He4_flow_rtol1e-6 \
+  --jcoupled64 /tmp/He4_mrimsrg.jcoupled64 \
   --output He4_mrimsrg.no2bpack --Z 2 --N 2 \
-  --diagnostic-jcoupled64 /tmp/He4_mrimsrg.jcoupled64
+  --diagnostic-jcoupled64 /tmp/He4_mrimsrg_roundtrip.jcoupled64
 ```
 
 The exporter uses the fixed interaction only for the verified HO orbit table.
-It projects the final vacuum m-scheme one- and two-body tensors onto scalar
-J-coupled matrix elements with the same `shell-model-obs` Clebsch--Gordan,
-pair normalization, phase and channel conventions used in the forward
-coupling. It then reconstructs the complete m-scheme tensors and refuses to
-write unless the maximum discrepancy is below `--scalar-tolerance` (default
+For production C++ output, `--jcoupled64` reads the lossless J-scheme file
+directly and maps its explicit `(n,l,2j,2tz)` orbit table and
+`(a,b,c,d,J)` TBME records to the independent `shell-model-obs` channel
+ordering. It does not assume that the two programs enumerate channels or
+pairs identically. The older `--flow-output` alternative projects a final
+vacuum m-scheme tensor onto scalar J-coupled matrix elements with the same
+`shell-model-obs` Clebsch--Gordan, pair normalization and phase conventions;
+that path reconstructs the complete m-scheme tensors and refuses to write
+unless the maximum discrepancy is below `--scalar-tolerance` (default
 `1e-9 MeV`). A checkpoint directory containing `vacuum_mscheme.bin` can be
-passed in place of the final flow directory.
+passed in place of the final flow directory. Select exactly one of
+`--jcoupled64` and `--flow-output`.
 
 The optional `--diagnostic-jcoupled64` output stores the same J-coupled OBMEs
 and TBMEs as float64, with an identifying magic header. It is an acceptance

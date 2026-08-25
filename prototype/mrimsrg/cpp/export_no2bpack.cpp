@@ -36,6 +36,7 @@ struct Options
 {
     fs::path interaction;
     fs::path flow_output;
+    fs::path jcoupled64;
     fs::path output;
     fs::path diagnostic_jcoupled64;
     int Z = -1;
@@ -47,7 +48,8 @@ struct Options
 {
     throw std::invalid_argument(
         message +
-        "\nusage: mrimsrg_export_no2bpack --interaction FILE --flow-output DIR_OR_PAYLOAD "
+        "\nusage: mrimsrg_export_no2bpack --interaction FILE "
+        "(--flow-output DIR_OR_PAYLOAD | --jcoupled64 FILE) "
         "--output FILE --Z Z --N N [--diagnostic-jcoupled64 FILE] [--scalar-tolerance X]");
 }
 
@@ -64,6 +66,8 @@ Options parse_options(int argc, char **argv)
             options.interaction = value;
         else if (key == "--flow-output")
             options.flow_output = value;
+        else if (key == "--jcoupled64")
+            options.jcoupled64 = value;
         else if (key == "--output")
             options.output = value;
         else if (key == "--diagnostic-jcoupled64")
@@ -77,8 +81,10 @@ Options parse_options(int argc, char **argv)
         else
             usage_error("unknown option " + key);
     }
-    if (options.interaction.empty() || options.flow_output.empty() || options.output.empty())
-        usage_error("--interaction, --flow-output and --output are required");
+    if (options.interaction.empty() || options.output.empty())
+        usage_error("--interaction and --output are required");
+    if (options.flow_output.empty() == options.jcoupled64.empty())
+        usage_error("select exactly one input: --flow-output or --jcoupled64");
     if (options.Z < 0 || options.N < 0)
         usage_error("--Z and --N are required");
     if (!(options.scalar_tolerance > 0.0) || !std::isfinite(options.scalar_tolerance))
@@ -356,20 +362,30 @@ int main(int argc, char **argv)
         Hamiltonian basis_source;
         basis_source.read_minipack(options.interaction.string(), options.Z + options.N, 0.0);
         basis_source.init_mbasis();
-        const auto dense = mrimsrg::read_vacuum_mscheme(
-            mrimsrg::resolve_vacuum_payload(options.flow_output));
-        const CoupledHamiltonian coupled = couple_to_j_scheme(
-            dense, basis_source.get_jbasis(), basis_source.get_mbasis());
+        CoupledHamiltonian coupled;
+        if (!options.jcoupled64.empty())
+        {
+            coupled = mrimsrg::read_jcoupled64(
+                options.jcoupled64, basis_source.get_jbasis());
+            std::cout << "read jcoupled64=" << fs::absolute(options.jcoupled64) << "\n";
+        }
+        else
+        {
+            const auto dense = mrimsrg::read_vacuum_mscheme(
+                mrimsrg::resolve_vacuum_payload(options.flow_output));
+            coupled = couple_to_j_scheme(
+                dense, basis_source.get_jbasis(), basis_source.get_mbasis());
 
-        std::cout << std::setprecision(12)
-                  << "m-to-J projection: max_one_body_error="
-                  << coupled.one_body_projection_error
-                  << " max_two_body_error=" << coupled.two_body_projection_error
-                  << " tolerance=" << options.scalar_tolerance << "\n";
-        if (coupled.one_body_projection_error > options.scalar_tolerance ||
-            coupled.two_body_projection_error > options.scalar_tolerance)
-            throw std::runtime_error(
-                "m-scheme Hamiltonian is not representable as a scalar J-coupled operator within tolerance");
+            std::cout << std::setprecision(12)
+                      << "m-to-J projection: max_one_body_error="
+                      << coupled.one_body_projection_error
+                      << " max_two_body_error=" << coupled.two_body_projection_error
+                      << " tolerance=" << options.scalar_tolerance << "\n";
+            if (coupled.one_body_projection_error > options.scalar_tolerance ||
+                coupled.two_body_projection_error > options.scalar_tolerance)
+                throw std::runtime_error(
+                    "m-scheme Hamiltonian is not representable as a scalar J-coupled operator within tolerance");
+        }
 
         if (!options.diagnostic_jcoupled64.empty())
         {
