@@ -5,6 +5,7 @@ import json
 import subprocess
 import re
 import shlex
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -250,6 +251,10 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
     reference_sha256 = _sha256(reference_file)
     executable_sha256 = _sha256(executable_path)
     repository_commit = _repository_commit(REPO_ROOT)
+    git_executable = shutil.which("git")
+    if git_executable is None:
+        raise RuntimeError("git is unavailable while generating MR flow job")
+    git_executable = str(Path(git_executable).resolve())
     segment_smax = settings.target_s - settings.start_s
     tag = (
         f"{settings.nucleus}_Nrefmax{settings.nrefmax}_emax{settings.emax}"
@@ -322,8 +327,8 @@ export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{library_paths}"
 echo repository_commit={repository_commit}
 echo cumulative_start_s={settings.start_s:.17g}
 echo cumulative_target_s={settings.target_s:.17g}
-test "$(git rev-parse HEAD)" = '{repository_commit}'
-git diff --quiet HEAD --
+test "$({shlex.quote(git_executable)} rev-parse HEAD)" = '{repository_commit}'
+{shlex.quote(git_executable)} diff --quiet HEAD --
 echo '{interaction_sha256}  {interaction}' | sha256sum -c -
 echo '{reference_sha256}  {reference_file}' | sha256sum -c -
 echo '{executable_sha256}  {executable_path}' | sha256sum -c -
@@ -340,6 +345,7 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
     metadata = {
         "schema": "mrimsrg_cpp_jscheme_slurm_v1",
         "repository_commit": repository_commit,
+        "git_executable": git_executable,
         "settings": {
             **asdict(settings),
             "interaction": str(interaction),
