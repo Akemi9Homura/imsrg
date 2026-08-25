@@ -133,7 +133,7 @@ class IMSRGSolver
   bool HasMRReference() const {return mr_reference != nullptr;};
   Operator EvaluateCommutator(const Operator& X, const Operator& Y) const;
 
-  int GetSystemDimension();
+  size_t GetSystemDimension();
   double GetS(){return s;};
   Operator& GetH_s(){return FlowingOps[0];};
   void SetH_s( Operator& Hset){ FlowingOps[0] = Hset;};

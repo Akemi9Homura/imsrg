@@ -848,12 +848,12 @@ void TwoBodyME::PrintAllMatrices() const
 
 
 
-int TwoBodyME::Dimension()
+size_t TwoBodyME::Dimension()
 {
-   int dim = 0;
+   size_t dim = 0;
    for ( auto& itmat : MatEl )
    {
-      int N = itmat.second.n_cols;
+      size_t N = itmat.second.n_cols;
       dim += N*(N+1)/2;
    }
    return dim;

@@ -1076,11 +1076,11 @@ Operator IMSRGSolver::Transform_Partial(Operator &&OpIn, int n)
 }
 
 // count number of equations to be solved
-int IMSRGSolver::GetSystemDimension()
+size_t IMSRGSolver::GetSystemDimension()
 {
-  int dim = 1; // zero-body part
+  size_t dim = 1; // zero-body part
 
-  int N = H_0->OneBody.n_cols;
+  size_t N = H_0->OneBody.n_cols;
   dim += N * (N + 1) / 2;
   dim += H_0->TwoBody.Dimension();
   return dim;
