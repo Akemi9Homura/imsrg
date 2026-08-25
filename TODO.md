@@ -29,7 +29,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 
 ### B. 生产参考态与正规序接口
 
-- [ ] 新增最小 `Jref=0` MR reference 对象，保存每个 J-orbit 的自然
+- [x] 新增最小 `Jref=0` MR reference 对象，保存每个 J-orbit 的自然
       占据与 J-coupled `lambda2`，不把相关密度隐藏成全局状态。
 - [ ] 读入时验证标量性、Hermiticity、pair antisymmetry、`Tr(gamma1)=A`
       和 `gamma2 -> (A-1)gamma1` 收缩，拒绝 `Jref!=0` 或非自然基密度。

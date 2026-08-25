@@ -285,6 +285,24 @@ PYBIND11_MODULE(pyIMSRG, m)
           //      .def("IsospinProject", &Operator::IsospinProject)
           ;
 
+      py::class_<MRReference>(m, "MRReference")
+          .def(py::init<ModelSpace &, int, int, int, const std::vector<double> &>(),
+               py::arg("modelspace"), py::arg("A"), py::arg("Z"),
+               py::arg("Nrefmax"), py::arg("occupations"), py::keep_alive<1, 2>())
+          .def_readonly("A", &MRReference::A)
+          .def_readonly("Z", &MRReference::Z)
+          .def_readonly("Nrefmax", &MRReference::Nrefmax)
+          .def_readonly("occupations", &MRReference::occupations)
+          .def_readwrite("Lambda2", &MRReference::Lambda2)
+          .def("OccupationsMatchModelSpace", &MRReference::OccupationsMatchModelSpace,
+               py::arg("tolerance") = 1e-12)
+          .def("MaximumHermiticityViolation", &MRReference::MaximumHermiticityViolation)
+          .def("MaximumContractionViolation", &MRReference::MaximumContractionViolation)
+          .def("Validate", &MRReference::Validate, py::arg("tolerance") = 1e-10)
+          .def("ContractLambda2", &MRReference::ContractLambda2)
+          .def("NormalOrder", &MRReference::NormalOrder)
+          .def("UndoNormalOrder", &MRReference::UndoNormalOrder);
+
       py::class_<arma::mat>(m, "ArmaMat")
           .def(py::init<>())
           .def(

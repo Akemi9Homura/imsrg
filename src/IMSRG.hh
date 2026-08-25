@@ -38,6 +38,7 @@
 #include "DarkMatterNREFT.hh"
 #include "HFMBPT.hh"
 #include "UnitTest.hh"
+#include "MRReference.hh"
 #include "PhysicalConstants.hh"
 #include "RPA.hh"
 #include "ReferenceImplementations.hh"

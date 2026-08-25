@@ -263,6 +263,18 @@ target_link_libraries(
 )
 
 add_library(
+    MRReference
+    MRReference.hh MRReference.cc
+)
+target_link_libraries(
+    MRReference
+    PUBLIC
+    Operator
+    TwoBodyME
+    ModelSpace
+)
+
+add_library(
     Version
     version.hh
     ${CMAKE_CURRENT_BINARY_DIR}/version.cc
@@ -666,6 +678,7 @@ add_library(
     TwoBodyME
     ThreeBodyME
     Operator
+    MRReference
     HartreeFock
     Commutator
     IMSRGSolver
@@ -690,6 +703,7 @@ target_link_libraries(
     TwoBodyME
     ThreeBodyME
     Operator
+    MRReference
     HartreeFock
     Commutator
     IMSRGSolver
@@ -769,3 +783,4 @@ add_test(NAME Factorized   COMMAND  python3 ../test/UnitTestFactorized.py )
 add_test(NAME Triples      COMMAND  python3 ../test/UnitTestTriples.py )
 add_test(NAME Tensor       COMMAND  python3 ../test/UnitTestTensor.py )
 add_test(NAME NormalOrdering    COMMAND  python3 ../test/UnitTestNormalOrdering.py )
+add_test(NAME MRReference COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRReference.py)

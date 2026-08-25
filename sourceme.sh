@@ -1,22 +1,12 @@
-if ! type module >/dev/null 2>&1; then
-    if [ -r /opt/modules/init/bash ]; then
-        source /opt/modules/init/bash
-    else
-        echo "ERROR: Environment Modules is not initialized" >&2
-        return 1 2>/dev/null || exit 1
-    fi
+if ! type module >/dev/null 2>&1 && [ -r /opt/modules/init/bash ]; then
+    source /opt/modules/init/bash
 fi
 
-# point7 keeps site modulefiles outside the Modules package's default path.
-if [ -d /opt/library/modulefiles ]; then
-    module use /opt/library/modulefiles
-fi
-
-module purge
-
-# Module names differ between machines, so branch on the machine. wm2 has the
-# /lustre/home/2401110128 tree; point7 does not.
-if [ -d /lustre/home/2401110128 ]; then
+# Module names differ between machines.  The development workstation uses the
+# system toolchain and has no Environment Modules installation; the two Slurm
+# clusters keep their existing explicit module selections.
+if type module >/dev/null 2>&1 && [ -d /lustre/home/2401110128 ]; then
+    module purge
     # wm2 default modules verified for this checkout.
     module load cmake/3.31.9
     module load OpenBLAS/0.3.17
@@ -25,7 +15,9 @@ if [ -d /lustre/home/2401110128 ]; then
 
     export GSL_ROOT_DIR=/lustre/software/gsl/2.7.0/gcc_8.5.0
     export CMAKE_PREFIX_PATH="$GSL_ROOT_DIR:$CMAKE_PREFIX_PATH"
-else
+elif type module >/dev/null 2>&1 && [ -d /opt/library/modulefiles ]; then
+    module use /opt/library/modulefiles
+    module purge
     # point7 modules. The checkout's imsrg++ links libopenblas.so.0, which the
     # single-threaded OpenBLAS module provides; gsl/2.7.1 supplies libgsl.so.27.
     module load cmake/3.25.2
@@ -39,5 +31,8 @@ fi
 
 export OPENBLAS_NUM_THREADS=1
 
-export PYTHONPATH="$PWD/build:$PYTHONPATH"
-export LD_LIBRARY_PATH="$PWD/build:$LD_LIBRARY_PATH"
+# A root-level CMake configure places targets in build/src, while the cluster
+# checkouts historically configure src/ directly and place them in build/.
+# Keep both layouts available without changing which executable job scripts use.
+export PYTHONPATH="$PWD/build/src:$PWD/build:$PYTHONPATH"
+export LD_LIBRARY_PATH="$PWD/build/src:$PWD/build:$LD_LIBRARY_PATH"
