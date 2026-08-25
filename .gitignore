@@ -1,6 +1,7 @@
 .vscode/
 build/
 build-src/
+build-py*/
 #CMake output files
 CMakeFiles/
 CMakeCache.txt
