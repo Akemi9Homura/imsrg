@@ -178,6 +178,14 @@ J-coupled 恒等式检查、正规序往返及 `mrimsrg_jref_v1` 文件 reader �
 绝对容差通过独立四指标协变对照。当前步骤 6 只剩 driver 参数接线与真实
 NNLOopt 的 `E/f/Gamma`、`s=0`/short-flow 门禁。
 
+严格门禁不能以 float32 `no2bpack` 作为内部真值，因此步骤 6 同时复用
+原型验收的 `mrimsrg_j64_v1`，在 `ReadWrite` 增加 float64 scalar J-coupled
+reader/writer。它按 `(n,l,2j,2tz)` 映射轨道并验证完整 channel/pair 覆盖；
+随机 Hermitian NN/NO2B 写读误差 `<1e-13`，读取既有真实
+`He4_s0_srcheck.jcoupled64` 与 Python reader 构造的 `Operator` 逐元素误差
+为零。该格式只作无损生产输入和验收检查点，最终 NCSM/FCIQMC 文件仍由
+既有 `no2bpack` writer 产生。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和

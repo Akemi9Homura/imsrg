@@ -9,11 +9,14 @@
 #include <sstream>
 #include <string>
 #include <chrono>
+#include <cstdint>
 #include <ctime>
 #include <array>
 #include <cmath>
 #include <limits>
 #include <map>
+#include <set>
+#include <tuple>
 #include <vector>
 #include <unordered_map>
 #include "omp.h"
@@ -379,6 +382,294 @@ void ReadWrite::Read_no2bpack( std::string filename, Operator& Hbare )
             << "  emax=" << emax_file
             << "  used " << n_tbme_used << " / " << num_tbme
             << " TBMEs" << std::endl;
+}
+
+
+/// Read the lossless mrimsrg_j64_v1 scalar NN/NO2B interchange format.
+/// Unlike no2bpack, all zero-, one-, and two-body values are float64 and no
+/// optional center-of-mass payload is present.  The file orbit table is mapped
+/// by (n,l,2j,2tz), never by assuming identical producer orbit indices.
+void ReadWrite::Read_jcoupled64( std::string filename, Operator& Hvac )
+{
+  std::ifstream input(filename, std::ios::binary);
+  if (!input)
+  {
+    std::cerr << "Read_jcoupled64: cannot open " << filename << std::endl;
+    goodstate = false;
+    return;
+  }
+  auto read = [&](auto& value, const char* field)
+  {
+    input.read(reinterpret_cast<char*>(&value), sizeof(value));
+    if (!input)
+    {
+      std::cerr << "Read_jcoupled64: truncated " << field << " in "
+                << filename << std::endl;
+      goodstate = false;
+    }
+  };
+
+  constexpr std::array<char,16> expected_magic = {
+      'm','r','i','m','s','r','g','_','j','6','4','_','v','1',0,0};
+  std::array<char,16> magic{};
+  input.read(magic.data(), magic.size());
+  if (!input || magic != expected_magic)
+  {
+    std::cerr << "Read_jcoupled64: unsupported payload " << filename << std::endl;
+    goodstate = false;
+    return;
+  }
+
+  double hw_file = 0.0;
+  std::int32_t emax_file = -1;
+  std::uint64_t norbits_file = 0;
+  std::uint64_t nobme_file = 0;
+  std::uint64_t ntbme_file = 0;
+  read(hw_file, "hw");
+  read(emax_file, "emax");
+  read(norbits_file, "orbit count");
+  read(nobme_file, "OBME count");
+  read(ntbme_file, "TBME count");
+  if (!goodstate) return;
+
+  ModelSpace* modelspace = Hvac.GetModelSpace();
+  const std::uint64_t norbits = modelspace->GetNumberOrbits();
+  std::uint64_t expected_tbmes = 0;
+  for (int ch = 0; ch < modelspace->GetNumberTwoBodyChannels(); ++ch)
+  {
+    const std::uint64_t nkets = modelspace->GetTwoBodyChannel(ch).GetNumberKets();
+    expected_tbmes += nkets * (nkets + 1) / 2;
+  }
+  if (norbits_file != norbits || nobme_file != norbits * (norbits + 1) / 2 ||
+      ntbme_file != expected_tbmes || emax_file != modelspace->GetEmax() ||
+      std::abs(hw_file - modelspace->GetHbarOmega()) > 1e-12)
+  {
+    std::cerr << "Read_jcoupled64: header does not match active ModelSpace"
+              << std::endl;
+    goodstate = false;
+    return;
+  }
+
+  std::vector<index_t> file_to_model(norbits_file, ModelSpace::NOT_AN_ORBIT);
+  std::set<index_t> mapped_orbits;
+  for (std::uint64_t i = 0; i < norbits_file; ++i)
+  {
+    std::int32_t n=0, l=0, j2=0, tz2=0;
+    read(n, "orbit n");
+    read(l, "orbit l");
+    read(j2, "orbit 2j");
+    read(tz2, "orbit 2tz");
+    if (!goodstate) return;
+    const index_t orbit = modelspace->GetOrbitIndex(n,l,j2,tz2);
+    if (orbit >= norbits || !mapped_orbits.insert(orbit).second)
+    {
+      std::cerr << "Read_jcoupled64: orbit table does not map one-to-one"
+                << std::endl;
+      goodstate = false;
+      return;
+    }
+    file_to_model[i] = orbit;
+  }
+
+  read(Hvac.ZeroBody, "zero body");
+  for (std::uint64_t a_file = 0; a_file < norbits_file; ++a_file)
+    for (std::uint64_t b_file = a_file; b_file < norbits_file; ++b_file)
+    {
+      double value = 0.0;
+      read(value, "OBME");
+      if (!goodstate) return;
+      const index_t a = file_to_model[a_file];
+      const index_t b = file_to_model[b_file];
+      Hvac.OneBody(a,b) = value;
+      Hvac.OneBody(b,a) = value;
+    }
+
+  std::set<std::tuple<int,size_t,size_t>> seen_tbmes;
+  for (std::uint64_t record = 0; record < ntbme_file; ++record)
+  {
+    std::int32_t a_file=0, b_file=0, c_file=0, d_file=0, J=0;
+    double value = 0.0;
+    read(a_file, "TBME orbit a");
+    read(b_file, "TBME orbit b");
+    read(c_file, "TBME orbit c");
+    read(d_file, "TBME orbit d");
+    read(J, "TBME J");
+    read(value, "TBME");
+    if (!goodstate) return;
+    const bool valid = a_file >= 0 && b_file >= 0 && c_file >= 0 && d_file >= 0 &&
+                       static_cast<std::uint64_t>(a_file) < norbits_file &&
+                       static_cast<std::uint64_t>(b_file) < norbits_file &&
+                       static_cast<std::uint64_t>(c_file) < norbits_file &&
+                       static_cast<std::uint64_t>(d_file) < norbits_file;
+    if (!valid)
+    {
+      std::cerr << "Read_jcoupled64: invalid orbit index in TBME record"
+                << std::endl;
+      goodstate = false;
+      return;
+    }
+    const index_t a = file_to_model[a_file];
+    const index_t b = file_to_model[b_file];
+    const index_t c = file_to_model[c_file];
+    const index_t d = file_to_model[d_file];
+    if (a > b || c > d)
+    {
+      std::cerr << "Read_jcoupled64: mapped pair ordering is not canonical"
+                << std::endl;
+      goodstate = false;
+      return;
+    }
+    const Orbit& oa = modelspace->GetOrbit(a);
+    const Orbit& ob = modelspace->GetOrbit(b);
+    const Orbit& oc = modelspace->GetOrbit(c);
+    const Orbit& od = modelspace->GetOrbit(d);
+    const int parity_bra = (oa.l + ob.l) % 2;
+    const int parity_ket = (oc.l + od.l) % 2;
+    const int Tz_bra = (oa.tz2 + ob.tz2) / 2;
+    const int Tz_ket = (oc.tz2 + od.tz2) / 2;
+    if (parity_bra != parity_ket || Tz_bra != Tz_ket)
+    {
+      std::cerr << "Read_jcoupled64: TBME violates scalar channel symmetry"
+                << std::endl;
+      goodstate = false;
+      return;
+    }
+    const size_t ch = modelspace->GetTwoBodyChannelIndex(J, parity_bra, Tz_bra);
+    if (ch >= static_cast<size_t>(modelspace->GetNumberTwoBodyChannels()))
+    {
+      std::cerr << "Read_jcoupled64: TBME has invalid J channel" << std::endl;
+      goodstate = false;
+      return;
+    }
+    TwoBodyChannel& channel = modelspace->GetTwoBodyChannel(ch);
+    const size_t bra = channel.GetLocalIndex(a,b);
+    const size_t ket = channel.GetLocalIndex(c,d);
+    const size_t row = std::min(bra,ket);
+    const size_t column = std::max(bra,ket);
+    if (bra >= channel.GetNumberKets() || ket >= channel.GetNumberKets() ||
+        !seen_tbmes.emplace(ch,row,column).second)
+    {
+      std::cerr << "Read_jcoupled64: duplicate or invalid TBME pair" << std::endl;
+      goodstate = false;
+      return;
+    }
+    Hvac.TwoBody.SetTBME(ch,ch,row,column,value);
+  }
+  if (seen_tbmes.size() != ntbme_file ||
+      input.peek() != std::ifstream::traits_type::eof() ||
+      !std::isfinite(Hvac.ZeroBody) || !Hvac.OneBody.is_finite() ||
+      !Hvac.TwoBody.IsHermitian())
+  {
+    std::cerr << "Read_jcoupled64: incomplete, trailing, non-finite, or non-Hermitian payload"
+              << std::endl;
+    goodstate = false;
+    return;
+  }
+  File2N = filename;
+  Aref = modelspace->GetAref();
+  Zref = modelspace->GetZref();
+  std::cout << "Read lossless jcoupled64 Hamiltonian " << filename
+            << " with " << norbits_file << " orbits and " << ntbme_file
+            << " TBMEs" << std::endl;
+}
+
+
+/// Write the lossless mrimsrg_j64_v1 scalar NN/NO2B interchange format.
+void ReadWrite::Write_jcoupled64( std::string filename, Operator& Hvac )
+{
+  if (!Hvac.IsHermitian() || Hvac.GetJRank() != 0 || Hvac.GetTRank() != 0 ||
+      Hvac.GetParity() != 0 || !Hvac.IsNumberConserving() ||
+      Hvac.GetParticleRank() > 2 || !std::isfinite(Hvac.ZeroBody) ||
+      !Hvac.OneBody.is_finite() || !Hvac.TwoBody.IsHermitian())
+  {
+    std::cerr << "Write_jcoupled64: input is not a finite Hermitian scalar NN/NO2B operator"
+              << std::endl;
+    goodstate = false;
+    return;
+  }
+  for (const auto& block : Hvac.TwoBody.MatEl)
+    if (!block.second.is_finite())
+    {
+      std::cerr << "Write_jcoupled64: non-finite TBME" << std::endl;
+      goodstate = false;
+      return;
+    }
+
+  std::ofstream output(filename, std::ios::binary);
+  if (!output)
+  {
+    std::cerr << "Write_jcoupled64: cannot open " << filename << std::endl;
+    goodstate = false;
+    return;
+  }
+  auto write = [&](const auto& value)
+  {
+    output.write(reinterpret_cast<const char*>(&value), sizeof(value));
+  };
+  constexpr std::array<char,16> magic = {
+      'm','r','i','m','s','r','g','_','j','6','4','_','v','1',0,0};
+  output.write(magic.data(), magic.size());
+  ModelSpace* modelspace = Hvac.GetModelSpace();
+  const double hw = modelspace->GetHbarOmega();
+  const std::int32_t emax = modelspace->GetEmax();
+  const std::uint64_t norbits = modelspace->GetNumberOrbits();
+  const std::uint64_t nobmes = norbits * (norbits + 1) / 2;
+  std::uint64_t ntbmes = 0;
+  for (int ch = 0; ch < modelspace->GetNumberTwoBodyChannels(); ++ch)
+  {
+    const std::uint64_t nkets = modelspace->GetTwoBodyChannel(ch).GetNumberKets();
+    ntbmes += nkets * (nkets + 1) / 2;
+  }
+  write(hw);
+  write(emax);
+  write(norbits);
+  write(nobmes);
+  write(ntbmes);
+  for (index_t a : modelspace->all_orbits)
+  {
+    const Orbit& orbit = modelspace->GetOrbit(a);
+    for (int quantum_number : {orbit.n,orbit.l,orbit.j2,orbit.tz2})
+    {
+      const std::int32_t value = quantum_number;
+      write(value);
+    }
+  }
+  write(Hvac.ZeroBody);
+  for (index_t a = 0; a < norbits; ++a)
+    for (index_t b = a; b < norbits; ++b)
+      write(Hvac.OneBody(a,b));
+  for (int ch = 0; ch < modelspace->GetNumberTwoBodyChannels(); ++ch)
+  {
+    TwoBodyChannel& channel = modelspace->GetTwoBodyChannel(ch);
+    for (size_t bra = 0; bra < channel.GetNumberKets(); ++bra)
+    {
+      Ket& bra_ket = channel.GetKet(bra);
+      for (size_t ket = bra; ket < channel.GetNumberKets(); ++ket)
+      {
+        Ket& ket_ket = channel.GetKet(ket);
+        for (int index : {static_cast<int>(bra_ket.p),
+                          static_cast<int>(bra_ket.q),
+                          static_cast<int>(ket_ket.p),
+                          static_cast<int>(ket_ket.q),channel.J})
+        {
+          const std::int32_t value = index;
+          write(value);
+        }
+        const double value = Hvac.TwoBody.GetTBME_norm(ch,bra,ket);
+        write(value);
+      }
+    }
+  }
+  output.close();
+  if (!output)
+  {
+    std::cerr << "Write_jcoupled64: failed while writing " << filename << std::endl;
+    goodstate = false;
+    return;
+  }
+  std::cout << "Wrote lossless jcoupled64 Hamiltonian to " << filename
+            << " with " << norbits << " orbits and " << ntbmes << " TBMEs"
+            << std::endl;
 }
 
 
@@ -6620,5 +6911,3 @@ void ReadWrite::CopyFile(std::string filename1, std::string filename2)
 //    f2 << f1.rdbuf ();
 //  } 
 }
-
-

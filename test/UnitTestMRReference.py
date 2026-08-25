@@ -490,4 +490,16 @@ np.testing.assert_allclose(
     rtol=0,
 )
 
+# The lossless J-coupled bridge used by the production driver must preserve
+# every stored rank exactly enough for the 1e-10 algebra gates.  no2bpack is
+# intentionally not used here because its established payload is float32.
+with tempfile.TemporaryDirectory() as temporary_directory:
+    j64_path = Path(temporary_directory) / "round_trip.jcoupled64"
+    j64_writer = pyIMSRG.ReadWrite()
+    j64_writer.Write_jcoupled64(str(j64_path), he4_ho_operator)
+    j64_recovered = pyIMSRG.Operator(he4_nref2_ms)
+    j64_reader = pyIMSRG.ReadWrite()
+    j64_reader.Read_jcoupled64(str(j64_path), j64_recovered)
+assert max_operator_difference(j64_recovered, he4_ho_operator) < 1e-13
+
 print("MRReference tests passed")

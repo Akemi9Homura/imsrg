@@ -38,6 +38,10 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 - [x] 抽取并复用 HF/HFMBPT 的 normalized-pair J-scheme 0/1/2B 基变换，
       用真实 `He4 Nrefmax=2` 非单位自然轨道验证 HO→NAT→HO，并对独立
       m-scheme 四指标变换逐元素比较。
+- [x] 将原型验收已有的 `mrimsrg_j64_v1` float64 J-coupled Hamiltonian
+      格式纳入 `ReadWrite`，作为 driver 的无损输入/检查点；随机写读误差
+      `<1e-13`，既有真实 He4 文件读入误差为零。下游 `no2bpack` 仍保持
+      既有 float32 布局。
 - [ ] 对真实 NNLOopt Hamiltonian 与 Python 比较自然基 `E/f/Gamma`，并
       比较最终真空反变换的全部矩阵元。
 

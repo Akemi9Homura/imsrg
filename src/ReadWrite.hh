@@ -45,6 +45,8 @@ class ReadWrite
    void ReadTBME_OakRidge( std::string spname, std::string tbmename, Operator& Hbare, std::string format);
    void Read_no2bpack( std::string filename, Operator& Hbare);
    void Write_no2bpack( std::string filename, Operator& Hvac);
+   void Read_jcoupled64( std::string filename, Operator& Hvac);
+   void Write_jcoupled64( std::string filename, Operator& Hvac);
    void ReadBareTBME_Navratil( std::string filename, Operator& Hbare);
    void ReadBareTBME_Navratil_from_stream( std::istream& infile, Operator& Hbare);
    void ReadBareTBME_Darmstadt( std::string filename, Operator& Hbare, int E1max, int E2max, int lmax);
