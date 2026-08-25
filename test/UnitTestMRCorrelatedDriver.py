@@ -37,7 +37,19 @@ from prototype.mrimsrg.normal_order import (  # noqa: E402
 )
 from prototype.mrimsrg.reference_io import load_reference  # noqa: E402
 from prototype.mrimsrg.jcoupling import couple_scalar_two_body  # noqa: E402
-from prototype.mrimsrg.sr_imsrgpp_check import operator_to_mscheme  # noqa: E402
+from prototype.mrimsrg.sr_imsrgpp_check import (  # noqa: E402
+    _mr_rk4_step,
+    operator_to_mscheme,
+)
+
+
+def mr_operator_errors(operator, expected, orbits):
+    actual = operator_to_mscheme(operator, orbits)
+    return (
+        abs(expected.zero_body - actual.zero_body),
+        float(np.max(np.abs(expected.one_body - actual.one_body))),
+        float(np.max(np.abs(expected.two_body - actual.two_body))),
+    )
 
 
 def coupled_term_errors(operator, expected, data, modelspace):
@@ -314,6 +326,87 @@ def main():
                     f"one={errors[1]:.3e} two={errors[2]:.3e}"
                 )
                 assert max(errors) < 2e-10
+
+            groups = spherical_orbit_groups_from_orbits(data.orbits)
+            quanta = oscillator_quanta_from_orbits(data.orbits)
+
+            def expected_rhs_at(hamiltonian):
+                eta = white_generator(
+                    hamiltonian,
+                    natural.densities,
+                    quanta,
+                    spherical_orbit_groups=groups,
+                )
+                return commutator(eta, hamiltonian, natural.densities)
+
+            checkpoint_step = 1e-3
+            expected_checkpoint = expected_initial
+            for checkpoint_index in range(1, 4):
+                expected_checkpoint = _mr_rk4_step(
+                    expected_checkpoint, checkpoint_step, expected_rhs_at
+                )
+                checkpoint_s = checkpoint_index * checkpoint_step
+                actual_path = run_driver(
+                    executable,
+                    root,
+                    nucleus,
+                    A,
+                    input_file,
+                    reference_file,
+                    checkpoint_s,
+                    True,
+                    step=checkpoint_step,
+                )
+                actual_vacuum = pyIMSRG.Operator(modelspace)
+                pyIMSRG.ReadWrite().Read_jcoupled64(
+                    str(actual_path), actual_vacuum
+                )
+                actual_checkpoint = reference.NormalOrder(
+                    actual_vacuum.TransformOneAndTwoBody(
+                        reference.NaturalOrbitTransformation
+                    )
+                )
+                h_errors = mr_operator_errors(
+                    actual_checkpoint, expected_checkpoint, data.orbits
+                )
+
+                expected_checkpoint_eta = white_generator(
+                    expected_checkpoint,
+                    natural.densities,
+                    quanta,
+                    spherical_orbit_groups=groups,
+                )
+                actual_checkpoint_eta = pyIMSRG.Operator(modelspace)
+                actual_checkpoint_eta.SetAntiHermitian()
+                generator.Update(actual_checkpoint, actual_checkpoint_eta)
+                eta_checkpoint_errors = mr_operator_errors(
+                    actual_checkpoint_eta,
+                    expected_checkpoint_eta,
+                    data.orbits,
+                )
+
+                expected_checkpoint_rhs = commutator(
+                    expected_checkpoint_eta,
+                    expected_checkpoint,
+                    natural.densities,
+                )
+                actual_checkpoint_rhs = pyIMSRG.MR_Commutator(
+                    actual_checkpoint_eta, actual_checkpoint, reference
+                )
+                rhs_checkpoint_errors = mr_operator_errors(
+                    actual_checkpoint_rhs,
+                    expected_checkpoint_rhs,
+                    data.orbits,
+                )
+                print(
+                    f"{nucleus} checkpoint s={checkpoint_s:.3f}: "
+                    f"H={max(h_errors):.3e} "
+                    f"eta={max(eta_checkpoint_errors):.3e} "
+                    f"RHS={max(rhs_checkpoint_errors):.3e}"
+                )
+                assert max(h_errors) < 2e-10
+                assert max(eta_checkpoint_errors) < 2e-10
+                assert max(rhs_checkpoint_errors) < 2e-10
 
 
 if __name__ == "__main__":

@@ -96,8 +96,11 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `6.38e-11 MeV`。Frobenius/最坏元素的持久化报告随 checkpoint 表生成。
 - [ ] 为四体系各命名项生成机器可读误差表，补齐相对 Frobenius 与最坏
       J/m 元素索引；该报告不能只存在于临时测试 stdout。
-- [ ] 比较 `ds=1e-4` Euler 一步与 `s=0.001,0.002,0.003` 共同固定步
-      RK4 checkpoints，每点重新比较 `H/eta/RHS`。
+- [x] 比较共同固定步 RK4 checkpoints：四体系用 `ds=1e-3` 到
+      `s=0.001,0.002,0.003`，每点从 driver 的 HO 真空 J64 输出读回、
+      HO→NAT 并 MR 正规序后重新比较 `H/eta/RHS`；全局最坏 max-abs
+      `7.043e-11 MeV`。机器记录见
+      `docs/MR-IMSRG-Jscheme-checkpoints.json`。独立 Euler 门禁仍待补。
 - [ ] 统一生成元/cutoff/停止条件/容差后比较完整流、真空
       `E0+t+V` 与 NCSM 谱；float32 `no2bpack` 只做下游格式验收。
 

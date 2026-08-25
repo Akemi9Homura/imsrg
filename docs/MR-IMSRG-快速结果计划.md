@@ -109,6 +109,11 @@ double-precision J-coupled 输入，不使用 float32 `no2bpack`；完整流后�
 做普通 Hamiltonian/NCSM/no2bpack 验收。最终能量相近不能替代逐矩阵元
 核对。
 
+截至 2026-08-25，四个相关参考测试点的 `ds=1e-3` RK4 已逐点通过
+`s=0.001,0.002,0.003` 的 `H/eta/RHS` J/m 对照，全局最坏 max-abs 为
+`7.043e-11 MeV`。下一门禁是独立 Euler 一步、带相对 Frobenius/最坏
+索引的逐命名 contraction 报告，然后才进入完整直接流与 NCSM 谱验收。
+
 ### M0：冻结普通 Hamiltonian 和基准
 
 任务：

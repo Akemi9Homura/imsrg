@@ -20,8 +20,18 @@ from prototype.mrimsrg.export_jref import export_reference  # noqa: E402
 from prototype.mrimsrg.reference_io import load_reference  # noqa: E402
 
 
-def run_driver(executable, root, nucleus, A, input_file, reference_file, smax, mr):
-    label = f"{nucleus}_{'mr' if mr else 'sr'}_{smax:.8g}"
+def run_driver(
+    executable,
+    root,
+    nucleus,
+    A,
+    input_file,
+    reference_file,
+    smax,
+    mr,
+    step=1e-4,
+):
+    label = f"{nucleus}_{'mr' if mr else 'sr'}_{smax:.8g}_ds{step:.8g}"
     output = root / f"{label}.jcoupled64"
     command = [
         str(executable),
@@ -37,8 +47,8 @@ def run_driver(executable, root, nucleus, A, input_file, reference_file, smax, m
         "method=flow_RK4",
         f"core_generator={'white-ncsm' if mr else 'white'}",
         f"smax={smax:.8g}",
-        "ds_0=0.0001",
-        "dsmax=0.0001",
+        f"ds_0={step:.8g}",
+        f"dsmax={step:.8g}",
         "eta_criterion=0",
         "BetaCM=0",
         f"flowfile={root / ('flow_' + label + '.txt')}",

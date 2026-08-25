@@ -1,0 +1,32 @@
+{
+  "schema": "mrimsrg_jscheme_checkpoint_v1",
+  "date": "2026-08-25",
+  "command": "source ./sourceme.sh && ctest --test-dir build -R ^MRCorrelatedDriver$ --output-on-failure",
+  "oracle": "prototype/mrimsrg Python m-scheme MR-IMSRG(2)",
+  "implementation": "imsrg++ C++ J-scheme direct flow_RK4",
+  "step": 0.001,
+  "tolerance_max_abs_mev": 2e-10,
+  "comparisons": {
+    "He4_Nrefmax2": [
+      {"s": 0.001, "H": 3.353e-11, "eta": 9.195e-13, "RHS": 3.771e-11},
+      {"s": 0.002, "H": 3.349e-11, "eta": 9.182e-13, "RHS": 3.766e-11},
+      {"s": 0.003, "H": 3.345e-11, "eta": 9.171e-13, "RHS": 3.762e-11}
+    ],
+    "Be8_Nrefmax0": [
+      {"s": 0.001, "H": 2.971e-11, "eta": 2.839e-13, "RHS": 1.220e-11},
+      {"s": 0.002, "H": 2.971e-11, "eta": 2.837e-13, "RHS": 1.217e-11},
+      {"s": 0.003, "H": 2.971e-11, "eta": 2.834e-13, "RHS": 1.214e-11}
+    ],
+    "C12_Nrefmax0": [
+      {"s": 0.001, "H": 4.638e-11, "eta": 4.094e-13, "RHS": 2.722e-11},
+      {"s": 0.002, "H": 4.639e-11, "eta": 4.090e-13, "RHS": 2.719e-11},
+      {"s": 0.003, "H": 4.637e-11, "eta": 4.085e-13, "RHS": 2.716e-11}
+    ],
+    "O16_Nrefmax2": [
+      {"s": 0.001, "H": 6.500e-11, "eta": 9.963e-13, "RHS": 7.043e-11},
+      {"s": 0.002, "H": 6.492e-11, "eta": 9.951e-13, "RHS": 7.034e-11},
+      {"s": 0.003, "H": 6.485e-11, "eta": 9.940e-13, "RHS": 7.027e-11}
+    ]
+  },
+  "result": "pass"
+}

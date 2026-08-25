@@ -336,3 +336,16 @@ little-endian float64 C-order `gamma1`, `gamma2`, `lambda2` 原始数据字节�
 旧 `Nrefmax=0` 与已取消的 `Nrefmax=2` 作业均早于
 `white_ncsm_spherical_monopole_v1`，不得作为正式结果或 continuation
 起点。正式 `Nrefmax=0` job、能量、门禁和文件摘要已记录在第 4 节。
+
+## 7. C++ J-scheme 固定步退化检查点
+
+生产 C++ driver 与 Python m-scheme oracle 使用相同 float64 Hamiltonian、
+RDM、White-NCSM 生成元和 `ds=1e-3` RK4。对 `He4/O16 Nrefmax=2`、
+`Be8/C12 Nrefmax=0` 分别积分到 `s=0.001,0.002,0.003`。每一点均从
+driver 写出的 HO 真空 `jcoupled64` 重新读入，再做 HO→NAT 与 MR 正规序，
+随后逐元素比较 `H`、重新计算的 `eta` 和 `RHS=[eta,H]`。36 个对象比较
+全部通过 `2e-10 MeV` 门槛，全局最坏误差为 O16 `s=0.001` 的 RHS
+`7.043e-11 MeV`。
+
+完整数值见 [`MR-IMSRG-Jscheme-checkpoints.json`](MR-IMSRG-Jscheme-checkpoints.json)；
+自动门禁为 CTest `MRCorrelatedDriver`，本次完整运行耗时约 250 秒。
