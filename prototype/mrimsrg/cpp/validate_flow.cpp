@@ -111,7 +111,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            mrimsrg::require_fixed_interaction(options.interaction);
+            mrimsrg::require_validated_interaction_basis(options.interaction);
             hamiltonian.read_minipack(options.interaction.string(), A, 0.0);
             hamiltonian.init_mscheme();
             const auto dense = options.jcoupled64.empty()

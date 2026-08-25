@@ -16,7 +16,7 @@ endif()
 # The bridge needs only the validated NN reader and simpleFCI path.  Disabling
 # optional 3B readers keeps this small build independent of unused libraries.
 set(TBME "NONE" CACHE STRING "shell-model-obs optional 3B reader" FORCE)
-set(SIMPLE_FCI_EMAX "2" CACHE STRING "simpleFCI determinant emax" FORCE)
+set(SIMPLE_FCI_EMAX "2" CACHE STRING "simpleFCI determinant emax")
 add_subdirectory("${SHELL_MODEL_OBS_ROOT}" "${CMAKE_BINARY_DIR}/shell-model-obs" EXCLUDE_FROM_ALL)
 
 execute_process(
@@ -39,7 +39,7 @@ foreach(target mrimsrg_prepare mrimsrg_validate mrimsrg_export_no2bpack
                mrimsrg_extract_minipack_subset)
     target_link_libraries(${target} PRIVATE fci nucleus util)
     target_compile_definitions(${target} PRIVATE
-        SIMPLE_FCI_EMAX=2
+        SIMPLE_FCI_EMAX=${SIMPLE_FCI_EMAX}
         SHELL_MODEL_OBS_ROOT="${SHELL_MODEL_OBS_ROOT}"
         SHELL_MODEL_OBS_REVISION="${SHELL_MODEL_OBS_REVISION}")
     target_compile_options(${target} PRIVATE
