@@ -30,6 +30,8 @@ class FlowJobTests(unittest.TestCase):
             pyimsrg = root / "pyimsrg"
             pyimsrg.mkdir()
             (pyimsrg / "pyIMSRG.so").write_bytes(b"test")
+            python = root / "python3"
+            python.write_bytes(b"test")
             script = generate_mr_check_job(
                 root,
                 root / "result",
@@ -40,6 +42,7 @@ class FlowJobTests(unittest.TestCase):
                     production_flow=flow,
                     pyimsrg_dir=pyimsrg,
                     ode_tolerance=1e-9,
+                    python_executable=python,
                 ),
             )
             contents = script.read_text(encoding="utf-8")
@@ -47,7 +50,7 @@ class FlowJobTests(unittest.TestCase):
             self.assertIn(f"--production-flow {flow}", contents)
             self.assertIn("--ode-tolerance 1.0000000000000001e-09", contents)
             self.assertIn("--output-jcoupled64", contents)
-            self.assertIn("/usr/bin/python3 -u", contents)
+            self.assertIn(f"{python} -u", contents)
             self.assertIn(f"ldd {pyimsrg / 'pyIMSRG.so'}", contents)
             self.assertNotIn("%N", contents)
 

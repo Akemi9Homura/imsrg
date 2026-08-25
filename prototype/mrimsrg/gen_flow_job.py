@@ -77,6 +77,7 @@ class MRCheckSettings:
     ode_tolerance: float = 1e-9
     initial_step: float = 1e-2
     flow_tolerance: float = 1e-5
+    python_executable: Path = _POINT7_SYSTEM_PYTHON
 
 
 def _number_tag(value: float) -> str:
@@ -317,6 +318,10 @@ def generate_mr_check_job(
         raise FileNotFoundError(f"pyIMSRG module is unavailable: {settings.pyimsrg_dir}")
     if min(settings.ode_tolerance, settings.initial_step, settings.flow_tolerance) <= 0:
         raise ValueError("MR check tolerances and initial step must be positive")
+    if not settings.python_executable.is_file():
+        raise FileNotFoundError(
+            f"MR check Python is unavailable: {settings.python_executable}"
+        )
 
     repo_root = repo_root.resolve()
     result_root = result_root.resolve()
@@ -344,7 +349,7 @@ def generate_mr_check_job(
     output_j64 = case_root / "cpp_vacuum.jcoupled64"
     command = (
         f"PYTHONPATH={repo_root / 'prototype' / 'mrimsrg'} "
-        f"{_POINT7_SYSTEM_PYTHON} -u "
+        f"{settings.python_executable.resolve()} -u "
         f"{repo_root / 'prototype' / 'mrimsrg' / 'mr_imsrgpp_flow_check.py'} "
         f"--nucleus {settings.nucleus} --reference {reference} "
         f"--interaction {settings.interaction.resolve()} "
@@ -373,7 +378,7 @@ export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 
 echo repository_commit={_repository_commit(repo_root)}
 ldd {settings.pyimsrg_dir.resolve() / 'pyIMSRG.so'} | grep -E 'openblas|blas|lapack|gsl|boost|not found' || true
-{_POINT7_SYSTEM_PYTHON} -c 'import sys, numpy, scipy; print("python", sys.version.split()[0], "numpy", numpy.__version__, "scipy", scipy.__version__, flush=True)'
+{settings.python_executable.resolve()} -c 'import sys, numpy, scipy; print("python", sys.version.split()[0], "numpy", numpy.__version__, "scipy", scipy.__version__, flush=True)'
 {command}
 """
     script.write_text(contents, encoding="utf-8")
@@ -415,6 +420,12 @@ def main() -> int:
     )
     parser.add_argument("--jcoupled64", type=Path)
     parser.add_argument("--pyimsrg-dir", type=Path)
+    parser.add_argument(
+        "--mr-check-python",
+        type=Path,
+        default=_POINT7_SYSTEM_PYTHON,
+        help="Python executable ABI-matched to --pyimsrg-dir",
+    )
     parser.add_argument("--sr-check-ode-tolerance", type=float)
     parser.add_argument("--sr-check-initial-step", type=float, default=1e-2)
     parser.add_argument("--sr-check-flow-tolerance", type=float, default=1e-5)
@@ -477,6 +488,7 @@ def main() -> int:
                 ode_tolerance=ode_tolerance,
                 initial_step=args.sr_check_initial_step,
                 flow_tolerance=args.sr_check_flow_tolerance,
+                python_executable=args.mr_check_python,
             ),
         )
     else:

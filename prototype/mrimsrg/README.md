@@ -88,7 +88,11 @@ non-diagonal HO-basis ``gamma1`` remains an error.
 On point7 this validator must be submitted through the same single-point job
 generator, using ``gen_flow_job.py --mr-check-flow FLOW --pyimsrg-dir
 build/src``; the generated job deliberately uses system Python matching the
-current ``pyIMSRG`` build rather than loading miniconda.
+current ``pyIMSRG`` build rather than loading miniconda. If compute nodes do
+not share the system NumPy installation, create a separate ABI-matched build
+and pass both explicitly, for example ``--pyimsrg-dir build-py312/src
+--mr-check-python /opt/library/miniconda-3.12.9/bin/python3``; never load
+miniconda around a system-Python extension.
 
 `commutator.py` implements the natural-orbital MR-IMSRG(2) commutator with
 `lambda3=0`.  Its equations were regenerated independently with QCombo 0.2.0:
