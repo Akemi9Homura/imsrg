@@ -31,7 +31,9 @@ endif()
 add_executable(mrimsrg_prepare cpp/prepare_reference.cpp)
 add_executable(mrimsrg_validate cpp/validate_flow.cpp)
 add_executable(mrimsrg_export_no2bpack cpp/export_no2bpack.cpp)
-foreach(target mrimsrg_prepare mrimsrg_validate mrimsrg_export_no2bpack)
+add_executable(mrimsrg_minipack_to_j64 cpp/minipack_to_j64.cpp)
+foreach(target mrimsrg_prepare mrimsrg_validate mrimsrg_export_no2bpack
+               mrimsrg_minipack_to_j64)
     target_link_libraries(${target} PRIVATE fci nucleus util)
     target_compile_definitions(${target} PRIVATE
         SIMPLE_FCI_EMAX=2

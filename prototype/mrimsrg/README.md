@@ -227,6 +227,22 @@ complete larger J-scheme channel layout, and reads it back independently. It
 does not claim that the NCSM reference was rediagonalized in a larger
 `Nrefmax` space.
 
+Convert the ordinary A-dependent bare minipack to the lossless J64 input read
+directly by the production `imsrg++` driver, without constructing m-scheme
+matrix elements:
+
+```bash
+prototype/mrimsrg/build/mrimsrg_minipack_to_j64 \
+  --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax4_e2max8.minipack \
+  --output /tmp/He4_NNLOopt_emax4.jcoupled64 --A 4
+```
+
+This bridge reuses `shell-model-obs::Hamiltonian::read_minipack()` for the
+same A-dependent intrinsic kinetic energy as the NCSM path, copies only its
+J-channel matrices, and requires an exact J64 write/read round trip. The J64
+file already contains the complete vacuum Hamiltonian, so the IMSRG driver
+must use `fmt2=jcoupled64` and must not add `Trel_Op` again.
+
 Read a materialized ordinary Hamiltonian back into the existing NCSM solver:
 
 ```bash
