@@ -67,6 +67,18 @@ def _number_tag(value: float) -> str:
     return format(value, ".0e").replace("+", "").replace("-", "m")
 
 
+def _repository_commit(repo_root: Path) -> str:
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        return "unknown"
+    return completed.stdout.strip()
+
+
 def _validate(settings: JobSettings) -> None:
     if (settings.nucleus, settings.nrefmax) not in _REFERENCE_NAMES:
         raise ValueError(
@@ -107,6 +119,7 @@ def generate_job(
     _validate(settings)
     repo_root = repo_root.resolve()
     result_root = result_root.resolve()
+    repository_commit = _repository_commit(repo_root)
     reference = (
         repo_root
         / "prototype"
@@ -164,6 +177,7 @@ export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 export MKL_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 
 {_POINT7_PYTHON} -c 'import sys, numpy, scipy; print("python", sys.version.split()[0], "numpy", numpy.__version__, "scipy", scipy.__version__, flush=True)'
+echo repository_commit={repository_commit}
 {command}
 """
     script.write_text(contents, encoding="utf-8")
@@ -199,6 +213,7 @@ def generate_sr_check_job(
 
     repo_root = repo_root.resolve()
     result_root = result_root.resolve()
+    repository_commit = _repository_commit(repo_root)
     reference = (
         repo_root
         / "prototype"
@@ -253,7 +268,7 @@ source ./sourceme.sh
 export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-64}}
 
-git rev-parse HEAD
+echo repository_commit={repository_commit}
 c++ --version | head -1
 ldd {settings.pyimsrg_dir.resolve() / 'pyIMSRG.so'} | grep -E 'openblas|blas|lapack|gsl|boost|not found' || true
 {_POINT7_PYTHON} -c 'import sys, numpy, scipy, sympy; print("python", sys.version.split()[0], "numpy", numpy.__version__, "scipy", scipy.__version__, "sympy", sympy.__version__, flush=True)'

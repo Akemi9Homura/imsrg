@@ -52,7 +52,7 @@ class FlowJobTests(unittest.TestCase):
             self.assertIn("sr_imsrgpp_check.py", contents)
             self.assertIn(f"--production-flow {flow}", contents)
             self.assertIn("--full-flow-ode-tolerance 1.0000000000000001e-09", contents)
-            self.assertIn("git rev-parse HEAD", contents)
+            self.assertIn("echo repository_commit=unknown", contents)
             self.assertIn(f"ldd {pyimsrg / 'pyIMSRG.so'}", contents)
             self.assertNotIn("%N", contents)
 
