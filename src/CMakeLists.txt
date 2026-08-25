@@ -90,6 +90,7 @@ target_link_libraries(
     AngMomCache
     PRIVATE
     AngMom
+    Commutator
 )
 
 add_library(

@@ -23,6 +23,15 @@ namespace MRCommutator
   /// not the production RHS.  It never expands a magnetic-substate tensor.
   MR1BResult comm221_lambda2_reference(const Operator &X, const Operator &Y,
                                        const MRReference &reference);
+
+  /// Block-matrix J-scheme implementation used by the production MR RHS.
+  MR1BResult comm221_lambda2(const Operator &X, const Operator &Y,
+                             const MRReference &reference);
+
+  /// Full MR-IMSRG(2) commutator for J_ref=0 and lambda3=0.
+  /// Lambda2=0 returns the existing scalar IMSRG(2) commutator directly.
+  Operator Commutator(const Operator &X, const Operator &Y,
+                      const MRReference &reference);
 }
 
 #endif

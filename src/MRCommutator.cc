@@ -1,4 +1,5 @@
 #include "MRCommutator.hh"
+#include "Commutator.hh"
 
 #include <algorithm>
 #include <cmath>
@@ -168,6 +169,168 @@ namespace
       }
     return result;
   }
+
+  double MatrixElement(const arma::mat &matrix, const TwoBodyChannel &channel,
+                       index_t a, index_t b, index_t c, index_t d)
+  {
+    Orbit &oa = channel.modelspace->GetOrbit(a);
+    Orbit &ob = channel.modelspace->GetOrbit(b);
+    Orbit &oc = channel.modelspace->GetOrbit(c);
+    Orbit &od = channel.modelspace->GetOrbit(d);
+    if (!channel.CheckChannel_ket(&oa, &ob) || !channel.CheckChannel_ket(&oc, &od))
+      return 0.0;
+    double phase = 1.0;
+    if (a > b)
+    {
+      phase *= channel.modelspace->GetKet(b, a).Phase(channel.J);
+      std::swap(a, b);
+    }
+    if (c > d)
+    {
+      phase *= channel.modelspace->GetKet(d, c).Phase(channel.J);
+      std::swap(c, d);
+    }
+    const size_t ibra = channel.GetLocalIndex(a, b);
+    const size_t iket = channel.GetLocalIndex(c, d);
+    if (a == b)
+      phase *= std::sqrt(2.0);
+    if (c == d)
+      phase *= std::sqrt(2.0);
+    return phase * matrix(ibra, iket);
+  }
+
+  struct StandardProducts
+  {
+    std::vector<arma::mat> XLY;
+    std::vector<arma::mat> YLX;
+    std::vector<arma::mat> LY;
+    std::vector<arma::mat> LX;
+  };
+
+  StandardProducts BuildStandardProducts(const Operator &X, const Operator &Y,
+                                         const MRReference &reference)
+  {
+    const size_t nch = X.modelspace->GetNumberTwoBodyChannels();
+    StandardProducts products;
+    products.XLY.resize(nch);
+    products.YLX.resize(nch);
+    products.LY.resize(nch);
+    products.LX.resize(nch);
+    for (size_t ch = 0; ch < nch; ++ch)
+    {
+      const arma::mat &x = X.TwoBody.GetMatrix(ch);
+      const arma::mat &y = Y.TwoBody.GetMatrix(ch);
+      const arma::mat &lambda = reference.Lambda2.GetMatrix(ch);
+      products.LY[ch] = lambda * y;
+      products.LX[ch] = lambda * x;
+      products.XLY[ch] = x * products.LY[ch];
+      products.YLX[ch] = y * products.LX[ch];
+    }
+    return products;
+  }
+
+  double PandyaElement(const TwoBodyME &two_body, ModelSpace &modelspace, int J,
+                       index_t a, index_t b, index_t c, index_t d)
+  {
+    const Orbit &oa = modelspace.GetOrbit(a);
+    const Orbit &ob = modelspace.GetOrbit(b);
+    const Orbit &oc = modelspace.GetOrbit(c);
+    const Orbit &od = modelspace.GetOrbit(d);
+    const int Jp_min = std::max(std::abs(oa.j2 - od.j2),
+                                std::abs(oc.j2 - ob.j2)) /
+                       2;
+    const int Jp_max = std::min(oa.j2 + od.j2, oc.j2 + ob.j2) / 2;
+    double value = 0.0;
+    for (int Jp = Jp_min; Jp <= Jp_max; ++Jp)
+    {
+      const double six_j = modelspace.GetSixJ(oa.j2 * 0.5, ob.j2 * 0.5, J,
+                                              oc.j2 * 0.5, od.j2 * 0.5, Jp);
+      value -= (2 * Jp + 1.0) * six_j *
+               two_body.GetTBME_J(Jp, Jp, a, d, c, b);
+    }
+    return value;
+  }
+
+  struct OrderedCrossBlock
+  {
+    int J;
+    int parity;
+    int delta_tz;
+    size_t norbits;
+    std::vector<std::array<index_t, 2>> pairs;
+    std::vector<int> pair_index;
+    arma::mat X;
+    arma::mat Y;
+    arma::mat Lambda;
+
+    int Find(index_t a, index_t b) const
+    {
+      return pair_index[a * norbits + b];
+    }
+  };
+
+  std::vector<OrderedCrossBlock> BuildOrderedCrossBlocks(
+      const Operator &X, const Operator &Y, const MRReference &reference)
+  {
+    ModelSpace &modelspace = *X.modelspace;
+    const size_t norbits = modelspace.GetNumberOrbits();
+    int max_J = 0;
+    for (index_t a : modelspace.all_orbits)
+      for (index_t b : modelspace.all_orbits)
+        max_J = std::max(max_J,
+                         (modelspace.GetOrbit(a).j2 + modelspace.GetOrbit(b).j2) / 2);
+    std::vector<OrderedCrossBlock> blocks;
+    for (int J = 0; J <= max_J; ++J)
+      for (int parity = 0; parity <= 1; ++parity)
+        for (int delta_tz = -1; delta_tz <= 1; ++delta_tz)
+        {
+          OrderedCrossBlock block{J, parity, delta_tz, norbits, {},
+                                  std::vector<int>(norbits * norbits, -1),
+                                  {}, {}, {}};
+          for (index_t a : modelspace.all_orbits)
+            for (index_t b : modelspace.all_orbits)
+            {
+              const Orbit &oa = modelspace.GetOrbit(a);
+              const Orbit &ob = modelspace.GetOrbit(b);
+              if ((oa.l + ob.l) % 2 != parity ||
+                  oa.tz2 - ob.tz2 != 2 * delta_tz ||
+                  std::abs(oa.j2 - ob.j2) > 2 * J || oa.j2 + ob.j2 < 2 * J)
+                continue;
+              block.pair_index[a * norbits + b] = block.pairs.size();
+              block.pairs.push_back({a, b});
+            }
+          if (block.pairs.empty())
+            continue;
+          const size_t dimension = block.pairs.size();
+          block.X.zeros(dimension, dimension);
+          block.Y.zeros(dimension, dimension);
+          block.Lambda.zeros(dimension, dimension);
+          for (size_t i = 0; i < dimension; ++i)
+            for (size_t j = 0; j < dimension; ++j)
+            {
+              const auto bra = block.pairs[i];
+              const auto ket = block.pairs[j];
+              block.X(i, j) = PandyaElement(X.TwoBody, modelspace, J,
+                                            bra[0], bra[1], ket[0], ket[1]);
+              block.Y(i, j) = PandyaElement(Y.TwoBody, modelspace, J,
+                                            bra[0], bra[1], ket[0], ket[1]);
+              block.Lambda(i, j) = PandyaElement(reference.Lambda2, modelspace, J,
+                                                 bra[0], bra[1], ket[0], ket[1]);
+            }
+          blocks.push_back(std::move(block));
+        }
+    return blocks;
+  }
+
+  MRCommutator::MR1BResult CompleteOneBodyParts(const arma::cube &raw,
+                                                int output_hermiticity)
+  {
+    MRCommutator::MR1BResult result;
+    result.IV = raw.slice(0) + output_hermiticity * raw.slice(0).t();
+    result.V = raw.slice(1) + output_hermiticity * raw.slice(1).t();
+    result.VI = raw.slice(2) + output_hermiticity * raw.slice(2).t();
+    return result;
+  }
 }
 
 namespace MRCommutator
@@ -195,10 +358,136 @@ namespace MRCommutator
                              RawTerms(one, two, 1, 0, cache);
       }
 
-    MR1BResult result;
-    result.IV = raw.slice(0) + output_hermiticity * raw.slice(0).t();
-    result.V = raw.slice(1) + output_hermiticity * raw.slice(1).t();
-    result.VI = raw.slice(2) + output_hermiticity * raw.slice(2).t();
+    return CompleteOneBodyParts(raw, output_hermiticity);
+  }
+
+  MR1BResult comm221_lambda2(const Operator &X, const Operator &Y,
+                             const MRReference &reference)
+  {
+    if (X.modelspace != Y.modelspace || X.modelspace != reference.modelspace)
+      throw std::invalid_argument("MR lambda2 commutator inputs use different ModelSpace objects");
+    if (X.GetJRank() != 0 || Y.GetJRank() != 0 || X.GetTRank() != 0 ||
+        Y.GetTRank() != 0 || X.GetParity() != 0 || Y.GetParity() != 0)
+      throw std::invalid_argument("MR lambda2 commutator supports scalar inputs only");
+    const int output_hermiticity = -Hermiticity(X) * Hermiticity(Y);
+    ModelSpace &modelspace = *X.modelspace;
+    const size_t norbits = modelspace.GetNumberOrbits();
+    int max_J = 0;
+    for (index_t a : modelspace.all_orbits)
+      for (index_t b : modelspace.all_orbits)
+        max_J = std::max(max_J,
+                         (modelspace.GetOrbit(a).j2 + modelspace.GetOrbit(b).j2) / 2);
+    const StandardProducts products = BuildStandardProducts(X, Y, reference);
+    arma::cube raw(norbits, norbits, 3, arma::fill::zeros);
+
+    // IV: ordinary pair-coupled X lambda Y products.
+    const size_t nch = modelspace.GetNumberTwoBodyChannels();
+    for (size_t ch = 0; ch < nch; ++ch)
+    {
+      const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
+      const double angular_weight = 2 * channel.J + 1.0;
+      for (index_t one : modelspace.all_orbits)
+        for (index_t two : modelspace.all_orbits)
+        {
+          const Orbit &o1 = modelspace.GetOrbit(one);
+          const Orbit &o2 = modelspace.GetOrbit(two);
+          if (o1.l != o2.l || o1.j2 != o2.j2 || o1.tz2 != o2.tz2)
+            continue;
+          for (index_t t : modelspace.all_orbits)
+            raw(one, two, 0) += 0.5 * angular_weight / (o1.j2 + 1.0) *
+                                (MatrixElement(products.XLY[ch], channel, one, t, two, t) -
+                                 MatrixElement(products.YLX[ch], channel, one, t, two, t));
+        }
+    }
+
+    // V: full ordered particle-hole pairs keep the sign of tz_a-tz_b.
+    const std::vector<OrderedCrossBlock> cross_blocks =
+        BuildOrderedCrossBlocks(X, Y, reference);
+    for (const OrderedCrossBlock &block : cross_blocks)
+    {
+      const arma::mat xly = block.X * block.Lambda * block.Y;
+      const arma::mat ylx = block.Y * block.Lambda * block.X;
+      const double angular_weight = 2 * block.J + 1.0;
+      for (index_t one : modelspace.all_orbits)
+        for (index_t two : modelspace.all_orbits)
+        {
+          const Orbit &o1 = modelspace.GetOrbit(one);
+          const Orbit &o2 = modelspace.GetOrbit(two);
+          if (o1.l != o2.l || o1.j2 != o2.j2 || o1.tz2 != o2.tz2)
+            continue;
+          for (index_t t : modelspace.all_orbits)
+          {
+            const int ibra = block.Find(one, t);
+            const int iket = block.Find(two, t);
+            if (ibra < 0 || iket < 0)
+              continue;
+            raw(one, two, 1) += 0.5 * angular_weight / (o1.j2 + 1.0) *
+                                (xly(ibra, iket) - ylx(ibra, iket));
+          }
+        }
+    }
+
+    // VI: lambda*Y and lambda*X remove the innermost (r,v) sum by BLAS.
+    for (index_t one : modelspace.all_orbits)
+      for (index_t two : modelspace.all_orbits)
+      {
+        const Orbit &o1 = modelspace.GetOrbit(one);
+        const Orbit &o2 = modelspace.GetOrbit(two);
+        if (o1.l != o2.l || o1.j2 != o2.j2 || o1.tz2 != o2.tz2)
+          continue;
+        for (int J1 = 0; J1 <= max_J; ++J1)
+          for (int J2 = 0; J2 <= max_J; ++J2)
+          {
+            const double angular_weight = (2 * J1 + 1.0) * (2 * J2 + 1.0);
+            for (index_t t : modelspace.all_orbits)
+            {
+              const Orbit &ot = modelspace.GetOrbit(t);
+              for (index_t s : modelspace.all_orbits)
+              {
+                if (ot.j2 != modelspace.GetOrbit(s).j2)
+                  continue;
+                const double x = X.TwoBody.GetTBME_J(J1, J1, one, t, two, s);
+                const double y = Y.TwoBody.GetTBME_J(J1, J1, one, t, two, s);
+                if (x == 0.0 && y == 0.0)
+                  continue;
+                for (index_t w : modelspace.all_orbits)
+                {
+                  const Orbit &os = modelspace.GetOrbit(s);
+                  const Orbit &ow = modelspace.GetOrbit(w);
+                  if ((os.l + ow.l) % 2 != (ot.l + ow.l) % 2 ||
+                      os.tz2 + ow.tz2 != ot.tz2 + ow.tz2)
+                    continue;
+                  const int ch = modelspace.GetTwoBodyChannelIndex(
+                      J2, (os.l + ow.l) % 2, (os.tz2 + ow.tz2) / 2);
+                  if (ch < 0 || static_cast<size_t>(ch) >= products.LY.size())
+                    continue;
+                  const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
+                  raw(one, two, 2) -= angular_weight /
+                                      ((o1.j2 + 1.0) * (ot.j2 + 1.0)) *
+                                      (x * MatrixElement(products.LY[ch], channel, s, w, t, w) -
+                                       y * MatrixElement(products.LX[ch], channel, s, w, t, w));
+                }
+              }
+            }
+          }
+      }
+    return CompleteOneBodyParts(raw, output_hermiticity);
+  }
+
+  Operator Commutator(const Operator &X, const Operator &Y,
+                      const MRReference &reference)
+  {
+    Operator result = ::Commutator::Commutator(X, Y);
+    // This exact branch is the SR-degeneration gate: no duplicated SR formula
+    // and no floating-point add/subtract of nominally zero MR corrections.
+    if (reference.Lambda2.Norm() == 0.0)
+      return result;
+
+    const MR1BResult lambda2_one_body = comm221_lambda2(X, Y, reference);
+    result.OneBody += lambda2_one_body.Total();
+    // Hergert Eq. (49): contract lambda2 with the completed 2B commutator,
+    // including 1B--2B as well as both 2B--2B topologies.
+    result.ZeroBody += reference.ContractLambda2(result.TwoBody);
     return result;
   }
 }

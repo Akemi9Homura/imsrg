@@ -38,15 +38,15 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 
 ### C. J-scheme MR-IMSRG(2) commutator
 
-- [ ] 保留并直接调用现有 `comm110/220/111/121/221/122/222_pp_hh/222_ph`
+- [x] 保留并直接调用现有 `comm110/220/111/121/221/122/222_pp_hh/222_ph`
       等 SR 项；禁止复制这些公共公式。
-- [ ] 只新增形式 MR-IMSRG(2) 在 `lambda3=0` 下剩余的线性
+- [x] 只新增形式 MR-IMSRG(2) 在 `lambda3=0` 下剩余的线性
       `lambda2` contractions：1B 的 2B--2B 收缩和 0B 的
       `1/4 C2·lambda2`。
-- [ ] 每个新 J-scheme contraction 必须同时通过：QCombo/m-scheme 指标式、
+- [x] 每个新 J-scheme contraction 必须同时通过：QCombo/m-scheme 指标式、
       随机标量 J-to-m oracle、一个显式小 Fock-space 矩阵、Hermiticity/
       anti-Hermiticity 和 `lambda2=0` 极限。
-- [ ] 稀疏块实现必须保留 angular-momentum/parity/isospin 选择定则，不在
+- [x] 稀疏块实现必须保留 angular-momentum/parity/isospin 选择定则，不在
       生产 RHS 中展开完整 m-scheme 张量。
 
 ### D. White-NCSM 生成元与流
@@ -72,7 +72,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 
 ### F. 相关参考态对 Python m-scheme 的退化门禁
 
-- [ ] 先用随机 `Jref=0` 标量 Hamiltonian 和合法 `lambda2` 比较每个
+- [x] 先用随机 `Jref=0` 标量 Hamiltonian 和合法 `lambda2` 比较每个
       新 J-scheme MR contraction 展开后的完整 m-scheme 张量。
 - [ ] 对 `Be8/C12, Nrefmax=0` 与 `He4/O16, Nrefmax=2` 使用同一份
       float64 Hamiltonian/RDM，比较 `E/f/Gamma`、生成元、每个 RHS

@@ -312,6 +312,10 @@ PYBIND11_MODULE(pyIMSRG, m)
       m.def("MR_comm221_lambda2_reference",
             &MRCommutator::comm221_lambda2_reference,
             py::arg("X"), py::arg("Y"), py::arg("reference"));
+      m.def("MR_comm221_lambda2", &MRCommutator::comm221_lambda2,
+            py::arg("X"), py::arg("Y"), py::arg("reference"));
+      m.def("MR_Commutator", &MRCommutator::Commutator,
+            py::arg("X"), py::arg("Y"), py::arg("reference"));
 
       py::class_<arma::mat>(m, "ArmaMat")
           .def(py::init<>())

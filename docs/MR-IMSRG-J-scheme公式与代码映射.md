@@ -97,8 +97,25 @@ spherical-orbit 慢循环时，IV、V 在最终 `1<->2` permutation 之前的系
 unnormalized/unrestricted pair 写法转为当前存储后的结果，不是物理截断。
 独立 CG 展开已把三种拓扑分别对到 m-scheme；C++
 `MRCommutator::comm221_lambda2_reference()` 又分别对到该 Python J-scheme
-oracle，当前 max-abs 依次为 `0`、`0`、`2.84e-14`。优化实现不得重新从
-排版公式猜系数，必须逐项复现这个 reference。
+oracle，max-abs 依次为 `0`、`0`、`2.84e-14`。生产实现
+`MRCommutator::comm221_lambda2()` 使用普通 pair block 和有符号
+`Delta Tz` 的有序 particle-hole block 做矩阵乘法；它对慢速 C++ reference
+的 IV、V、VI max-abs 分别为 `1.07e-14`、`3.55e-14`、`5.68e-14`。
+生产 RHS 中不构造 m-scheme 张量。
+
+需要区分论文前因子和归一化 block 乘积前因子。IV 的慢速、未限制
+spherical-orbit 指标式在最终 permutation 前是 `1/8`；生产代码先以
+normalized-pair block 形成 `X*lambda*Y`，其中对中间相同粒子 pair 的
+限制求和已经吸收另一组归一化/计数因子，所以 spectator contraction 的
+系数是 `1/2`。VI 中完整未限制 `(r,v)` 求和等于 normalized-pair
+`lambda*Y` block 乘积的两倍，因此矩阵乘积实现使用 `-1`，而慢速指标式
+保持 `-1/2`。这些不是改变物理公式；逐拓扑的 J-to-m 和慢/快双重比较
+是当前系数的验收依据。
+
+完整入口 `MRCommutator::Commutator()` 先调用原
+`Commutator::Commutator()`，只加入上述 1B 项及完整 2B 输出与
+`lambda2` 的 0B 收缩。`lambda2.Norm()==0` 有显式直接返回门禁，随机
+算符测试中 MR 与原 SR 输出的 0B/1B/2B 差为逐位 `0`。
 
 ## 4. 现有代码可直接复用的边界
 
@@ -130,6 +147,10 @@ oracle，当前 max-abs 依次为 `0`、`0`、`2.84e-14`。优化实现不得重
 5. 增加完整 `C2-lambda2` 0B 收缩；
 6. `lambda2=0` 时确认 dispatcher 只执行原 SR contractions，然后进入
    White-NCSM generator 与 flow 集成。
+
+截至 2026-08-25，第 1--6 步中的 commutator 部分均已实现并通过；下一
+边界是 reference-density reader、White-NCSM generator 与 solver/driver
+显式上下文接线。
 
 随机严格标量张量要求 J/m 转换 `<=1e-12`；真实 RDM 的输入标量投影
 残差单独报告并暂以 `1e-10` 为拒绝阈值。所有能量/RHS contraction 的

@@ -128,4 +128,42 @@ for cpp_name, python_name in (("IV", "iv"), ("V", "v"), ("VI", "vi")):
         cpp_values, getattr(python_parts, python_name), atol=2e-11, rtol=0
     )
 
+# The block-matrix implementation must match the slow spherical-orbit C++
+# reference topology by topology.
+optimized_parts = pyIMSRG.MR_comm221_lambda2(
+    x_operator, y_operator, algebraic_reference
+)
+for name in ("IV", "V", "VI"):
+    optimized = getattr(optimized_parts, name)
+    reference_part = getattr(cpp_parts, name)
+    maximum = max(
+        abs(optimized(i, j) - reference_part(i, j))
+        for i in range(ms.GetNumberOrbits())
+        for j in range(ms.GetNumberOrbits())
+    )
+    assert maximum < 2e-11, f"optimized MR topology {name} differs by {maximum}"
+
+# Exact lambda2=0 uses the existing C++ SR dispatcher and is bitwise unchanged.
+slater_reference = pyIMSRG.MRReference(ms, 4, 2, 0, occupations)
+sr_commutator = pyIMSRG.Commutator.Commutator(x_operator, y_operator)
+mr_slater_commutator = pyIMSRG.MR_Commutator(
+    x_operator, y_operator, slater_reference
+)
+assert max_operator_difference(sr_commutator, mr_slater_commutator) == 0.0
+
+# For nonzero lambda2, the full entry adds the verified 1B term and contracts
+# lambda2 with the already completed SR two-body commutator for the 0B term.
+mr_commutator = pyIMSRG.MR_Commutator(
+    x_operator, y_operator, algebraic_reference
+)
+expected_one_body = sr_commutator.OneBody + optimized_parts.Total()
+assert (mr_commutator.OneBody - expected_one_body).Norm() < 2e-11
+assert (mr_commutator.TwoBody - sr_commutator.TwoBody).Norm() == 0.0
+assert math.isclose(
+    mr_commutator.ZeroBody - sr_commutator.ZeroBody,
+    algebraic_reference.ContractLambda2(sr_commutator.TwoBody),
+    rel_tol=0.0,
+    abs_tol=2e-11,
+)
+
 print("MRReference tests passed")
