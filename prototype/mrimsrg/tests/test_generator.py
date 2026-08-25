@@ -15,6 +15,7 @@ from generator import (
     epstein_nesbet_denominators,
     masked_decoupling_residual,
     oscillator_quanta_from_orbits,
+    spherical_orbit_groups_from_orbits,
     white_generator,
     white_ncsm_matrix_elements,
     white_ncsm_numerator_residual,
@@ -48,6 +49,23 @@ def random_hermitian_hamiltonian(norb: int, seed: int) -> MRHamiltonian:
 
 
 class GeneratorTests(unittest.TestCase):
+    def test_spherical_orbit_groups_require_complete_multiplets(self) -> None:
+        orbits = np.array(
+            [
+                [4, 0, 1, 1, -1, -1],
+                [4, 0, 1, 1, 1, -1],
+                [9, 0, 1, 3, -3, 1],
+                [9, 0, 1, 3, -1, 1],
+                [9, 0, 1, 3, 1, 1],
+                [9, 0, 1, 3, 3, 1],
+            ]
+        )
+        np.testing.assert_array_equal(
+            spherical_orbit_groups_from_orbits(orbits), [4, 4, 9, 9, 9, 9]
+        )
+        with self.assertRaisesRegex(ValueError, "complete magnetic multiplet"):
+            spherical_orbit_groups_from_orbits(orbits[:-1])
+
     def test_masks_use_ho_quanta_and_preserve_internal_blocks(self) -> None:
         orbits = np.array(
             [
@@ -212,6 +230,36 @@ class GeneratorTests(unittest.TestCase):
             self.assertAlmostEqual(
                 delta2[particle1, particle2, hole1, hole2], expected, places=12
             )
+
+    def test_spherical_en_denominator_uses_j_orbit_monopole(self) -> None:
+        densities = compute_densities(
+            occupations((0, 1), norb=4), np.array([1.0])
+        )
+        one_body = np.diag([1.0, 1.0, 5.0, 5.0])
+        two_body = np.zeros((4,) * 4)
+
+        # Two j=1/2 orbits with normalized J=0 and J=1 diagonal TBMEs 2 and
+        # 6 MeV have uncoupled diagonal elements 6,4,4,6 MeV.  Their ordered
+        # m average is the imsrg++ monopole (1*2 + 3*6)/4 = 5 MeV.
+        for particle, hole, value in (
+            (2, 0, 6.0),
+            (2, 1, 4.0),
+            (3, 0, 4.0),
+            (3, 1, 6.0),
+        ):
+            two_body[particle, hole, particle, hole] = value
+            two_body[hole, particle, particle, hole] = -value
+            two_body[particle, hole, hole, particle] = -value
+            two_body[hole, particle, hole, particle] = value
+        hamiltonian = MRHamiltonian(0.0, one_body, two_body)
+        groups = np.array([0, 0, 1, 1])
+        delta1, _ = epstein_nesbet_denominators(
+            hamiltonian, densities, spherical_orbit_groups=groups
+        )
+        np.testing.assert_allclose(delta1[2:, :2], -1.0, atol=2e-12)
+
+        uncoupled, _ = epstein_nesbet_denominators(hamiltonian, densities)
+        self.assertGreater(np.ptp(uncoupled[2:, :2]), 1.0)
 
     def test_correlated_two_body_denominator_is_pair_symmetric(self) -> None:
         norb = 4

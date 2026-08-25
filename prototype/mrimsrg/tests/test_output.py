@@ -78,6 +78,16 @@ class OutputTests(unittest.TestCase):
                 "all omitted",
             )
             self.assertEqual(
+                metadata["generator_implementation"],
+                "white_ncsm_spherical_monopole_v1",
+            )
+            self.assertIn(
+                "GetTBMEmonopole",
+                metadata["generator_denominator"][
+                    "spherical_diagonal_interpretation"
+                ],
+            )
+            self.assertEqual(
                 metadata["acceptance_residual"]["normalization"],
                 "ratio to the initial generator norm",
             )
@@ -109,6 +119,14 @@ class OutputTests(unittest.TestCase):
                 norb, zero_body = struct.unpack("<Qd", stream.read(16))
                 self.assertEqual(norb, 2)
                 self.assertAlmostEqual(zero_body, vacuum.zero_body)
+            del metadata["generator_implementation"]
+            (output_path / "metadata.json").write_text(
+                json.dumps(metadata), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ValueError, "different generator implementation"
+            ):
+                _load_resume_state(output_path, reference.metadata, densities)
             with self.assertRaises(FileExistsError):
                 save_flow_output(
                     output_path, "reference", reference, densities, initial, result, FlowSettings()

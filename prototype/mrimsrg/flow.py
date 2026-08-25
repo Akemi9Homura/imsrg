@@ -205,6 +205,7 @@ def integrate_flow(
     *,
     start_s: float = 0.0,
     residual_normalization: tuple[float, float, float] | None = None,
+    spherical_orbit_groups: np.ndarray | None = None,
 ) -> FlowResult:
     """Integrate ``dH/ds=[eta(H),H]`` until convergence or ``smax``.
 
@@ -226,6 +227,10 @@ def integrate_flow(
         raise ValueError("checkpoint_s must lie strictly between start_s and smax")
 
     norb = int(initial_hamiltonian.one_body.shape[0])
+    if spherical_orbit_groups is not None:
+        spherical_orbit_groups = np.asarray(spherical_orbit_groups)
+        if spherical_orbit_groups.shape != (norb,):
+            raise ValueError("spherical-orbit group array has an incompatible length")
     mask1, mask2 = decoupling_masks(oscillator_quanta)
     if mask1.shape != initial_hamiltonian.one_body.shape:
         raise ValueError("oscillator-quanta array has an incompatible length")
@@ -260,12 +265,20 @@ def integrate_flow(
     initial_residual = masked_residual_norm(initial_residual_operator)
     initial_generator_residual = masked_residual_norm(
         apply_ncsm_mask(
-            white_generator_unmasked(working_initial, working_densities)
+            white_generator_unmasked(
+                working_initial,
+                working_densities,
+                spherical_orbit_groups=spherical_orbit_groups,
+            )
         )
     )
     initial_generator_numerator_residual = masked_residual_norm(
         apply_ncsm_mask(
-            white_ncsm_numerator_residual(working_initial, working_densities)
+            white_ncsm_numerator_residual(
+                working_initial,
+                working_densities,
+                spherical_orbit_groups=spherical_orbit_groups,
+            )
         )
     )
     if residual_normalization is None:
@@ -315,7 +328,11 @@ def integrate_flow(
         nonlocal function_evaluations
         hamiltonian = _unpack(values, norb)
         eta = apply_ncsm_mask(
-            white_generator_unmasked(hamiltonian, working_densities)
+            white_generator_unmasked(
+                hamiltonian,
+                working_densities,
+                spherical_orbit_groups=spherical_orbit_groups,
+            )
         )
         derivative = commutator(eta, hamiltonian, working_densities)
         packed = _pack(derivative)
@@ -364,14 +381,18 @@ def integrate_flow(
             checkpoint_generator_residual = masked_residual_norm(
                 apply_ncsm_mask(
                     white_generator_unmasked(
-                        checkpoint_hamiltonian, working_densities
+                        checkpoint_hamiltonian,
+                        working_densities,
+                        spherical_orbit_groups=spherical_orbit_groups,
                     )
                 )
             )
             checkpoint_generator_numerator_residual = masked_residual_norm(
                 apply_ncsm_mask(
                     white_ncsm_numerator_residual(
-                        checkpoint_hamiltonian, working_densities
+                        checkpoint_hamiltonian,
+                        working_densities,
+                        spherical_orbit_groups=spherical_orbit_groups,
                     )
                 )
             )
@@ -398,12 +419,20 @@ def integrate_flow(
         residual = masked_residual_norm(residual_operator)
         generator_residual = masked_residual_norm(
             apply_ncsm_mask(
-                white_generator_unmasked(hamiltonian, working_densities)
+                white_generator_unmasked(
+                    hamiltonian,
+                    working_densities,
+                    spherical_orbit_groups=spherical_orbit_groups,
+                )
             )
         )
         generator_numerator_residual = masked_residual_norm(
             apply_ncsm_mask(
-                white_ncsm_numerator_residual(hamiltonian, working_densities)
+                white_ncsm_numerator_residual(
+                    hamiltonian,
+                    working_densities,
+                    spherical_orbit_groups=spherical_orbit_groups,
+                )
             )
         )
         point = _flow_point(

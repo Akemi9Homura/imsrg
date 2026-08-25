@@ -164,6 +164,11 @@ prototype/mrimsrg/
    `lambda^(2,3,...)`；Epstein--Nesbet 分母同样舍去文献标为
    `O(lambda2)` 的修正。这是生成元截断，不是对易子截断；
    MR-IMSRG(2) 对易子仍保留线性 `lambda2`。
+   这些式子实现于球形自然轨道框架：`f_pp`、`n_p` 对同一完整磁多重态
+   取共同值，`Gamma_pq,pq` 必须取按所有 `m_p,m_q` 的 ordered average，
+   等价于 `src/TwoBodyME.cc::GetTBMEmonopole()` 的
+   `(2J+1)` 加权未归一化 monopole。禁止把单个 m-scheme Slater 对角元
+   逐元素放进分母；该操作不保持旋转标量性。
 2. 应用 IM-NCSM 掩码：
 
    \[
@@ -193,6 +198,8 @@ prototype/mrimsrg/
 退出条件：
 
 - `H` 始终 Hermitian，`eta` 始终 anti-Hermitian；
+- 每个保存点的完整 m-scheme Hamiltonian 经 m-to-J-to-m 重构后，一体和
+  二体最大误差均不超过 `1e-9 MeV`；
 - 目标掩码内的 White-NCSM 生成元范数 `Rgen` 相对初值至少下降
   `1e-6`，并同时报告 `Rnum` 和严格 `Rstrict` 的变化；
 - 同 HO 量子数的参考空间内部耦合没有被错误清零；

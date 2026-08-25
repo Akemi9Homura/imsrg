@@ -11,7 +11,11 @@ import numpy as np
 try:
     from .densities import compute_densities, reference_energy, validate_densities
     from .flow import FlowPoint, FlowSettings, integrate_flow
-    from .generator import oscillator_quanta_from_orbits
+    from .generator import (
+        GENERATOR_IMPLEMENTATION,
+        oscillator_quanta_from_orbits,
+        spherical_orbit_groups_from_orbits,
+    )
     from .normal_order import (
         MRHamiltonian,
         VacuumHamiltonian,
@@ -23,7 +27,11 @@ try:
 except ImportError:
     from densities import compute_densities, reference_energy, validate_densities
     from flow import FlowPoint, FlowSettings, integrate_flow
-    from generator import oscillator_quanta_from_orbits
+    from generator import (
+        GENERATOR_IMPLEMENTATION,
+        oscillator_quanta_from_orbits,
+        spherical_orbit_groups_from_orbits,
+    )
     from normal_order import (
         MRHamiltonian,
         VacuumHamiltonian,
@@ -57,6 +65,8 @@ def _load_resume_state(
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     if metadata.get("schema") != "mrimsrg_flow_v1":
         raise ValueError("resume input is not an MR-IMSRG flow output")
+    if metadata.get("generator_implementation") != GENERATOR_IMPLEMENTATION:
+        raise ValueError("resume input used a different generator implementation")
     if metadata.get("reference_metadata") != reference_metadata:
         raise ValueError("resume input was produced from a different reference")
     for name, expected in (
@@ -189,6 +199,7 @@ def main() -> int:
         observer=_print_point,
         start_s=start_s,
         residual_normalization=residual_normalization,
+        spherical_orbit_groups=spherical_orbit_groups_from_orbits(reference.orbits),
     )
     final_vacuum = save_flow_output(
         args.output,

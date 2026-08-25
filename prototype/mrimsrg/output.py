@@ -14,14 +14,14 @@ try:
     from .basis import prepare_natural_basis
     from .densities import Densities
     from .flow import FlowResult, FlowSettings
-    from .generator import WHITE_DENOMINATOR_CUTOFF
+    from .generator import GENERATOR_IMPLEMENTATION, WHITE_DENOMINATOR_CUTOFF
     from .normal_order import MRHamiltonian, VacuumHamiltonian, to_vacuum
     from .reference_io import ReferenceData
 except ImportError:
     from basis import prepare_natural_basis
     from densities import Densities
     from flow import FlowResult, FlowSettings
-    from generator import WHITE_DENOMINATOR_CUTOFF
+    from generator import GENERATOR_IMPLEMENTATION, WHITE_DENOMINATOR_CUTOFF
     from normal_order import MRHamiltonian, VacuumHamiltonian, to_vacuum
     from reference_io import ReferenceData
 
@@ -147,6 +147,7 @@ def save_flow_output(
         "reference_path": str(Path(reference_path).resolve()),
         "reference_metadata": reference.metadata,
         "generator": "white_ncsm_epstein_nesbet_delta_e_masked",
+        "generator_implementation": GENERATOR_IMPLEMENTATION,
         "generator_numerator": {
             "formula": "Vobig Eqs. (6.5.28)-(6.5.29), White-NCSM truncation",
             "irreducible_density_terms": "all omitted",
@@ -156,6 +157,10 @@ def save_flow_output(
             "lambda2_terms": "omitted as O(lambda2)",
             "cutoff_mev": WHITE_DENOMINATOR_CUTOFF,
             "cutoff_sign": "preserved",
+            "spherical_diagonal_interpretation": (
+                "m-averaged unnormalized J-orbit monopoles matching "
+                "TwoBodyME::GetTBMEmonopole"
+            ),
         },
         "commutator": "MR-IMSRG(2), lambda3=0",
         "density_approximation": "lambda3=0",

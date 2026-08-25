@@ -61,9 +61,14 @@ defined in Vobig Sec. 6.5.4: all irreducible-density terms are omitted from
 the generator numerator and the displayed `O(lambda2)` terms are omitted
 from the Epstein--Nesbet denominators. The MR-IMSRG(2) commutator itself still
 retains `lambda2`. A sign-preserving `1e-6 MeV` denominator cutoff is used;
-in the Slater limit the denominators reduce term by term to
-`src/Generator.cc`. Independently, the strict directional
-`D1/D2=<Psi|H:A:|Psi>` diagnostic retains the published terms linear in
+the diagonal one-body values, occupations, and two-body diagonal terms are
+first reduced to spherical-orbit scalars.  In particular, the ordered
+magnetic-substate average of `Gamma[p,q,p,q]` is exactly the unnormalized
+`src/TwoBodyME.cc::GetTBMEmonopole()` convention.  This is essential: using
+individual m-scheme diagonals in the denominator makes `eta` non-scalar even
+when `H` and the `J=0` reference are scalar.  In the Slater limit the resulting
+denominators reduce term by term to `src/Generator.cc`. Independently, the
+strict directional `D1/D2=<Psi|H:A:|Psi>` diagnostic retains the published terms linear in
 `lambda2` with `lambda3=0`. Its anti-Hermitian combination is monitored as
 the strict diagnostic and agrees with `<Psi|[H,:A:]|Psi>` from the QCombo and
 explicit-commutator checks.
@@ -122,10 +127,11 @@ PYTHONPATH=prototype/mrimsrg python3 prototype/mrimsrg/run_mrimsrg.py \
   --resume-from prior-flow --smax 50000 --checkpoint-s 40000
 ```
 
-The continuation verifies that the reference metadata and exact
-`gamma1/gamma2/lambda2` arrays match, rejects legacy outputs that predate the
-separate `Rgen/Rnum` records, and retains the original three residual norms as
-the ratio denominators. `smax` and `checkpoint-s` are absolute flow parameters.
+The continuation verifies the generator implementation identifier, reference
+metadata, and exact `gamma1/gamma2/lambda2` arrays match, rejects legacy
+outputs that predate the current spherical-monopole denominator or separate
+`Rgen/Rnum` records, and retains the original three residual norms as the
+ratio denominators. `smax` and `checkpoint-s` are absolute flow parameters.
 The dedicated point7 generator accepts the same `--resume-from` option and
 still emits exactly one inspected Slurm job.
 
@@ -165,6 +171,13 @@ coupling. It then reconstructs the complete m-scheme tensors and refuses to
 write unless the maximum discrepancy is below `--scalar-tolerance` (default
 `1e-9 MeV`). A checkpoint directory containing `vacuum_mscheme.bin` can be
 passed in place of the final flow directory.
+
+As an end-to-end rotational-symmetry regression, a fresh He4 flow to
+`s=0.001` reconstructs both the one- and two-body m-scheme tensors from the
+projected J-coupled data with maximum errors `3.55e-15 MeV`.  At `Nmax=8`,
+the direct double-precision dense path gives `-20.3396323958 MeV` and the
+packed reader gives `-20.3396333376 MeV`; their `0.942 keV` difference is the
+measured float32 OBME/TBME packing effect.
 
 Read the exported file through the independent native `no2bpack` reader and
 the same NCSM solver with:

@@ -35,6 +35,7 @@ except ImportError:
 
 
 WHITE_DENOMINATOR_CUTOFF = 1e-6
+GENERATOR_IMPLEMENTATION = "white_ncsm_spherical_monopole_v1"
 
 
 def oscillator_quanta_from_orbits(orbits: np.ndarray) -> np.ndarray:
@@ -42,6 +43,89 @@ def oscillator_quanta_from_orbits(orbits: np.ndarray) -> np.ndarray:
     if orbits.ndim != 2 or orbits.shape[1] < 3:
         raise ValueError("orbit table must contain n and l columns")
     return 2 * orbits[:, 1].astype(np.int64) + orbits[:, 2].astype(np.int64)
+
+
+def spherical_orbit_groups_from_orbits(orbits: np.ndarray) -> np.ndarray:
+    """Return and validate spherical-orbit labels for an m-scheme orbit table.
+
+    The bridge columns are ``(jindex,n,l,2j,2m,2tz)``.  Every ``jindex``
+    must contain one complete magnetic multiplet with common ``n,l,j,tz``.
+    Natural orbitals inherit these output-slot labels after radial mixing.
+    """
+    values = np.asarray(orbits)
+    if values.ndim != 2 or values.shape[1] < 6:
+        raise ValueError("orbit table must contain (jindex,n,l,2j,2m,2tz)")
+    groups = values[:, 0].astype(np.int64)
+    if not np.array_equal(groups, values[:, 0]):
+        raise ValueError("spherical j-orbit indices must be integers")
+    for group in np.unique(groups):
+        members = values[groups == group]
+        if not np.all(members[:, [1, 2, 3, 5]] == members[0, [1, 2, 3, 5]]):
+            raise ValueError(f"j-orbit group {group} mixes n,l,j, or tz")
+        j2 = int(members[0, 3])
+        expected_m2 = np.arange(-j2, j2 + 1, 2, dtype=np.int64)
+        if not np.array_equal(np.sort(members[:, 4].astype(np.int64)), expected_m2):
+            raise ValueError(
+                f"j-orbit group {group} is not a complete magnetic multiplet"
+            )
+    return groups
+
+
+def _validate_spherical_groups(
+    spherical_orbit_groups: np.ndarray | None, norb: int
+) -> np.ndarray:
+    if spherical_orbit_groups is None:
+        return np.arange(norb, dtype=np.int64)
+    groups = np.asarray(spherical_orbit_groups)
+    if groups.shape != (norb,):
+        raise ValueError("spherical-orbit group array has an incompatible length")
+    _, inverse = np.unique(groups, return_inverse=True)
+    return inverse.astype(np.int64)
+
+
+def _spherical_scalar_diagonals(
+    hamiltonian: MRHamiltonian,
+    occupations: np.ndarray,
+    spherical_orbit_groups: np.ndarray | None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return m-independent occupations, 1B diagonals, and 2B monopoles.
+
+    For spherical orbits ``a,b``, averaging ``Gamma[p,q,p,q]`` over every
+    ``m_p in a, m_q in b`` is exactly the unnormalized monopole convention
+    used by ``TwoBodyME::GetTBMEmonopole``:
+
+    ``sqrt((1+d_ab)^2) sum_J (2J+1) Gamma^J_abab / (d_a d_b)``.
+
+    The ordered-m average automatically supplies the factor two for
+    identical spherical orbits because antisymmetric ``p=q`` elements vanish.
+    """
+    norb = len(occupations)
+    groups = _validate_spherical_groups(spherical_orbit_groups, norb)
+    ngroup = int(groups.max()) + 1 if norb else 0
+    counts = np.bincount(groups, minlength=ngroup).astype(np.float64)
+
+    occupation_mean = np.bincount(
+        groups, weights=np.asarray(occupations, dtype=np.float64), minlength=ngroup
+    ) / counts
+    one_diagonal = np.diag(hamiltonian.one_body)
+    one_mean = np.bincount(
+        groups, weights=np.asarray(one_diagonal, dtype=np.float64), minlength=ngroup
+    ) / counts
+
+    m_diagonal = np.einsum("ijij->ij", hamiltonian.two_body)
+    pair_groups = groups[:, None] * ngroup + groups[None, :]
+    pair_sum = np.bincount(
+        pair_groups.ravel(),
+        weights=np.asarray(m_diagonal, dtype=np.float64).ravel(),
+        minlength=ngroup * ngroup,
+    ).reshape(ngroup, ngroup)
+    pair_count = counts[:, None] * counts[None, :]
+    monopole = pair_sum / pair_count
+    return (
+        occupation_mean[groups],
+        one_mean[groups],
+        monopole[groups[:, None], groups[None, :]],
+    )
 
 
 def decoupling_masks(oscillator_quanta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -126,6 +210,7 @@ def white_ncsm_matrix_elements(
     densities: Densities,
     *,
     natural_tolerance: float = 1e-10,
+    spherical_orbit_groups: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return the lambda-free numerator used by White-NCSM.
 
@@ -135,6 +220,9 @@ def white_ncsm_matrix_elements(
     strict ``D1/D2`` diagnostic returned by :func:`decoupling_matrix_elements`.
     """
     n = _natural_occupations(densities, natural_tolerance)
+    n, _, _ = _spherical_scalar_diagonals(
+        hamiltonian, n, spherical_orbit_groups
+    )
     nbar = 1.0 - n
     norb = len(n)
     if hamiltonian.one_body.shape != (norb, norb):
@@ -158,6 +246,7 @@ def epstein_nesbet_denominators(
     densities: Densities,
     *,
     natural_tolerance: float = 1e-10,
+    spherical_orbit_groups: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return leading MR Epstein--Nesbet denominators.
 
@@ -166,9 +255,10 @@ def epstein_nesbet_denominators(
     exactly to the Epstein--Nesbet denominator in ``src/Generator.cc``.
     """
     n = _natural_occupations(densities, natural_tolerance)
+    n, f_diagonal, gamma_diagonal = _spherical_scalar_diagonals(
+        hamiltonian, n, spherical_orbit_groups
+    )
     nbar = 1.0 - n
-    f_diagonal = np.diag(hamiltonian.one_body)
-    gamma_diagonal = np.einsum("ijij->ij", hamiltonian.two_body)
     energy = hamiltonian.zero_body
 
     delta1 = (
@@ -257,6 +347,7 @@ def white_ncsm_numerator_residual(
     densities: Densities,
     *,
     natural_tolerance: float = 1e-10,
+    spherical_orbit_groups: np.ndarray | None = None,
 ) -> MRHamiltonian:
     """Return the unmasked anti-Hermitian White-NCSM numerator.
 
@@ -267,7 +358,10 @@ def white_ncsm_numerator_residual(
     for fractional occupations.
     """
     d1, d2 = white_ncsm_matrix_elements(
-        hamiltonian, densities, natural_tolerance=natural_tolerance
+        hamiltonian,
+        densities,
+        natural_tolerance=natural_tolerance,
+        spherical_orbit_groups=spherical_orbit_groups,
     )
     return MRHamiltonian(
         0.0,
@@ -283,6 +377,7 @@ def white_generator(
     *,
     denominator_cutoff: float = WHITE_DENOMINATOR_CUTOFF,
     natural_tolerance: float = 1e-10,
+    spherical_orbit_groups: np.ndarray | None = None,
 ) -> MRHamiltonian:
     """Build the single masked White generator used by the prototype."""
     eta = white_generator_unmasked(
@@ -290,6 +385,7 @@ def white_generator(
         densities,
         denominator_cutoff=denominator_cutoff,
         natural_tolerance=natural_tolerance,
+        spherical_orbit_groups=spherical_orbit_groups,
     )
     mask1, mask2 = decoupling_masks(oscillator_quanta)
     if mask1.shape != eta.one_body.shape:
@@ -303,13 +399,20 @@ def white_generator_unmasked(
     *,
     denominator_cutoff: float = WHITE_DENOMINATOR_CUTOFF,
     natural_tolerance: float = 1e-10,
+    spherical_orbit_groups: np.ndarray | None = None,
 ) -> MRHamiltonian:
     """Build the unmasked White generator in a natural-orbital basis."""
     d1, d2 = white_ncsm_matrix_elements(
-        hamiltonian, densities, natural_tolerance=natural_tolerance
+        hamiltonian,
+        densities,
+        natural_tolerance=natural_tolerance,
+        spherical_orbit_groups=spherical_orbit_groups,
     )
     delta1, delta2 = epstein_nesbet_denominators(
-        hamiltonian, densities, natural_tolerance=natural_tolerance
+        hamiltonian,
+        densities,
+        natural_tolerance=natural_tolerance,
+        spherical_orbit_groups=spherical_orbit_groups,
     )
     weighted1 = d1 / _safe_denominator(delta1, denominator_cutoff)
     weighted2 = d2 / _safe_denominator(delta2, denominator_cutoff)
