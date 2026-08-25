@@ -1,5 +1,10 @@
 # NNLOopt emax2 MR-IMSRG 快速结果计划
 
+> 状态：本计划所定义的 Python m-scheme 快速原型和第一批四核
+> `Nrefmax=0` 闭环已完成，现作为 C++ J-scheme 生产实现的
+> 独立 oracle。当前计划见
+> [`MR-IMSRG-C++-J-scheme实现计划.md`](MR-IMSRG-C++-J-scheme实现计划.md)。
+
 ## 1. 交付目标
 
 本计划只追求最短的可信闭环，不追求高效、通用或生产级 MR-IMSRG：

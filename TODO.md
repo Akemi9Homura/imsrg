@@ -1,68 +1,103 @@
 # MR-IMSRG 当前 TODO
 
-## P0：生产 MR 路径严格退化到 `imsrg++` SR-IMSRG(2)
+## P0：生产版 C++ J-scheme MR-IMSRG(2)
 
-这是当前最高优先级门禁。比较必须运行现有生产 `prototype/mrimsrg/`
-路径；不得另写一套只为通过测试的 SR 生成元、对易子或 flow。只允许增加
-不改变生产物理定义的导出、诊断和逐项比较接口。
+当前唯一实现目标是把已验收的 MR 物理放入现有 `imsrg++`
+生产 J-scheme 框架。不得为退化验收复制一套 SR commutator、生成元
+或 ODE；必须复用现有 `Operator`/`TwoBodyME`/`ModelSpace`、SR
+contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参考
+态的独立 oracle，不得成为生产 C++ 运行时后端。
 
-固定输入：
+固定输入继续使用 NNLOopt、`hw=20 MeV`、`emax=2`、`e2max=4`、NN-only、
+`BetaCM=0`、HO 基和 A-dependent 内禀动能。生产范围限定为 `Jref=0`、
+`lambda2` 保留、`lambda3=0`。
 
-- `N2LO_opt`, `hw=20 MeV`, `emax=2`, `e2max=4`, NN-only；
-- 固定 minipack SHA-256
-  `76b7243ef53d30955c0293d29da73688dc3839942143ccf147739108bb58ff84`；
-- `BetaCM=0`，无 Coulomb、无额外质量修正；
-- HO 基，A-dependent 内禀动能；
-- `He4/O16, Nrefmax=0` 闭壳单 Slater 参考；
-- `lambda2=lambda3=0`；
-- `imsrg++` 的 `white` 生成元和 `Epstein_Nesbet` 分母。
+### A. 文献、约定与架构冻结
 
-### A. 冻结完全相同的输入
+- [ ] 逐篇阅读 `refs/` 中 Hergert 2016、Gebrerufael/Vobig/Mongelli 学位
+      论文和 IM-NCSM 系列论文，建立 m-scheme 公式、J-scheme 张量约定与
+      `lambda3=0` 截断表。
+- [ ] 重生并核对 QCombo `MR_IMSRG2.ipynb`，固定指标方向、反对称、
+      组合系数和每个命名 contraction。
+- [ ] 逐文件审读 `Operator`/`TwoBodyME`/`TwoBodyChannel`/`ModelSpace`、
+      `Commutator.cc`、`Generator.cc`、`IMSRGSolver.cc` 和现有测试，确定哪些
+      SR contractions 在分数占据下已等于 MR 公式的公共部分。
+- [ ] 冻结 `Operator` TBME 归一化/相位、J-coupled `lambda2` 定义、
+      natural-orbit 占据和 `Jref=0` 标量密度格式；用 J-to-m-to-J 随机
+      张量闭环验证。
 
-- [x] 记录本仓库和 oracle checkout 的 commit、编译器及线性代数库版本。
-- [x] 从同一个 double-precision J-coupled Hamiltonian 构造两边的初始算符，
-      禁止用 float32 `no2bpack` 做代数级比较。
-- [x] 核对 J-orbit/m-orbit 表、质子中子约定、占据数、core/particle 划分。
-- [x] 核对 `He4/O16` 的 `lambda2` 最大绝对值为数值零。
-- [x] 证明闭壳参考的所有非零 `ph/pphh` 分子均满足 `Delta e != 0`，因此生产
-      IM-NCSM 掩码与 `imsrg++` SR 非对角块在这两个核上完全相同。
+### B. 生产参考态与正规序接口
 
-### B. `s=0` 逐项退化
+- [ ] 新增最小 `Jref=0` MR reference 对象，保存每个 J-orbit 的自然
+      占据与 J-coupled `lambda2`，不把相关密度隐藏成全局状态。
+- [ ] 读入时验证标量性、Hermiticity、pair antisymmetry、`Tr(gamma1)=A`
+      和 `gamma2 -> (A-1)gamma1` 收缩，拒绝 `Jref!=0` 或非自然基密度。
+- [ ] 复用生产正规序/反变换路径，只增加 `lambda2` 必需的 MR 收缩；
+      与 Python 的 `E/f/Gamma` 和真空往返逐元素比较。
 
-- [x] 比较正规序后的 `E`、`f`、`Gamma`，并分别报告 max-abs、Frobenius
-      和最坏矩阵元索引。
-- [x] 比较每个被选择的 1B/2B Epstein--Nesbet 分母。
-- [x] 检查两边是否触发 `1e-6 MeV` 小分母 cutoff；若触发，生产实现必须与
-      当前 `src/Generator.cc` 的实际符号约定一致。
-- [x] 比较 `eta(s=0)` 的 1B/2B 全部矩阵元。
-- [x] 比较 `dH/ds=[eta,H]` 的 0B/1B/2B 全部矩阵元。
-- [x] 对 commutator 的 0B/1B/2B 各收缩项增加可单独开关的诊断，定位首个
-      不一致项，不能只比较总和。
+### C. J-scheme MR-IMSRG(2) commutator
 
-代数级门槛：输入转换 max-abs `<=1e-12 MeV`；分母、`eta` 和 RHS 的
-max-abs `<=1e-10 MeV`，且相对 Frobenius 误差 `<=1e-10`。接近零的张量只用
-绝对门槛判断。
+- [ ] 保留并直接调用现有 `comm110/220/111/121/221/122/222_pp_hh/222_ph`
+      等 SR 项；禁止复制这些公共公式。
+- [ ] 只新增形式 MR-IMSRG(2) 在 `lambda3=0` 下剩余的线性
+      `lambda2` contractions：1B 的 2B--2B 收缩和 0B 的
+      `1/4 C2·lambda2`。
+- [ ] 每个新 J-scheme contraction 必须同时通过：QCombo/m-scheme 指标式、
+      随机标量 J-to-m oracle、一个显式小 Fock-space 矩阵、Hermiticity/
+      anti-Hermiticity 和 `lambda2=0` 极限。
+- [ ] 稀疏块实现必须保留 angular-momentum/parity/isospin 选择定则，不在
+      生产 RHS 中展开完整 m-scheme 张量。
 
-### C. 短流和完整流
+### D. White-NCSM 生成元与流
 
-- [x] 在完全相同的初始算符上比较一个 `ds=1e-4` Euler 固定步，并在步后
-      重新比较 `H/eta/RHS`。
-- [x] 用共同的固定步 RK4 比较 `s=0.001,0.002,0.003` 三个 checkpoint；
-      这一步继续隔离 ODE
-      driver 差异。
-- [x] 统一直接 flow、生成元、cutoff、停止条件和 ODE 容差后，比较完整流的
-      `E/f/Gamma`、`eta` 范数及停止点。
-- [x] 容差缩小十倍后，最终 SR 能量变化 `<1 keV`。
-- [x] 转回普通 `E0+t+V` 后用 double-precision J-coupled readback 比较，
-      再用 NCSM 对角化比较谱；float32 `no2bpack` 只做下游格式验收。
+- [ ] 在现有 `Generator` 中增加显式 MR/IM-NCSM 模式，复用
+      Epstein--Nesbet monopole 分母、`1e-6 MeV` cutoff 和 anti-Hermitization。
+- [ ] 按 Vobig 6.5.28--6.5.34 与命名表使用舍去 `lambda[2,3,...]`
+      的 White-NCSM 分子/分母，MR commutator 本身仍保留 `lambda2`。
+- [ ] 在球形自然基中实施 `Delta e != 0` 的 1B/2B 掩码，保留同
+      HO 量子数参考空间内部耦合。
+- [ ] 复用 `IMSRGSolver` 直接 flow/ODE 和停止诊断；默认 SR/VS-IMSRG
+      不得因 MR 参数或状态而改变。
 
-### D. 核顺序与完成定义
+### E. 单参考生产退化门禁
 
-- [x] `He4 Nrefmax=0` 全部 A--C 通过。
-- [x] `O16 Nrefmax=0` 全部 A--C 通过。
-- [x] 把命令、commit、输入摘要、误差表和最坏元素写入
-      `docs/MR-IMSRG-验收结果.md`。
-- [x] 两核通过后，才恢复把生产 MR 流用于新的 `Nrefmax=2` 物理结果。
+- [ ] 对 `He4/O16, Nrefmax=0`，同一生产 MR 入口在 `lambda2=0`
+      时直接运行现有 SR contractions；不允许根据测试核名或 fixture
+      切换实现。
+- [ ] 比较 `E/f/Gamma`、每个被选中的 EN 分母、`eta(s=0)`、每个
+      命名 RHS contraction 与总 RHS，报告 max-abs/Frobenius/最坏元素。
+- [ ] 代数级输入转换 max-abs `<=1e-12 MeV`，分母/eta/RHS max-abs
+      `<=1e-10 MeV`、相对 Frobenius `<=1e-10`。
 
-“最终能量接近”不能替代 B 阶段；只有 `E/f/Gamma -> denominator -> eta ->
-RHS -> flow` 整条链逐层通过，才能称为退化到 `imsrg++`。
+### F. 相关参考态对 Python m-scheme 的退化门禁
+
+- [ ] 先用随机 `Jref=0` 标量 Hamiltonian 和合法 `lambda2` 比较每个
+      新 J-scheme MR contraction 展开后的完整 m-scheme 张量。
+- [ ] 对 `Be8/C12, Nrefmax=0` 与 `He4/O16, Nrefmax=2` 使用同一份
+      float64 Hamiltonian/RDM，比较 `E/f/Gamma`、生成元、每个 RHS
+      contraction 和总 RHS。
+- [ ] 比较 `ds=1e-4` Euler 一步与 `s=0.001,0.002,0.003` 共同固定步
+      RK4 checkpoints，每点重新比较 `H/eta/RHS`。
+- [ ] 统一生成元/cutoff/停止条件/容差后比较完整流、真空
+      `E0+t+V` 与 NCSM 谱；float32 `no2bpack` 只做下游格式验收。
+
+### G. 性能与完成定义
+
+- [ ] J-scheme MR RHS 的主存储不随 m-substate 数量增长，主收缩使用块稀疏
+      矩阵/现有 channel 索引，并给出相对 Python m-scheme 的时间和内存比较。
+- [ ] `He4/O16 Nrefmax=0`、`Be8/C12 Nrefmax=0` 和 `He4/O16 Nrefmax=2`
+      按 E--F 门禁通过。
+- [ ] 四核完成流和 NCSM/no2bpack 读回通过，命令、commit、环境、
+      误差表、最坏元素及性能写入新验收文档。
+
+“最终能量接近”不能替代 E--F；只有
+`E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`
+整条链逐层通过，才能称为 C++ J-scheme 生产 MR 实现完成。
+
+## 已完成基准
+
+- [x] Python m-scheme MR 原型的 RDM、正规序、QCombo/显式 Fock-space
+      commutator、White-NCSM、真空物化与 NCSM/no2bpack 闭环。
+- [x] Python 生产 MR 路径在 `He4/O16, Nrefmax=0` 下对当前 C++
+      `imsrg++` 逐正规序、分母、eta、命名 RHS 收缩、Euler/RK4 和
+      `s=100` 完整流严格退化；证据见 `docs/MR-IMSRG-验收结果.md`。

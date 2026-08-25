@@ -1,4 +1,4 @@
-# MR-IMSRG 快速原型仓库说明
+# C++ J-scheme MR-IMSRG 仓库说明
 
 ## 最高优先级强制规则
 
@@ -12,9 +12,16 @@
 
 ## 当前唯一目标
 
-本分支不以实现生产级、高效或通用的 MR-IMSRG 为目标。当前目标是尽快得到一个物理定义清楚、可验证、可物化为零/一/二体 Hamiltonian 的 MR-IMSRG(2) 结果，然后交给 NCSM 做确定性验证，也可把同一输出交给 FCIQMC 做后续测试。
+当前目标是在现有 `imsrg++` 生产路径中实现高效、球形的 C++
+J-scheme MR-IMSRG(2)，供 IM-NCSM 与后续 NCSM/FCIQMC 生产计算使用。
+已验收的 `prototype/mrimsrg/` Python m-scheme 实现不再是交付主路，
+而是相关参考态的独立物理 oracle；现有 C++ SR-IMSRG(2) 则是单
+Slater 极限的生产 oracle。
 
-执行计划以 `docs/MR-IMSRG-快速结果计划.md` 为准。不要让性能优化、J-scheme 化、显式 3N、一般张量算符或大模型空间重构阻塞第一批结果。
+执行计划以 `docs/MR-IMSRG-C++-J-scheme实现计划.md` 与根目录
+`TODO.md` 为准。禁止为了通过验收另写一套测试专用的 MR 或 SR
+commutator/generator/flow；验收必须运行将来真正用于生产计算的同一
+C++ 入口。
 
 ## 固定物理范围
 
@@ -42,17 +49,29 @@
 
 基准采用 HO 基、`BetaCM=0`、无库伦、无额外核子质量修正，和现有 N2LO_opt emax2 的 NCSM/FCI 基准保持一致。读取 `minipack` 时仍必须按目标质量数 `A` 构造内禀动能，因此四个核的 Hamiltonian 是四份 A-dependent 输出，不能互相复用。
 
-## 第一版算法边界
+## 当前算法边界
 
-- 独立、低效、便于检查的 m-scheme MR-IMSRG(2) 原型；不要先改写现有高效 J-coupled commutator。
+- 生产实现是 `Jref=0` 标量参考态下的球形 J-scheme
+  MR-IMSRG(2)；不通过展开完整 m-scheme 张量实现生产 commutator。
+- 必须复用 `Operator`/`TwoBodyME`/`ModelSpace` 的 J-coupled 块、现有
+  SR contractions、`Generator` 和 `IMSRGSolver`；MR 代码只新增不可约化为
+  现有 SR 项的 reference-density/cumulant 数据与收缩。
+- Python m-scheme 原型仅作独立 oracle 和小模型诊断，不能成为 C++
+  生产 driver 的运行时后端，也不能在 C++ 内部无条件展开整个
+  m-scheme 空间。
 - 参考态由 `Nrefmax` 截断 NCSM 波函数产生。
 - 至少输入 `gamma1`、`gamma2`，构造并真正保留 `lambda2`。
-- 第一版设 `lambda3=0`；这一近似必须写入输出元数据。
+- 当前版本设 `lambda3=0`；这一近似必须写入输出元数据。
 - Hamiltonian 和生成元始终截断到参考态正规序 0B/1B/2B。
-- 直接积分 `dH/ds = [eta,H]_(0,1,2B)`；第一版不要求 Magnus。
+- 先使用现有直接积分 `dH/ds = [eta,H]_(0,1,2B)` 打通生产验收；
+  Magnus/BCH 在直接流通过后复用现有框架，不与首个 MR commutator
+  同时开发。
 - 使用 IM-NCSM 的放松解耦：只处理 `Delta e != 0` 的 1p1h 与 2p2h 通道，保留同 HO 量子数参考空间内部耦合。
 - 首选一个有文献公式和 QCombo 输出可核对的生成元；第一批只实现一种。不要同时开发多种生成元。
-- 第一版不做自然轨道 NCSM 变分优化或独立生产工作流、显式 3N、`lambda3`、奇核、非标量密度、观测算符演化、MPI 或大规模优化。这里不禁止 Vobig Sec. 6.5.3 所要求的内部临时自然基求值：相关参考态的生成元公式和 `Delta e` 掩码必须在连通块自然基中计算，再把流后的 Hamiltonian 变回原 HO 轨道顺序。
+- 当前不做显式 3N、`lambda3`、奇核、`Jref!=0` 的非标量密度、
+  一般张量观测算符或 MPI 重构。这里不禁止 Vobig Sec. 6.5.3
+  要求的球形自然基：相关参考态的流方程、生成元和 `Delta e`
+  掩码必须在该基中自洽求值，最终 Hamiltonian 再变回下游约定。
 
 ## 输入输出硬要求
 
@@ -77,19 +96,28 @@ E0 + one-body + two-body
 
 ## 开发顺序
 
-1. 冻结核力、轨道顺序、相位和普通 Hamiltonian 的现有 FCI/NCSM 基准。
-2. 打通 NCSM 参考态到 `gamma1/gamma2/lambda2` 的接口和恒等式测试。
-3. 实现 MR 正规序及其真空表示往返。
-4. 实现并逐项验证 MR-IMSRG(2) commutator。
-5. 实现单一生成元、`Delta e != 0` 掩码和直接流积分。
-6. 输出普通 0B/1B/2B Hamiltonian，先由 NCSM 读回验证。
-7. 按 `He4 -> Be8 -> C12 -> O16` 产生第一批结果。
-8. 管线通过后做 `He4/O16, Nrefmax=2`，最后才考虑 FCIQMC 性能测试或代码优化。
+1. 锁定已通过的 Python m-scheme 与 C++ SR 基准、轨道/相位/归一化约定。
+2. 建立球形 `gamma1/lambda2` J-coupled 输入与恒等式/J 重构测试。
+3. 在现有 `Commutator` 中复用全部 SR 项，只新增并逐项验证
+   `lambda2` 收缩。
+4. 在现有 `Generator` 和 `IMSRGSolver` 中加入 White-NCSM 和
+   `Delta e != 0` 路径，不复制 ODE 框架。
+5. 先让 `He4/O16, Nrefmax=0` 的同一生产入口直接退化到 SR，
+   再让 `Be8/C12, Nrefmax=0` 及 `He4/O16, Nrefmax=2` 逐项复现
+   Python m-scheme 原型。
+6. 复用现有真空正规序、`no2bpack` 和 NCSM 读回路径完成谱验收。
+7. 代数、短流、完整流和性能门禁通过后，才扩展到更大空间。
 
 ## 最低验收门槛
 
 - `Tr(gamma1)=A`，RDM 的 Hermiticity、反对称性和收缩关系通过。
 - 单 Slater 参考态给出 `lambda2=0`，并复现现有 SR-IMSRG(2) 极限。
+- 单 Slater 极限不允许调用测试专用分支；生产 MR commutator 在
+  `lambda2=0` 时必须调用同一批现有 SR contractions，并对
+  `E/f/Gamma -> denominator -> eta -> RHS -> flow` 逐层通过。
+- 相关参考态的 C++ J-scheme 结果必须展开成 m-scheme，与已验收
+  Python 原型的正规序、生成元、每个 commutator 项、RHS、短流和
+  最终真空 Hamiltonian 逐项比较；只比较最终能量不算通过。
 - `E=<Psi_ref|H|Psi_ref>`；真空正规序与 MR 正规序往返误差不高于 `1e-10` 相对量级。
 - 每步保持 `H` Hermitian、`eta` anti-Hermitian 和二体反对称性。
 - `s=0` 导出的 Hamiltonian 由下游读回后复现原始谱。
@@ -103,7 +131,8 @@ E0 + one-body + two-body
 - 新的项目设计文档放在 `docs/`；上游 Doxygen 文件留在 `doc/`。
 - `refs/` 是本地文献库，已被 `.gitignore` 排除，不要提交 PDF、提取文本或 QCombo 克隆。
 - 构建前执行 `source ./sourceme.sh`。
-- 不要为这个快速原型修改现有 `imsrg++` 生产 `gen_job.py`、Slurm 约定或 SR/VS-IMSRG 行为，除非任务明确要求。`gen_job.py` 的后续规则均适用于这条现有 `imsrg++` 路径。
+- 生产 MR 必须扩展现有 `imsrg++` 路径，但默认 SR/VS-IMSRG 的物理
+  与参数语义必须保持不变；新 MR 行为只能由显式参数启用。
 - 快速 Python MR-IMSRG 原型的集群作业必须由专用的 `prototype/mrimsrg/gen_flow_job.py` 单参数生成器产生；同样禁止手写 Slurm 或 `sbatch --wrap`。生成后必须按本文的 point7 规则检查完整脚本并通过 `sbatch --test-only` 再提交。
 - 不要提交生成的 Hamiltonian、波函数、RDM、大日志或结果目录；提交小型测试 fixture 时必须说明来源与校验和。
 - 工作区可能已有用户修改。只提交当前任务明确生成或修改的文件，不顺手清理、移动或覆盖其他改动。
