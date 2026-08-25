@@ -418,3 +418,12 @@ VI 用时由 `0.492 s` 降至 `0.022 s`，整个短流由 `1.37 s` 降至 `0.88 
 优化前后 J64 逐元素无差，emax2 Python oracle 和完整相关参考 CTest 均
 保持通过。V 的 ordered Pandya 块现为下一主瓶颈，本报告未把这一阶段写成
 性能优化完成。
+
+V 随后复用了三个张量共同的 Pandya recoupling、dense Six-J cache 和已有
+双算符 TBME accessor，没有改变指标、相位、有限求和次序或 BLAS
+contraction。emax4 V 由 `0.616 s` 降至 `0.332 s`，整个短流由 `0.88 s`
+降至 `0.602 s`，相对最初版本快 `2.28` 倍。单线程输出与优化前 bitwise
+相同，1/64 线程最坏差仍为 `4.44e-16 MeV`；emax2 Python oracle 的最坏差
+仍是 `3.11e-12 MeV`，完整相关参考 CTest 在 `351.93 s` 后通过。曾试验的
+单块 OpenMP 在 emax4 没有加速，已撤回；本阶段仍需 point7 完整流/NCSM
+回归，不能仅凭短流性能宣称全部优化验收完成。

@@ -161,7 +161,13 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       第一步已把 VI 的独立 `(J2,w)` 迹提出循环，emax4 VI 从 `0.492 s`
       降至 `0.022 s`，短流从 `1.37 s` 降至 `0.88 s`；输出相对优化前逐元素
       为零，emax2 Python oracle 仍为 `3.11e-12 MeV`，完整相关参考 CTest
-      通过。V 仍占 `0.616 s`，本项在 V 优化和完整流/NCSM 回归前不勾选。
+      通过。第二步让 V 的 `X/Y/lambda2` 共用同一个 Pandya 求和、复用
+      `imsrg++` 的 dense Six-J cache 和双算符 TBME accessor；V 从
+      `0.616 s` 降至 `0.332 s`，短流从 `0.88 s` 降至 `0.602 s`，相对最初
+      快 `2.28` 倍。单线程 J64 与优化前 bitwise 相同，1/64 线程最坏仍为
+      `4.44e-16 MeV`，emax2 oracle 仍为 `3.11e-12 MeV`，完整相关参考 CTest
+      用时 `351.93 s` 并通过。块内 OpenMP 在 emax4 无实测收益，已撤回。
+      本项只等待 point7 完整流/NCSM 回归后勾选。
 - [ ] 只有验证 emax6 interaction 的来源、header 和校验和后，才重复
       emax6 RHS/短流；不得使用文件名含 `candidate` 的核力产生验收结果。
 - [ ] 在 emax4/6 实测内存与时间外推支持后，才开始大空间完整流和

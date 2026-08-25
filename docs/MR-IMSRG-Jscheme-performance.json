@@ -12,7 +12,7 @@
   "omp_num_threads": 1,
   "repetitions": 3,
   "rhs_max_abs_mev": 3.105959933691338e-12,
-  "schema": "mrimsrg_jscheme_performance_v2",
+  "schema": "mrimsrg_jscheme_performance_v3",
   "storage_scaling": [
     {
       "dense_m_two_body_bytes": 20480000,
@@ -86,14 +86,24 @@
     }
   ],
   "timing_seconds_median": {
-    "cpp_jscheme": 0.004598542989697307,
-    "python_dense_mscheme": 1.7544659370032605,
-    "speedup": 381.5264837001656
+    "cpp_jscheme": 0.004508042009547353,
+    "python_dense_mscheme": 1.756777303002309,
+    "speedup": 389.6985208393621
   },
   "vi_trace_factorization": {
     "commit": "f9a18abcb6ab26c08094025035721ef2708f29d1",
     "baseline_cpp_jscheme_seconds": 0.0068755639949813485,
     "optimized_cpp_jscheme_seconds": 0.004598542989697307,
     "rhs_max_abs_vs_python_mev": 3.105959933691338e-12
+  },
+  "v_pandya_reuse": {
+    "commit": "2458d48c0365976a3bb11fb8dc12e4f99d0dd7a4",
+    "cpp_jscheme_seconds": 0.004508042009547353,
+    "rhs_max_abs_vs_python_mev": 3.105959933691338e-12,
+    "emax4_v_seconds_before": 0.61618,
+    "emax4_v_seconds_after": 0.33186,
+    "emax4_short_flow_seconds_before": 0.88348,
+    "emax4_short_flow_seconds_after": 0.60232,
+    "emax4_output_max_abs_vs_before_mev": 0.0
   }
 }

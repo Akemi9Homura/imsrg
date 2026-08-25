@@ -302,6 +302,16 @@ VI 从 `0.492 s` 降至 `0.022 s`，单线程短流从 `1.37 s` 降至 `0.88 s`�
 Python oracle 的 RHS 误差保持 `3.11e-12 MeV`，完整相关参考 CTest 用时
 `350.07 s` 并通过。当前真实主瓶颈已收敛到 V 的 ordered Pandya 块。
 
+V 的下一轮优化也保持公式和 contraction 次序不变：一次 Pandya 求和同时
+构造 `X/Y/lambda2`，Six-J 改用 `imsrg++` 已预计算的 dense cache，并用
+现有双算符 TBME accessor 合并 `X/Y` 的 channel、ket 与 phase 查询。
+emax4 的 V 从 `0.616 s` 降至 `0.332 s`，单线程短流由 `0.88 s` 降至
+`0.602 s`；相对最初 `1.37 s` 快 `2.28` 倍。优化前后单线程 J64 bitwise
+相同，1/64 线程两体最坏差仍为 `4.44e-16 MeV`；emax2 Python oracle 为
+`3.11e-12 MeV`，完整相关参考 CTest 用时 `351.93 s` 并通过。单块内部
+OpenMP 在 emax4 未产生实测加速且增加线程驻留，试验改动已撤回。Gate 7
+的 profiler 优化仍须完成 point7 完整流和 NCSM 回归后才最终勾选。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和

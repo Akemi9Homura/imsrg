@@ -1,6 +1,6 @@
 {
-  "schema": "mrimsrg_jscheme_large_space_acceptance_v1",
-  "implementation_commit": "f9a18abcb6ab26c08094025035721ef2708f29d1",
+  "schema": "mrimsrg_jscheme_large_space_acceptance_v2",
+  "implementation_commit": "2458d48c0365976a3bb11fb8dc12e4f99d0dd7a4",
   "baseline_profiler_commit": "1f02961a2c8ab9560ece346284ab4dd2d7a25337",
   "shell_model_obs_commit": "4b10afab0218711b0278ef66ad73e88bc7791c34",
   "host": "DESKTOP-EIV63LR",
@@ -79,15 +79,38 @@
     "vi_speedup": 22.315049864007253,
     "whole_short_flow_speedup": 1.5514782451215647
   },
+  "single_thread_after_v_pandya_reuse": {
+    "omp_num_threads": 1,
+    "openblas_num_threads": 1,
+    "wall_seconds": 0.60232,
+    "maximum_rss_kib": 54708,
+    "output_max_abs_vs_baseline_mev": 0.0,
+    "profiler_seconds": {
+      "mr_comm221_lambda2_setup": 0.00643,
+      "mr_comm221_lambda2_iv": 0.00842,
+      "mr_comm221_lambda2_v": 0.33186,
+      "mr_comm221_lambda2_v_build": 0.28199,
+      "mr_comm221_lambda2_v_blas": 0.04633,
+      "mr_comm221_lambda2_v_partial_trace": 0.00292,
+      "mr_comm221_lambda2_vi": 0.02366,
+      "mr_comm221_lambda2_vi_trace": 0.00285,
+      "mr_comm221_lambda2_total": 0.37043,
+      "mr_lambda2_commutator_addons": 0.37074,
+      "existing_sr_commutator": 0.04570,
+      "generator_update": 0.10882
+    },
+    "v_speedup_vs_after_vi": 1.856738409597878,
+    "whole_short_flow_speedup_vs_baseline": 2.275872226664017
+  },
   "thread_reproducibility": {
     "compared_threads": [1, 64],
-    "thread64_wall_seconds": 1.71562,
-    "thread64_maximum_rss_kib": 79572,
+    "thread64_wall_seconds": 1.10230,
+    "thread64_reported_rss_mb": 80.562,
     "zero_body_max_abs_mev": 0.0,
     "one_body_max_abs_mev": 0.0,
     "two_body_max_abs_mev": 4.440892098500626e-16,
     "passed": true,
-    "note": "64 threads are slower for this small emax4 short flow; V is now the dominant measured optimization target"
+    "note": "64 threads remain slower for this small emax4 short flow; a bounded single-block OpenMP experiment did not improve V and was reverted"
   },
   "capacity_claim": {
     "largest_actually_run_emax": 4,
@@ -97,7 +120,7 @@
   },
   "regression": {
     "ctest": ["MRReference", "MRDriver", "MRSRDriver", "MRCorrelatedDriver"],
-    "mr_correlated_driver_seconds": 350.07,
+    "mr_correlated_driver_seconds": 351.93,
     "passed": true
   }
 }
