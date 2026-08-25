@@ -429,6 +429,11 @@ def main() -> int:
     parser.add_argument("--sr-check-ode-tolerance", type=float)
     parser.add_argument("--sr-check-initial-step", type=float, default=1e-2)
     parser.add_argument("--sr-check-flow-tolerance", type=float, default=1e-5)
+    parser.add_argument(
+        "--generate-only",
+        action="store_true",
+        help="generate and print the single job without submitting (the default)",
+    )
     parser.add_argument("--submit", action="store_true")
     parser.add_argument(
         "--repo-root",
@@ -438,6 +443,8 @@ def main() -> int:
     )
     parser.add_argument("--result-root", type=Path)
     args = parser.parse_args()
+    if args.generate_only and args.submit:
+        parser.error("--generate-only and --submit are mutually exclusive")
 
     repo_root = args.repo_root.resolve()
     result_root = (

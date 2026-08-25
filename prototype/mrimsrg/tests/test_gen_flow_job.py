@@ -52,6 +52,7 @@ class FlowJobTests(unittest.TestCase):
                 str(root),
                 "--result-root",
                 str(result),
+                "--generate-only",
             ]
             saved_arguments = sys.argv
             try:
