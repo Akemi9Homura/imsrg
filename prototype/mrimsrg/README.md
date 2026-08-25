@@ -89,7 +89,8 @@ one- and two-body masks. It follows the production `White-NCSM` truncation
 defined in Vobig Sec. 6.5.4: all irreducible-density terms are omitted from
 the generator numerator and the displayed `O(lambda2)` terms are omitted
 from the Epstein--Nesbet denominators. The MR-IMSRG(2) commutator itself still
-retains `lambda2`. A sign-preserving `1e-6 MeV` denominator cutoff is used;
+retains `lambda2`. Denominators with magnitude below `1e-6 MeV` are replaced
+by the positive cutoff, matching the current `src/Generator.cc` behavior;
 the diagonal one-body values, occupations, and two-body diagonal terms are
 first reduced to spherical-orbit scalars.  In particular, the ordered
 magnetic-substate average of `Gamma[p,q,p,q]` is exactly the unnormalized

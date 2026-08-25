@@ -1,11 +1,10 @@
 # NNLOopt emax2 MR-IMSRG 验收结果
 
-> 当前状态（2026-08-25）：下述结果已经通过 RDM、正规序往返、旋转标量、
-> J-coupling、格式读回和 NCSM 管线检查，但尚未完成生产 MR 路径对当前
-> `imsrg++` 的逐矩阵元 SR 退化门禁。该门禁以仓库根目录 `TODO.md` P0
-> 为准；在 `He4/O16, Nrefmax=0` 的 `E/f/Gamma`、EN 分母、`eta`、RHS
-> 和完整流全部通过前，下述流结果不能作为“MR 方程已严格复现 SR-IMSRG(2)”
-> 的证据。
+> 当前状态（2026-08-25）：生产 MR 路径对当前 `imsrg++` 的
+> `He4/O16, Nrefmax=0` 单参考退化门禁已经通过正规序、逐分母、逐生成元
+> 元素、逐对易子收缩、共同短流和固定 `s=100` 完整流。验收不依赖零体
+> 能量偶合；完整 `E/f/Gamma`、`eta`、RHS 和真空 Hamiltonian 均逐元素
+> 比较。
 
 本文记录快速 m-scheme MR-IMSRG(2) 原型的可重复验收证据。大型
 Hamiltonian、RDM 和日志均保留在被 Git 忽略的本机/集群结果目录，
@@ -40,7 +39,7 @@ Hamiltonian、RDM 和日志均保留在被 Git 忽略的本机/集群结果目�
 
 ## 2. 实现正确性证据
 
-### 2.1 生产路径对 `imsrg++` 的 SR 退化核对（进行中）
+### 2.1 生产路径对 `imsrg++` 的 SR 退化核对（已通过）
 
 新增 `prototype/mrimsrg/sr_imsrgpp_check.py`，它不实现第二套 SR 公式。
 同一个 float64 `jcoupled64` 普通 Hamiltonian 被装入当前构建的
@@ -49,7 +48,7 @@ Hamiltonian、RDM 和日志均保留在被 Git 忽略的本机/集群结果目�
 算符按已经通过 NCSM 谱验收的相位和 pair normalization 反耦合到完整
 m-scheme，再与生产 `prototype/mrimsrg/` 路径逐元素比较。
 
-本轮 oracle 是本仓库 `build-src/src/pyIMSRG.so`。运行前工具核对实际编译
+代数级本机 oracle 是本仓库 `build-src/src/pyIMSRG.so`。运行前工具核对实际编译
 所用的 `Generator.cc`、`Commutator.cc`、`IMSRGSolver.cc` 与当前 checkout；
 三个 SHA-256 分别为
 `3fbc8d005792a171684fd4ab48f559e719ea0b198669b33a72b852a63ac50a49`、
@@ -102,7 +101,82 @@ MeV，O16 分别为 `1.42e-14/2.78e-17/1.07e-14 MeV`。这说明退化不只在
 `4.86e-17/3.55e-15 MeV`；O16 三点的 Hamiltonian 最大差均为
 `1.42e-14 MeV`，终点 `eta/RHS` 最大差为
 `4.16e-17/1.07e-14 MeV`。以上已通过 P0 的输入、正规序、分母、生成元、
-RHS、Euler 单步和共同 RK4 checkpoints 门禁；完整直接流仍待完成。
+RHS、Euler 单步和共同 RK4 checkpoints 门禁；完整直接流结果如下。
+
+完整流在 point7 的独立干净 checkout 中完成。生产固定-s 作业从 commit
+`6974c93b` 启动；正式验收器 commit 为 `4badb01e`，物化 C++ 真空文件的
+补充验收器为 `6ca85738`。后两次提交只改诊断/输出，不改 C++ oracle 或
+生产流方程。编译与运行环境为 GCC `10.2.1`、Boost `1.81.0`、GSL
+`2.7.1`、`openblas/0.3.10-single`、Python `3.12.9`、NumPy `2.2.4`、
+SciPy `1.15.2`、SymPy `1.13.3`；`ldd` 没有 `not found`。三份 oracle
+核心源码仍逐文件通过上列 SHA-256 核对。
+
+两边都使用直接 flow、White/EN、正的 `1e-6 MeV` cutoff，并关闭提前
+`eta` 停止；固定比较点为 `s=100`。Python 使用 DOP853，当前 C++ 使用
+Boost odeint Dopri5，因此相同 `rtol=atol` 下预期只在 ODE 截断误差内
+相同，而不是逐 bit 相同。所有初点和终点选中分母均未触发 cutoff。
+
+| 核 | `rtol=atol` | Python 0B | C++ 0B | H 最大差 | eta 最大差 | RHS 最大差 | 真空 H 最大差 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| He4 | `1e-8` | -20.244646589352 | -20.244646543773 | `2.22e-7` | `3.51e-9` | `3.19e-7` | `2.22e-7` |
+| He4 | `1e-9` | -20.244646550834 | -20.244646544175 | `1.11e-8` | `1.77e-10` | `1.60e-8` | `1.11e-8` |
+| O16 | `1e-8` | -63.721496035277 | -63.721495961970 | `7.33e-8` | `7.47e-11` | `6.02e-9` | `8.03e-9` |
+| O16 | `1e-9` | -63.721495973051 | -63.721495962337 | `2.20e-8` | `3.23e-10` | `3.00e-8` | `2.20e-8` |
+
+表中“最大差”取 0B/1B/2B 的最大绝对值。tight He4 的最坏 H 元素是
+`Gamma[0,1,12,13]`，Python/C++ 分别为
+`1.1821796358e-6/1.1933277485e-6 MeV`；tight O16 是
+`Gamma[12,13,29,30]`，分别为
+`2.2322531542e-7/2.0122705856e-7 MeV`。这些接近零的流后非对角元采用
+绝对门槛判断。tight 的分母最大差为 He4 `8.39e-9 MeV`、O16
+`5.77e-9 MeV`。
+
+同一点分别记录不同范数定义：tight He4 的 Python m-scheme/C++
+`Eta.Norm()` 为 `1.31587e-7/1.78308e-7`，tight O16 为
+`5.04772e-8/1.02354e-7`。它们反映同一组已经逐元素对上的 eta，但二体
+简并度权重不同。Python 从 `1e-8` 收紧到 `1e-9` 后，He4/O16 最终 0B
+分别只变化 `3.85e-8/6.22e-8 MeV`，即
+`3.85e-5/6.22e-5 keV`，远低于 `1 keV`。
+
+正式生产 Slurm job 为 `100142--100145`，正式 retry 验收 job 为
+`100154--100157`。最初的 `100148/100149` 在启动计算前因计算节点没有
+`git` 命令而退出；生成器随后改为在登录节点解析并把 commit 字面量写入
+脚本，未手改 Slurm、未改变物理输入。代表性命令为：
+
+```bash
+python3 prototype/mrimsrg/gen_flow_job.py --nucleus He4 \
+  --smax 100 --checkpoint-s 50 --rtol 1e-9 --atol 1e-9 \
+  --max-step 10 --residual-ratio 1e-14 --label sr_s100 \
+  --partition c128m512 --result-root /tns/mengziyan/mr-imsrg-sr-results
+
+python3 prototype/mrimsrg/gen_flow_job.py --nucleus He4 \
+  --sr-check-flow <fixed-s-flow> --jcoupled64 <s0-float64-file> \
+  --pyimsrg-dir build-src/src --sr-check-ode-tolerance 1e-9 \
+  --label s100_retry --partition c128m512
+```
+
+tight 流随后分别由 job `100160/100161` 调用实际 C++
+`UndoNormalOrdering()`，物化成验收专用 float64 J-coupled 普通
+`E0+t+V`。与生产 Python `to_vacuum()` 的逐元素最大差仍为上表的
+`1.11e-8/2.20e-8 MeV`；真空零体常数在两边均只剩约 `1e-13 MeV`
+的舍入噪声。两份 float64 文件分别交给相同的 `simpleFCI` NCSM reader，
+不是只根据矩阵元误差推断谱：
+
+| 核/空间 | 态 | Python float64 J | C++ float64 J | 差值 |
+|---|---:|---:|---:|---:|
+| He4, Nmax=8 | 0 | -20.244646550839 | -20.244646544180 | `6.66e-9` |
+|  | 1 | -16.319249831823 | -16.319249830124 | `1.70e-9` |
+|  | 2 | -16.070458954444 | -16.070458952310 | `2.13e-9` |
+| O16, Nmax=2 | 0 | -63.721495973051 | -63.721495962338 | `1.07e-8` |
+|  | 1 | -54.826082264030 | -54.826082257894 | `6.14e-9` |
+|  | 2 | -54.454755882982 | -54.454755876976 | `6.01e-9` |
+
+所有差值单位为 MeV，且各态 `2J` 顺序也一致：He4 为 `0,4,0`，O16
+为 `0,0,4`。生产 tight Hamiltonian 同时导出既有 float32
+`no2bpack` 做格式验收；基态相对 float64 J readback 的量化差为 He4
+`4.78e-7 MeV = 0.000478 keV`、O16
+`2.87e-6 MeV = 0.002872 keV`。因此 double-precision 角动量/真空转换
+和 NCSM 谱闭环通过，float32 差异继续只作为既有下游格式精度记录。
 
 - Python 回归测试：`44/44` 通过。覆盖 RDM/cumulant、普通与 MR 正规序
   往返、QCombo/显式 Fock-space 对易子、SR 极限、生成元、掩码、

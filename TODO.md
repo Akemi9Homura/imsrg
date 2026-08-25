@@ -19,7 +19,7 @@
 
 ### A. 冻结完全相同的输入
 
-- [ ] 记录本仓库和 oracle checkout 的 commit、编译器及线性代数库版本。
+- [x] 记录本仓库和 oracle checkout 的 commit、编译器及线性代数库版本。
 - [x] 从同一个 double-precision J-coupled Hamiltonian 构造两边的初始算符，
       禁止用 float32 `no2bpack` 做代数级比较。
 - [x] 核对 J-orbit/m-orbit 表、质子中子约定、占据数、core/particle 划分。
@@ -50,19 +50,19 @@ max-abs `<=1e-10 MeV`，且相对 Frobenius 误差 `<=1e-10`。接近零的张�
 - [x] 用共同的固定步 RK4 比较 `s=0.001,0.002,0.003` 三个 checkpoint；
       这一步继续隔离 ODE
       driver 差异。
-- [ ] 统一直接 flow、生成元、cutoff、停止条件和 ODE 容差后，比较完整流的
+- [x] 统一直接 flow、生成元、cutoff、停止条件和 ODE 容差后，比较完整流的
       `E/f/Gamma`、`eta` 范数及停止点。
-- [ ] 容差缩小十倍后，最终 SR 能量变化 `<1 keV`。
-- [ ] 转回普通 `E0+t+V` 后用 double-precision J-coupled readback 比较，
+- [x] 容差缩小十倍后，最终 SR 能量变化 `<1 keV`。
+- [x] 转回普通 `E0+t+V` 后用 double-precision J-coupled readback 比较，
       再用 NCSM 对角化比较谱；float32 `no2bpack` 只做下游格式验收。
 
 ### D. 核顺序与完成定义
 
-- [ ] `He4 Nrefmax=0` 全部 A--C 通过。
-- [ ] `O16 Nrefmax=0` 全部 A--C 通过。
-- [ ] 把命令、commit、输入摘要、误差表和最坏元素写入
+- [x] `He4 Nrefmax=0` 全部 A--C 通过。
+- [x] `O16 Nrefmax=0` 全部 A--C 通过。
+- [x] 把命令、commit、输入摘要、误差表和最坏元素写入
       `docs/MR-IMSRG-验收结果.md`。
-- [ ] 两核通过后，才恢复把生产 MR 流用于新的 `Nrefmax=2` 物理结果。
+- [x] 两核通过后，才恢复把生产 MR 流用于新的 `Nrefmax=2` 物理结果。
 
 “最终能量接近”不能替代 B 阶段；只有 `E/f/Gamma -> denominator -> eta ->
 RHS -> flow` 整条链逐层通过，才能称为退化到 `imsrg++`。
