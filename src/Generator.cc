@@ -253,13 +253,22 @@ double Generator::Get2bDenominator_Jdep(int ch, int ibra, int iket)
 
 double Generator::Get1bDenominatorWhiteNCSM(int i, int j)
 {
+   return Get1bDenominatorWhiteNCSMCached(i, j, nullptr);
+}
+
+double Generator::Get1bDenominatorWhiteNCSMCached(
+    int i, int j, const arma::mat* monopole_cache)
+{
    const Orbit& oi = H->modelspace->GetOrbit(i);
    const Orbit& oj = H->modelspace->GetOrbit(j);
    const double ni = oi.occ;
    const double nj = oj.occ;
    const double nbi = 1.0 - ni;
+   const double gamma_ijij = monopole_cache == nullptr
+       ? H->TwoBody.GetTBMEmonopole(i,j,i,j)
+       : (*monopole_cache)(i,j);
    double denominator =
-       -nbi*nbi*nj*nj * H->TwoBody.GetTBMEmonopole(i,j,i,j)
+       -nbi*nbi*nj*nj * gamma_ijij
        +nbi*nbi*nj * H->OneBody(i,i)
        -nbi*nj*nj * H->OneBody(j,j)
        +H->ZeroBody * (nbi*nj - 1.0);
@@ -269,6 +278,12 @@ double Generator::Get1bDenominatorWhiteNCSM(int i, int j)
 }
 
 double Generator::Get2bDenominatorWhiteNCSM(int ch, int ibra, int iket)
+{
+   return Get2bDenominatorWhiteNCSMCached(ch, ibra, iket, nullptr);
+}
+
+double Generator::Get2bDenominatorWhiteNCSMCached(
+    int ch, int ibra, int iket, const arma::mat* monopole_cache)
 {
    TwoBodyChannel& channel = H->modelspace->GetTwoBodyChannel(ch);
    Ket& bra = channel.GetKet(ibra);
@@ -284,13 +299,18 @@ double Generator::Get2bDenominatorWhiteNCSM(int ch, int ibra, int iket)
    const double nbi = 1.0 - ni;
    const double nbj = 1.0 - nj;
    const double weight = nbi * nbj * nk * nl;
+   const auto monopole = [this, monopole_cache](int a, int b) {
+      return monopole_cache == nullptr
+          ? H->TwoBody.GetTBMEmonopole(a,b,a,b)
+          : (*monopole_cache)(a,b);
+   };
    double denominator = weight * (
-       nbi*nbj * H->TwoBody.GetTBMEmonopole(i,j,i,j)
-       +nk*nl * H->TwoBody.GetTBMEmonopole(k,l,k,l)
-       -nbi*nl * H->TwoBody.GetTBMEmonopole(i,l,i,l)
-       -nbi*nk * H->TwoBody.GetTBMEmonopole(i,k,i,k)
-       -nbj*nk * H->TwoBody.GetTBMEmonopole(j,k,j,k)
-       -nbj*nl * H->TwoBody.GetTBMEmonopole(j,l,j,l)
+       nbi*nbj * monopole(i,j)
+       +nk*nl * monopole(k,l)
+       -nbi*nl * monopole(i,l)
+       -nbi*nk * monopole(i,k)
+       -nbj*nk * monopole(j,k)
+       -nbj*nl * monopole(j,l)
        +nbi * H->OneBody(i,i) + nbj * H->OneBody(j,j)
        -nk * H->OneBody(k,k) - nl * H->OneBody(l,l))
        +H->ZeroBody * (weight - 1.0);
@@ -308,6 +328,17 @@ void Generator::ConstructGenerator_WhiteNCSM()
    if (denominator_partitioning != Epstein_Nesbet)
       throw std::invalid_argument("White-NCSM generator requires Epstein-Nesbet partitioning");
    ModelSpace& modelspace = *H->modelspace;
+   const size_t norbits = modelspace.GetNumberOrbits();
+   arma::mat monopole_cache(norbits, norbits, arma::fill::zeros);
+   const double cache_start = omp_get_wtime();
+   for (size_t i=0; i<norbits; ++i)
+   {
+      for (size_t j=0; j<norbits; ++j)
+      {
+         monopole_cache(i,j) = H->TwoBody.GetTBMEmonopole(i,j,i,j);
+      }
+   }
+   Eta->profiler.timer["WhiteNCSM monopole cache"] += omp_get_wtime() - cache_start;
    // The scalar 1B operator only connects identical (l,j,tz) channels.  An
    // all-orbit loop is kept here so the Delta-e definition remains explicit.
    for (index_t i : modelspace.all_orbits)
@@ -322,8 +353,8 @@ void Generator::ConstructGenerator_WhiteNCSM()
          const double forward_weight = (1.0-oi.occ) * oj.occ;
          const double reverse_weight = (1.0-oj.occ) * oi.occ;
          const double eta = H->OneBody(i,j) *
-             (forward_weight / Get1bDenominatorWhiteNCSM(i,j)
-              - reverse_weight / Get1bDenominatorWhiteNCSM(j,i));
+             (forward_weight / Get1bDenominatorWhiteNCSMCached(i,j,&monopole_cache)
+              - reverse_weight / Get1bDenominatorWhiteNCSMCached(j,i,&monopole_cache));
          Eta->OneBody(i,j) = eta;
          Eta->OneBody(j,i) = -eta;
       }
@@ -351,8 +382,10 @@ void Generator::ConstructGenerator_WhiteNCSM()
             const double reverse_weight = (1.0-ket.op->occ) * (1.0-ket.oq->occ)
                                           * bra.op->occ * bra.oq->occ;
             const double eta = h_matrix(ibra,iket) *
-                (forward_weight / Get2bDenominatorWhiteNCSM(ch,ibra,iket)
-                 - reverse_weight / Get2bDenominatorWhiteNCSM(ch,iket,ibra));
+                (forward_weight / Get2bDenominatorWhiteNCSMCached(
+                                      ch,ibra,iket,&monopole_cache)
+                 - reverse_weight / Get2bDenominatorWhiteNCSMCached(
+                                      ch,iket,ibra,&monopole_cache));
             eta_matrix(ibra,iket) = eta;
             eta_matrix(iket,ibra) = -eta;
          }

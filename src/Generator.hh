@@ -90,6 +90,12 @@ class Generator
   double Get2bDenominator_Jdep(int ch, int ibra, int iket);
   double Get1bDenominatorWhiteNCSM(int i, int j);
   double Get2bDenominatorWhiteNCSM(int ch, int ibra, int iket);
+ private:
+  double Get1bDenominatorWhiteNCSMCached(
+      int i, int j, const arma::mat* monopole_cache);
+  double Get2bDenominatorWhiteNCSMCached(
+      int ch, int ibra, int iket, const arma::mat* monopole_cache);
+ public:
   double Get3bDenominator(int i, int j, int k, int l, int m, int n);
 
   Operator GetHod_SingleRef( Operator& H );
