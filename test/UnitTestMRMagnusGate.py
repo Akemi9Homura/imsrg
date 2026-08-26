@@ -17,7 +17,10 @@ from prototype.mrimsrg.summarize_magnus_gate import (  # noqa: E402
     parse_resource_usage,
 )
 from prototype.mrimsrg.aggregate_magnus_gates import (  # noqa: E402
+    EXPECTED_INTERACTION_SHA256,
     EXPECTED_NREFMAX,
+    EXPECTED_NMAX,
+    EXPECTED_THRESHOLDS,
     aggregate,
 )
 
@@ -98,6 +101,7 @@ def main():
                 "packing_max_abs_mev": 2e-6,
                 "omega_files": index + 1,
                 "omega_validation": {
+                    "executable_sha256": "omega-validator-sha",
                     "zero_body_max_abs": 1e-22,
                     "one_body_antihermiticity_max_abs": 0.0,
                     "two_body_antihermiticity_max_abs": 0.0,
@@ -108,10 +112,11 @@ def main():
                 "schema": "mrimsrg_magnus_gate_v1",
                 "nucleus": nucleus,
                 "nrefmax": nrefmax,
-                "nmax": index,
-                "interaction_sha256": "interaction-sha",
+                "nmax": EXPECTED_NMAX[nucleus],
+                "states": 3,
+                "interaction_sha256": EXPECTED_INTERACTION_SHA256,
                 "downstream_validator": {"sha256": "validator-sha"},
-                "thresholds": {"spectral_tolerance_mev": 1e-3},
+                "thresholds": EXPECTED_THRESHOLDS,
                 "spectral_max_abs_mev": (index + 1) * 1e-4,
                 "default": dict(profile),
                 "tight": dict(profile),

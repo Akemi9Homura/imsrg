@@ -12,6 +12,16 @@ from typing import Optional
 
 
 EXPECTED_NREFMAX = {"He4": 2, "Be8": 0, "C12": 0, "O16": 2}
+EXPECTED_NMAX = {"He4": 8, "Be8": 0, "C12": 0, "O16": 2}
+EXPECTED_INTERACTION_SHA256 = (
+    "76b7243ef53d30955c0293d29da73688dc3839942143ccf147739108bb58ff84"
+)
+EXPECTED_THRESHOLDS = {
+    "endpoint_tolerance": 1e-4,
+    "packing_tolerance_mev": 5e-6,
+    "residual_ratio": 1e-6,
+    "spectral_tolerance_mev": 1e-3,
+}
 JOB_PATTERN = re.compile(r"_(\d+)\.txt$")
 
 
@@ -57,6 +67,13 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
             raise ValueError(
                 f"{nucleus} gate uses Nrefmax={actual}, expected {expected_nrefmax}"
             )
+        actual_nmax = by_nucleus[nucleus][1].get("nmax")
+        if actual_nmax != EXPECTED_NMAX[nucleus]:
+            raise ValueError(
+                f"{nucleus} gate uses Nmax={actual_nmax}, expected {EXPECTED_NMAX[nucleus]}"
+            )
+        if by_nucleus[nucleus][1].get("states") != 3:
+            raise ValueError(f"{nucleus} gate does not contain exactly three states")
 
     reports = [by_nucleus[nucleus][1] for nucleus in EXPECTED_NREFMAX]
     interaction_sha256 = unique(
@@ -81,6 +98,14 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
             for profile in ("default", "tight")
         ),
         "production shared-library SHA-256",
+    )
+    omega_validator_sha256 = unique(
+        (
+            report[profile]["omega_validation"]["executable_sha256"]
+            for report in reports
+            for profile in ("default", "tight")
+        ),
+        "Omega validator SHA-256",
     )
     thresholds = unique(
         (json.dumps(report["thresholds"], sort_keys=True) for report in reports),
@@ -134,11 +159,14 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
         "all_single_nucleus_gates_passed": all(
             report["passed"] for report in reports
         ),
-        "interaction_identical": bool(interaction_sha256),
+        "interaction_is_frozen": (
+            interaction_sha256 == EXPECTED_INTERACTION_SHA256
+        ),
         "downstream_validator_identical": bool(downstream_validator_sha256),
         "production_executable_identical": bool(production_executable_sha256),
         "production_library_identical": bool(production_library_sha256),
-        "thresholds_identical": bool(thresholds),
+        "omega_validator_identical": bool(omega_validator_sha256),
+        "thresholds_are_frozen": json.loads(thresholds) == EXPECTED_THRESHOLDS,
     }
     return {
         "schema": "mrimsrg_four_nucleus_magnus_gate_v1",
@@ -146,6 +174,7 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
         "downstream_validator_sha256": downstream_validator_sha256,
         "production_executable_sha256": production_executable_sha256,
         "production_library_sha256": production_library_sha256,
+        "omega_validator_sha256": omega_validator_sha256,
         "thresholds": json.loads(thresholds),
         "nuclei": nuclei,
         "max_default_residual_ratio": max(
