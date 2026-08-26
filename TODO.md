@@ -534,6 +534,13 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       命令记录在实现计划 Sec. 6.4。
       TODO 中唯一 `[~]` 是用户已明确终止的 emax8 finite-s NCSM 研究，不是
       MR 实现遗留项；当前声明范围内没有未关闭的实现或验收任务。
+- [x] **MR-P6：生产 flow 参数继承。** 根目录 `--mr-jscheme` 固定接入原有
+      `method=flow`，删除 wrapper 的 method 选择以及
+      `ds_0/dsmax/ode_tolerance` 字段和 CLI 参数，不再用 MR 专用默认值覆盖
+      `imsrg++`。生成脚本 metadata 显式记录 ODE 参数来自 executable 的
+      runtime defaults 且 override 列表为空，schema 因接口变化升为
+      `mrimsrg_cpp_jscheme_slurm_v2`；`target_s` 仍作为本段作业边界，
+      `eta_criterion` 仍作为物理解耦停止条件保留。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

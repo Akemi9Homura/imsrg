@@ -172,10 +172,6 @@ class MRJschemeSettings:
     reference_file: Path
     target_s: float
     start_s: float = 0.0
-    method: str = "flow"
-    ds_0: float = 1e-2
-    dsmax: float = 0.5
-    ode_tolerance: float = 1e-8
     eta_criterion: float = 1e-6
     partition: str = "c128m512"
     qos: str = "low"
@@ -307,13 +303,10 @@ def _validate_mr_jscheme_settings(settings: MRJschemeSettings) -> None:
         raise ValueError("unsupported nucleus/Nrefmax MR reference")
     if settings.emax < 2 or settings.emax % 2:
         raise ValueError("MR J-scheme emax must be an even integer >= 2")
-    if settings.method not in ("flow", "flow_adaptive", "flow_RK4"):
-        raise ValueError("MR J-scheme production currently supports direct flow only")
     if not settings.start_s >= 0.0 or not settings.target_s > settings.start_s:
         raise ValueError("MR J-scheme requires 0 <= start_s < target_s")
-    if min(settings.ds_0, settings.dsmax, settings.ode_tolerance,
-           settings.eta_criterion) <= 0.0:
-        raise ValueError("MR flow steps, tolerance, and eta criterion must be positive")
+    if settings.eta_criterion <= 0.0:
+        raise ValueError("MR eta criterion must be positive")
     if settings.cpus < 1:
         raise ValueError("MR J-scheme cpus must be positive")
     if settings.partition not in ("c128m1024", "c128m512", "compute_C", "compute_A"):
@@ -356,7 +349,6 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
     tag = (
         f"{settings.nucleus}_Nrefmax{settings.nrefmax}_emax{settings.emax}"
         f"_s{path_token(settings.start_s)}to{path_token(settings.target_s)}"
-        f"_tol{settings.ode_tolerance:.0e}".replace("+", "").replace("-", "m")
     )
     if settings.label:
         tag += f"_{settings.label}"
@@ -382,7 +374,7 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
         "hw=20",
         f"emax={settings.emax}",
         "basis=oscillator",
-        f"method={settings.method}",
+        "method=flow",
         "nsteps=1",
         "core_generator=white-ncsm",
         "denominator_partitioning=Epstein_Nesbet",
@@ -392,9 +384,6 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
         f"mr_reference_file={reference_file}",
         "mr_validation_tolerance=1e-10",
         f"smax={segment_smax:.17g}",
-        f"ds_0={settings.ds_0:.17g}",
-        f"dsmax={settings.dsmax:.17g}",
-        f"ode_tolerance={settings.ode_tolerance:.17g}",
         f"eta_criterion={settings.eta_criterion:.17g}",
         f"flowfile={flow_file}",
         f"intfile={prefix}",
@@ -464,7 +453,7 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
     script_file.write_text(contents, encoding="utf-8")
     script_file.chmod(0o755)
     metadata = {
-        "schema": "mrimsrg_cpp_jscheme_slurm_v1",
+        "schema": "mrimsrg_cpp_jscheme_slurm_v2",
         "repository_commit": repository_commit,
         "repository_state_files": [
             {"path": str(path), "sha256": digest}
@@ -480,6 +469,9 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
         "cumulative_start_s": settings.start_s,
         "cumulative_target_s": settings.target_s,
         "segment_smax": segment_smax,
+        "solver_method": "flow",
+        "ode_parameter_source": "imsrg++ runtime defaults",
+        "ode_parameter_overrides": [],
         "interaction_sha256": interaction_sha256,
         "reference_sha256": reference_sha256,
         "executable_sha256": executable_sha256,
@@ -926,13 +918,6 @@ def parse_args():
     parser.add_argument("--mr-pyimsrg-dir", type=Path)
     parser.add_argument("--mr-start-s", type=float, default=0.0)
     parser.add_argument("--mr-target-s", type=float)
-    parser.add_argument(
-        "--mr-method", choices=("flow", "flow_adaptive", "flow_RK4"),
-        default="flow",
-    )
-    parser.add_argument("--mr-ds-0", type=float, default=1e-2)
-    parser.add_argument("--mr-dsmax", type=float, default=0.5)
-    parser.add_argument("--mr-ode-tolerance", type=float, default=1e-8)
     parser.add_argument("--mr-eta-criterion", type=float, default=1e-6)
     parser.add_argument(
         "--mr-partition",
@@ -996,10 +981,6 @@ if __name__ == "__main__":
                 reference_file=args.mr_reference_file,
                 start_s=args.mr_start_s,
                 target_s=args.mr_target_s,
-                method=args.mr_method,
-                ds_0=args.mr_ds_0,
-                dsmax=args.mr_dsmax,
-                ode_tolerance=args.mr_ode_tolerance,
                 eta_criterion=args.mr_eta_criterion,
                 partition=args.mr_partition,
                 cpus=args.mr_cpus,

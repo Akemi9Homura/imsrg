@@ -46,8 +46,6 @@ def main():
             reference_file=reference,
             start_s=40.0,
             target_s=100.0,
-            method="flow",
-            ode_tolerance=1e-9,
             partition="compute_C",
             cpus=64,
             label="restart",
@@ -59,11 +57,17 @@ def main():
         contents = script.read_text(encoding="utf-8")
         metadata = json.loads((script.parent / "metadata.json").read_text(encoding="utf-8"))
 
-        require(metadata["schema"] == "mrimsrg_cpp_jscheme_slurm_v1",
+        require(metadata["schema"] == "mrimsrg_cpp_jscheme_slurm_v2",
                 "unexpected manifest schema")
         require(metadata["cumulative_start_s"] == 40.0, "lost cumulative start s")
         require(metadata["cumulative_target_s"] == 100.0, "lost cumulative target s")
         require(metadata["segment_smax"] == 60.0, "restart segment length is wrong")
+        require(metadata["solver_method"] == "flow",
+                "MR production solver is not fixed to the existing flow path")
+        require(metadata["ode_parameter_source"] == "imsrg++ runtime defaults",
+                "MR flow does not record the source of its ODE parameters")
+        require(metadata["ode_parameter_overrides"] == [],
+                "MR flow still records wrapper-level ODE overrides")
         required_tokens = (
             "#SBATCH --partition=compute_C",
             "#SBATCH --cpus-per-task=64",
@@ -84,7 +88,6 @@ def main():
             "nucleon_mass_correction=false",
             "mr_validation_tolerance=1e-10",
             "smax=60",
-            "ode_tolerance=1.0000000000000001e-09",
             "write_H_jcoupled64=",
             "write_H_no2bpack=",
             "echo repository_commit=",
@@ -97,6 +100,9 @@ def main():
         )
         for token in required_tokens:
             require(token in contents, "generated script is missing: " + token)
+        for token in ("ds_0=", "dsmax=", "ode_tolerance="):
+            require(token not in contents,
+                    "generated MR script overrides an imsrg++ ODE default: " + token)
         require(len(metadata["executable_sha256"]) == 64,
                 "executable SHA-256 was not recorded")
         require(len(metadata["shared_library_sha256"]) == 64,

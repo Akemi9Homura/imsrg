@@ -259,8 +259,10 @@ Magnus。执行顺序固定为：
    通过数值门禁的公式来迎合 notebook 输出。
 2. 根目录 `gen_job.py` 增加独立 `--mr-jscheme` 模式；每次只接受一个核、
    一个 `Nrefmax`、一个 `emax` 和一个累计目标 `s`。脚本必须记录 git
-   commit、输入/reference SHA-256、ODE 控制、point7 资源以及两种物化
-   输出，且拒绝覆盖现有结果目录。
+   commit、输入/reference SHA-256、求解器及 ODE 参数来源、point7 资源
+   以及两种物化输出，且拒绝覆盖现有结果目录。生产入口固定使用原有
+   `method=flow`，不另设或暴露 `ds_0/dsmax/ode_tolerance`，直接继承
+   `imsrg++` 运行时默认值；固定步 `flow_RK4` 只留在底层测试入口。
 3. direct flow 的恢复语义冻结为 Hamiltonian 分段：上一段导出的 vacuum
    J64 作为下一段 `fmt2=jcoupled64` 输入；同一 reference 重新执行
    HO→NAT→MR 正规序后积分 `target_s-start_s`。`start_s/target_s` 只记录
