@@ -1,12 +1,42 @@
 #ifndef BCH_hh
 #define BCH_hh 1
 
+#include <cstddef>
+#include <stdexcept>
+
 #include "Operator.hh"
 
 class MRReference;
 
 namespace BCH
 {
+
+    class MagnusSeriesError : public std::runtime_error
+    {
+      public:
+        enum class Reason
+        {
+            NonDecreasingNestedNorm,
+            MaximumOrderReached
+        };
+
+        MagnusSeriesError(Reason reason, std::size_t order,
+                          double previous_nested_norm,
+                          double nested_norm);
+        Reason GetReason() const noexcept { return reason_; }
+        std::size_t GetOrder() const noexcept { return order_; }
+        double GetPreviousNestedNorm() const noexcept
+        {
+            return previous_nested_norm_;
+        }
+        double GetNestedNorm() const noexcept { return nested_norm_; }
+
+      private:
+        Reason reason_;
+        std::size_t order_;
+        double previous_nested_norm_;
+        double nested_norm_;
+    };
 
     extern bool use_goose_tank_correction;
     extern bool use_brueckner_bch;

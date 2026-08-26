@@ -65,6 +65,8 @@ class IMSRGSolver
   bool hunter_gatherer;
   bool perturbative_triples;
   const MRReference* mr_reference = nullptr;
+  std::size_t magnus_series_step_rejections = 0;
+  std::size_t magnus_series_segment_restarts = 0;
 
   double Elast;
   double cumulative_error;
@@ -112,6 +114,14 @@ class IMSRGSolver
   void SetOmega(size_t i, Operator& om);
   size_t GetOmegaSize(){return Omega.size();};
   int GetNOmegaWritten(){return n_omega_written;};
+  std::size_t GetMagnusSeriesStepRejections() const
+  {
+    return magnus_series_step_rejections;
+  }
+  std::size_t GetMagnusSeriesSegmentRestarts() const
+  {
+    return magnus_series_segment_restarts;
+  }
   Operator Transform_Partial(Operator& OpIn, int n);
   Operator Transform_Partial(Operator&& OpIn, int n);
 

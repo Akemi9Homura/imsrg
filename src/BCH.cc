@@ -4,6 +4,7 @@
 #include "MRCommutator.hh"
 #include "MRReference.hh"
 
+#include <sstream>
 #include <stdexcept>
 
 namespace
@@ -19,6 +20,28 @@ namespace
 
 namespace BCH
 {
+
+  MagnusSeriesError::MagnusSeriesError(
+      Reason reason, std::size_t order, double previous_nested_norm,
+      double nested_norm)
+      : std::runtime_error([&]()
+        {
+          std::ostringstream message;
+          message << "Magnus Bernoulli series ";
+          if (reason == Reason::NonDecreasingNestedNorm)
+            message << "has a non-decreasing nested-commutator norm";
+          else
+            message << "did not converge before the maximum order";
+          message << " at k=" << order
+                  << " (previous norm=" << previous_nested_norm
+                  << ", current norm=" << nested_norm << ")";
+          return message.str();
+        }()),
+        reason_(reason), order_(order),
+        previous_nested_norm_(previous_nested_norm),
+        nested_norm_(nested_norm)
+  {
+  }
 
   bool use_goose_tank_correction = false;
   bool use_brueckner_bch = false;
@@ -403,10 +426,13 @@ namespace BCH
   /// commutator used by the flow.
   ///
   /// The finite list is the same Bernoulli sequence already used by
-  /// BCH_Product.  Following Vobig Eq. (4.6.7), production stops only at a
+  /// BCH_Product. Following Vobig Eq. (4.6.7), production stops only at a
   /// nonzero Bernoulli order k>=2 when the new term is small relative to the
-  /// accumulated derivative and all nested-commutator norms have decreased.
-  /// A zero threshold is the exact k<=8 algebra-test mode.
+  /// accumulated derivative. Eq. (4.6.8) requires every nested-commutator
+  /// norm to decrease; violating that condition, or reaching k=8 without
+  /// convergence, raises MagnusSeriesError so the ODE driver can reject the
+  /// trial step. A zero threshold is the exact k<=8 algebra-test mode and
+  /// deliberately never raises a convergence error.
   Operator MagnusDerivative(const Operator &Omega, const Operator &Eta,
                              const MRReference *mr_reference,
                              double relative_threshold)
@@ -429,23 +455,27 @@ namespace BCH
     Operator derivative = Eta;
     Operator nested = Eta;
     double previous_nested_norm = nested.Norm();
-    bool monotonically_decreasing = true;
     for (size_t order = 1; order < bernoulli.size(); ++order)
     {
       nested = EvaluateScalarCommutator(Omega, nested, mr_reference);
       const double nested_norm = nested.Norm();
-      if (previous_nested_norm > 0.0 &&
+      if (relative_threshold > 0.0 && previous_nested_norm > 0.0 &&
           nested_norm >= previous_nested_norm)
-        monotonically_decreasing = false;
+        throw MagnusSeriesError(
+            MagnusSeriesError::Reason::NonDecreasingNestedNorm,
+            order, previous_nested_norm, nested_norm);
       if (bernoulli[order] != 0.0)
       {
         Operator term = (bernoulli[order] / factorial[order]) * nested;
         derivative += term;
         if (relative_threshold > 0.0 && order >= 2 &&
-            monotonically_decreasing &&
             term.Norm() < relative_threshold * derivative.Norm())
           return derivative;
       }
+      if (relative_threshold > 0.0 && order + 1 == bernoulli.size())
+        throw MagnusSeriesError(
+            MagnusSeriesError::Reason::MaximumOrderReached,
+            order, previous_nested_norm, nested_norm);
       previous_nested_norm = nested_norm;
     }
     return derivative;

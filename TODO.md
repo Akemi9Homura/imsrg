@@ -88,19 +88,23 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
 
 ### M4. 生产收尾：级数失败不得静默接受
 
-- [ ] 将 Vobig Eq. (4.6.8) 从“仅禁止提前停止”升级为可诊断的
+- [x] 将 Vobig Eq. (4.6.8) 从“仅禁止提前停止”升级为可诊断的
       Magnus 级数失败：生产 `MagnusDerivative` 必须区分已收敛、
       嵌套范数不再递减与达到最大阶仍未收敛；禁止固定
       `k=8` 后静默返回不可靠的导数。`relative_threshold=0` 仍保留
       固定 `k<=8` 的代数 oracle 语义。
-- [ ] `magnus_adaptive` 在 RK45 stage 内遇到级数失败时必须拒绝该
+- [x] `magnus_adaptive` 在 RK45 stage 内遇到级数失败时必须拒绝该
       trial step、缩小步长并从未修改的已接受状态重试；若起点
-      `Omega` 本身已无法收敛，则先物化当前段并以 `Omega=0` 开新段，
+      `Omega` 本身已无法收敛，或同一段累计八次 stage 缩步仍不能
+      安全前进，则先物化当前段并以 `Omega=0` 开新段，
       禁止无限重试。日志记录失败阶数、范数比、旧/新步长及分段。
-- [ ] 用可控小模型强制触发“stage 拒步后恢复”和“起点分段后
+- [x] 用可控小模型强制触发“stage 拒步后恢复”和“起点分段后
       恢复”，验证拒绝步不改写 `s/Omega/H`、恢复后与小步长 oracle
       一致；重跑随机 MR-BCH、He4/O16 SR 退化、sanitizer 和分段
-      `Omega` 读写测试。
+      `Omega` 读写测试。独立 Debug
+      `-fsanitize=address,undefined` 构建下
+      `MRMagnus/MRSRDriver/MRJobGenerator` 均通过；完整 Release
+      CTest `21/21` 以 `499.20 s` 通过。
 - [ ] 按 `He4 -> Be8 -> C12 -> O16` 跑完整生产流；每个体系保存
       默认/十倍收紧的最终 0B/1B/2B 矩阵元差、解耦残差、
       Magnus 收敛/拒步计数、分段 `Omega` 及 NCSM 低能谱；不以零体项

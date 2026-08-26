@@ -157,6 +157,13 @@ def main():
             initial, reference, dsmax=0.05, ode_tolerance=1e-7,
             transform_threshold=1e-10, product_threshold=1e-5, smax=smax,
         )
+        print(
+            "Magnus-series recovery counts "
+            f"default=(reject={default.GetMagnusSeriesStepRejections()},"
+            f"segment={default.GetMagnusSeriesSegmentRestarts()}) "
+            f"tight=(reject={tight.GetMagnusSeriesStepRejections()},"
+            f"segment={tight.GetMagnusSeriesSegmentRestarts()})"
+        )
         default_j64, default_packed = materialize(
             root, "default", default, reference
         )

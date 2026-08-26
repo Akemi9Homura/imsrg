@@ -704,6 +704,10 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("EstimateBCHError", &IMSRGSolver::EstimateBCHError)
           .def("UpdateEta", &IMSRGSolver::UpdateEta)
           .def("GetNOmegaWritten", &IMSRGSolver::GetNOmegaWritten)
+          .def("GetMagnusSeriesStepRejections",
+               &IMSRGSolver::GetMagnusSeriesStepRejections)
+          .def("GetMagnusSeriesSegmentRestarts",
+               &IMSRGSolver::GetMagnusSeriesSegmentRestarts)
           .def("GetOmegaSize", &IMSRGSolver::GetOmegaSize)
           //      .def("GetScratchDir",[](IMSRGSolver& self){ return self.rw->GetScratchDir();} )
           .def("GetScratchDir", [](IMSRGSolver &self)

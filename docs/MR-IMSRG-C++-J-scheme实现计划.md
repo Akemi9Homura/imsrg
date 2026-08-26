@@ -1040,3 +1040,39 @@ emax4 wall 从 `1.63` 降至 `0.64 s`，峰值约 `61.5 MiB`；emax6 从
 `14.31` 降至 `5.59 s`，峰值约 `390.1 MiB`。两空间停止版与固定做到
 `k=8` 的 J64 输出在 0B/1B/2B 上均逐位相同。这是计算能力/实现门，不把
 `s=1e-4` 称作已脱耦的物理 Hamiltonian。
+
+### 8.5 Magnus 级数失败与拒步
+
+本阶段的生产收尾改动将 Vobig Eq. (4.6.8) 从只用于提前
+停止的条件升级为真正的失败信号。对非零生产阈值，嵌套对易子
+范数不再严格递减，或到 `k=8` 仍未达到 Eq. (4.6.7) 的相对项
+门，都抛出带失败阶数和相邻范数的 `MagnusSeriesError`；不再将最后
+一个部分和静默当作导数。`relative_threshold=0` 仍固定计算到
+`k=8` 且不抛收敛异常，保留独立代数 oracle。
+
+`Solve_ode_magnus` 在任一 Dormand--Prince stage 遇到该异常时，显式把
+`state/current_s` 恢复到 `Omega.back()/s`，清除 FSAL 导数缓存，把
+trial step 减半后重试。若失败就在已接受起点发生，或同一
+Omega 段累计八次真实缩步仍不能安全前进，则先用 MR-BCH
+物化该已接受段，再以局部 `Omega=0` 继续。普通
+`omega_norm_max` 分段后也现在清除 FSAL 缓存，避免把上一个局部
+坐标的末导数误用为新段首导数。
+
+固定随机非零 `lambda2` 模型已分别强到：
+
+- 非递减级数拒绝，以及不可能的 `1e-30` 项阈值在 `k=8`
+  仍未收敛时拒绝；
+- 起点 `Omega` 失败时自动分段，其最终 Hamiltonian 与先显式
+  物化同一段再流的 oracle 差小于 `1e-13 MeV`；
+- 近边界段在 RK45 中间 stage 于同一段累计触发八次
+  拒步，然后有界
+  分段恢复并到达目标 `s`，没有耗尽浮点步长。
+
+真实 `He4 Nrefmax=2, s=1` 默认/十倍收紧流均无需级数拒步；
+二者 Hamiltonian 最大矩阵元差 `0.2543 keV`，`Nmax=8` 三条
+低能级最大差 `0.4807 keV`，driver/library 最大差
+`5.33e-15 MeV`，J64/no2bpack 最大差 `0.907 eV`。上述强制恢复、
+SR driver 与作业生成回归还在独立 Debug
+`-fsanitize=address,undefined` 构建下全部通过；完整 Release
+CTest `21/21` 以 `499.20 s` 通过，其中相关参考态验收项
+`MRCorrelatedDriver` 为 `405.61 s`。

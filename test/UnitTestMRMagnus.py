@@ -196,6 +196,36 @@ def main():
         assert max(errors(
             actual_production_derivative, expected_production_derivative
         )) < 1e-10
+
+        # Fixed-order threshold=0 remains the algebra oracle even when the
+        # nested-commutator norms are deliberately made non-decreasing.
+        divergent_omega = 64.0 * omega
+        fixed_order_derivative = solver.EvaluateMagnusDerivative(
+            divergent_omega, d_omega, 0.0
+        )
+        assert np.isfinite(fixed_order_derivative.Norm())
+        try:
+            solver.EvaluateMagnusDerivative(divergent_omega, d_omega)
+        except RuntimeError as error:
+            assert "non-decreasing nested-commutator norm" in str(error)
+        else:
+            raise AssertionError(
+                "production Magnus derivative silently accepted a "
+                "non-decreasing nested series"
+            )
+
+        # A monotonically decreasing series that has not met an intentionally
+        # impossible tolerance by k=8 must also fail instead of returning the
+        # last partial sum as if it had converged.
+        try:
+            solver.EvaluateMagnusDerivative(omega, d_omega, 1e-30)
+        except RuntimeError as error:
+            assert "maximum order" in str(error)
+        else:
+            raise AssertionError(
+                "production Magnus derivative silently accepted an "
+                "unconverged maximum-order partial sum"
+            )
     finally:
         pyIMSRG.BCH.Set_BCH_Transform_Threshold(1e-9)
         pyIMSRG.BCH.Set_BCH_Product_Threshold(1e-4)
@@ -269,6 +299,67 @@ def main():
             5.0 * (2 * orbit_p.n + orbit_p.l)
             + 0.05 * p,
         )
+
+    def run_recovery(initial, *, initial_omega=None, step, smax,
+                     omega_norm_max=0.25):
+        recovery_solver = pyIMSRG.IMSRGSolver(initial)
+        recovery_solver.SetMRReference(reference)
+        recovery_solver.SetGenerator("white-ncsm")
+        recovery_solver.SetMethod("magnus_adaptive")
+        recovery_solver.SetEtaCriterion(0.0)
+        recovery_solver.SetDs(step)
+        recovery_solver.SetDsmax(step)
+        recovery_solver.SetOmegaNormMax(omega_norm_max)
+        recovery_solver.SetODETolerance(1e-7)
+        recovery_solver.SetSmax(smax)
+        if initial_omega is not None:
+            recovery_solver.SetOmega(0, initial_omega)
+        recovery_solver.Solve()
+        assert abs(recovery_solver.GetS() - smax) < 1e-12
+        return recovery_solver
+
+    # If the accepted starting Omega itself violates Vobig Eq. (4.6.8), the
+    # solver must materialize that exact segment and restart at Omega=0. This
+    # must be identical to doing the same materialization explicitly.
+    recovery_direction = 0.015 * random_scalar_operator(
+        modelspace, layout, np.random.default_rng(20260826), -1
+    )
+    segment_seed = 57.0 * recovery_direction
+    seed_transformer = pyIMSRG.IMSRGSolver(flow_hamiltonian)
+    seed_transformer.SetMRReference(reference)
+    materialized_seed = seed_transformer.EvaluateBCHTransform(
+        flow_hamiltonian, segment_seed
+    )
+    automatic_segment = run_recovery(
+        flow_hamiltonian, initial_omega=segment_seed,
+        step=1e-4, smax=1e-4,
+    )
+    explicit_segment = run_recovery(
+        materialized_seed, step=1e-4, smax=1e-4,
+    )
+    assert automatic_segment.GetMagnusSeriesStepRejections() == 0
+    assert automatic_segment.GetMagnusSeriesSegmentRestarts() == 1
+    assert automatic_segment.GetOmegaSize() == 2
+    assert j_operator_error(
+        automatic_segment.GetH_s(), explicit_segment.GetH_s()
+    ) < 1e-13
+
+    # A near-boundary accepted segment forces failures at intermediate RK45
+    # stages. The driver must restore the accepted state, reduce the step, and
+    # eventually segment rather than silently accepting the bad derivative or
+    # exhausting the floating-point step-size range.
+    stage_seed = 54.7 * recovery_direction
+    stage_recovery = run_recovery(
+        flow_hamiltonian, initial_omega=stage_seed,
+        step=0.1, smax=0.1, omega_norm_max=100.0,
+    )
+    assert stage_recovery.GetMagnusSeriesStepRejections() == 8
+    assert stage_recovery.GetMagnusSeriesSegmentRestarts() == 1
+    assert stage_recovery.GetH_s().IsHermitian()
+    assert all(
+        segment.IsAntiHermitian()
+        for segment in stage_recovery.GetOmega()
+    )
 
     convergence_errors = []
     for step in (1e-2, 5e-3, 2.5e-3):

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <sstream>
@@ -979,10 +980,15 @@ void IMSRGSolver::operator()(const std::deque<Operator> &x, std::deque<Operator>
 /// repository choices, not terminology prescribed by those references.
 void IMSRGSolver::Solve_ode_magnus()
 {
+  if (!(ds > 0.0) || !(ds_max > 0.0))
+    throw std::invalid_argument(
+        "magnus_adaptive requires positive ds and dsmax");
   ode_mode = "Omega";
   istep = 0;
   Elast = H_0->ZeroBody;
   cumulative_error = 0.0;
+  magnus_series_step_rejections = 0;
+  magnus_series_segment_restarts = 0;
   generator.Update(FlowingOps[0], Eta);
   WriteFlowStatus(std::cout);
   WriteFlowStatus(flowfile);
@@ -996,9 +1002,12 @@ void IMSRGSolver::Solve_ode_magnus()
   std::deque<Operator> state{Omega.back()};
   double current_s = s;
   double trial_step = std::min(ds, ds_max);
-  auto system = [this](const std::deque<Operator>& x,
-                       std::deque<Operator>& dxdt, const double)
+  double rhs_s = current_s;
+  auto system = [this, &rhs_s](const std::deque<Operator>& x,
+                               std::deque<Operator>& dxdt,
+                               const double evaluation_s)
   {
+    rhs_s = evaluation_s;
     const Operator& omega = x.back();
     if ((Omega.size() + n_omega_written) > 1)
       FlowingOps[0] = EvaluateBCHTransform(H_saved, omega);
@@ -1013,6 +1022,20 @@ void IMSRGSolver::Solve_ode_magnus()
       dxdt.back() = EvaluateMagnusDerivative(omega, Eta);
   };
 
+  auto log_series_event = [this](const std::string& message)
+  {
+    std::cout << message << std::endl;
+    if (!flowfile.empty())
+    {
+      std::ofstream output(flowfile, std::ios::app);
+      output << message << '\n';
+    }
+  };
+  std::size_t consecutive_series_failures = 0;
+  std::size_t series_rejections_current_segment = 0;
+  constexpr std::size_t maximum_consecutive_series_failures = 64;
+  constexpr std::size_t series_rejections_before_segment_restart = 8;
+
   while (current_s < smax)
   {
     Omega.back() = state.back();
@@ -1025,13 +1048,118 @@ void IMSRGSolver::Solve_ode_magnus()
       break;
 
     trial_step = std::min({trial_step, ds_max, smax - current_s});
-    const auto result = controlled.try_step(
-        system, state, current_s, trial_step);
-    if (result != odeint::success)
+    boost::numeric::odeint::controlled_step_result result;
+    try
+    {
+      result = controlled.try_step(system, state, current_s, trial_step);
+    }
+    catch (const BCH::MagnusSeriesError& error)
+    {
+      // try_step only overwrites its in/out state after an accepted step, but
+      // restore explicitly from the accepted segment state to make rejection
+      // semantics independent of that implementation detail.
+      state.back() = Omega.back();
+      current_s = s;
+      controlled.reset();
+      ++consecutive_series_failures;
+      if (consecutive_series_failures >
+          maximum_consecutive_series_failures)
+        throw std::runtime_error(
+            "magnus_adaptive exceeded the consecutive Magnus-series "
+            "failure limit");
+
+      const double stage_tolerance =
+          32.0 * std::numeric_limits<double>::epsilon() *
+          std::max(1.0, std::abs(current_s));
+      const bool failed_at_accepted_state =
+          std::abs(rhs_s - current_s) <= stage_tolerance;
+      std::ostringstream message;
+      message << "Magnus series rejected at s=" << std::setprecision(16)
+              << current_s << ", stage_s=" << rhs_s << ": "
+              << error.what();
+
+      if (failed_at_accepted_state)
+      {
+        if (Omega.back().Norm() <= 1e-12)
+          throw std::runtime_error(
+              message.str() +
+              "; the series fails at Omega=0 and cannot be recovered by "
+              "step reduction or segmentation");
+
+        // The accepted Omega itself is too large for a reliable Bernoulli
+        // derivative. Materialize that exact accepted transformation before
+        // NewOmega() resets the local segment, then retry at the same s.
+        if ((Omega.size() + n_omega_written) > 1)
+          FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
+        else
+          FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
+        generator.Update(FlowingOps[0], Eta);
+        NewOmega();
+        state.back() = Omega.back();
+        ++magnus_series_segment_restarts;
+        consecutive_series_failures = 0;
+        series_rejections_current_segment = 0;
+        trial_step = std::min(trial_step, ds_max);
+        message << "; materialized the accepted segment and restarted with "
+                   "Omega=0, trial ds="
+                << trial_step;
+      }
+      else
+      {
+        const double old_trial_step = trial_step;
+        trial_step *= 0.5;
+        const double minimum_trial_step =
+            32.0 * std::numeric_limits<double>::epsilon() *
+            std::max(1.0, std::abs(current_s));
+        if (!(trial_step > minimum_trial_step))
+          throw std::runtime_error(
+              message.str() + "; trial step reached the floating-point floor");
+        ++magnus_series_step_rejections;
+        ++series_rejections_current_segment;
+        message << "; rejected trial ds=" << old_trial_step
+                << " and reduced ds to " << trial_step;
+
+        // A state can satisfy Eq. (4.6.8) itself while every forward RK
+        // stage leaves the convergence domain. Repeatedly halving toward the
+        // floating-point floor cannot resolve that geometry. After a bounded
+        // number of genuine step-reduction attempts, materialize the exact
+        // accepted state and restart the local Magnus coordinate at zero.
+        if (series_rejections_current_segment >=
+                series_rejections_before_segment_restart &&
+            Omega.back().Norm() > 1e-12)
+        {
+          if ((Omega.size() + n_omega_written) > 1)
+            FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
+          else
+            FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
+          generator.Update(FlowingOps[0], Eta);
+          NewOmega();
+          state.back() = Omega.back();
+          ++magnus_series_segment_restarts;
+          consecutive_series_failures = 0;
+          series_rejections_current_segment = 0;
+          message << "; repeated stage failures reached the bounded retry "
+                     "limit, materialized the accepted segment, and "
+                     "restarted with Omega=0";
+        }
+        else
+        {
+          message << " and will retry from the unchanged accepted state";
+        }
+      }
+      log_series_event(message.str());
       continue;
+    }
+    if (result != odeint::success)
+    {
+      state.back() = Omega.back();
+      current_s = s;
+      continue;
+    }
 
     s = current_s;
     ++istep;
+    consecutive_series_failures = 0;
     Omega.back() = state.back();
     if ((Omega.size() + n_omega_written) > 1)
       FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
@@ -1045,6 +1173,10 @@ void IMSRGSolver::Solve_ode_magnus()
     {
       NewOmega();
       state.back() = Omega.back();
+      series_rejections_current_segment = 0;
+      // A segment reset changes the meaning of the local state. Do not reuse
+      // Dormand--Prince's FSAL derivative from the previous segment.
+      controlled.reset();
     }
   }
   ds = trial_step;
