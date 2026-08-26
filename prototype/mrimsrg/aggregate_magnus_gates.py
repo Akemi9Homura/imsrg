@@ -16,6 +16,12 @@ EXPECTED_NMAX = {"He4": 8, "Be8": 0, "C12": 0, "O16": 2}
 EXPECTED_INTERACTION_SHA256 = (
     "76b7243ef53d30955c0293d29da73688dc3839942143ccf147739108bb58ff84"
 )
+EXPECTED_PRODUCTION_EXECUTABLE_SHA256 = (
+    "a70a28582d232d675c41a8db26a327b6d29bde8e5cf0317695d7d26745218de5"
+)
+EXPECTED_PRODUCTION_LIBRARY_SHA256 = (
+    "c7eb668df585e96c29b0c7e659288ef16cbeecefcf358d9d390399488261927b"
+)
 EXPECTED_THRESHOLDS = {
     "endpoint_tolerance": 1e-4,
     "packing_tolerance_mev": 5e-6,
@@ -181,8 +187,13 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
             interaction_sha256 == EXPECTED_INTERACTION_SHA256
         ),
         "downstream_validator_identical": bool(downstream_validator_sha256),
-        "production_executable_identical": bool(production_executable_sha256),
-        "production_library_identical": bool(production_library_sha256),
+        "production_executable_is_frozen": (
+            production_executable_sha256
+            == EXPECTED_PRODUCTION_EXECUTABLE_SHA256
+        ),
+        "production_library_is_frozen": (
+            production_library_sha256 == EXPECTED_PRODUCTION_LIBRARY_SHA256
+        ),
         "omega_validator_identical": bool(omega_validator_sha256),
         "thresholds_are_frozen": json.loads(thresholds) == EXPECTED_THRESHOLDS,
         "input_artifacts_are_frozen": all(

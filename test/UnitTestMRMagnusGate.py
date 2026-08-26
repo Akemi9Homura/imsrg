@@ -22,6 +22,8 @@ from prototype.mrimsrg.aggregate_magnus_gates import (  # noqa: E402
     EXPECTED_INTERACTION_SHA256,
     EXPECTED_NREFMAX,
     EXPECTED_NMAX,
+    EXPECTED_PRODUCTION_EXECUTABLE_SHA256,
+    EXPECTED_PRODUCTION_LIBRARY_SHA256,
     EXPECTED_REFERENCE_SHA256,
     EXPECTED_THRESHOLDS,
     aggregate,
@@ -95,8 +97,8 @@ def main():
         for index, (nucleus, nrefmax) in enumerate(EXPECTED_NREFMAX.items()):
             profile = {
                 "metadata": {
-                    "executable_sha256": "exe-sha",
-                    "shared_library_sha256": "library-sha",
+                    "executable_sha256": EXPECTED_PRODUCTION_EXECUTABLE_SHA256,
+                    "shared_library_sha256": EXPECTED_PRODUCTION_LIBRARY_SHA256,
                     "reference_sha256": EXPECTED_REFERENCE_SHA256[nucleus],
                     "interaction_sha256": EXPECTED_BARE_J64_SHA256[nucleus],
                 },
@@ -165,6 +167,38 @@ def main():
             pass
         else:
             raise AssertionError("inconsistent production executables were accepted")
+
+        unfrozen_entries = []
+        for path, report in entries:
+            unfrozen_report = dict(report)
+            for profile_name in ("default", "tight"):
+                unfrozen_profile = dict(unfrozen_report[profile_name])
+                unfrozen_metadata = dict(unfrozen_profile["metadata"])
+                unfrozen_metadata["executable_sha256"] = "consistent-but-unfrozen"
+                unfrozen_profile["metadata"] = unfrozen_metadata
+                unfrozen_report[profile_name] = unfrozen_profile
+            unfrozen_entries.append((path, unfrozen_report))
+        require(
+            not aggregate(unfrozen_entries)["passed"],
+            "a consistent but unfrozen production executable was accepted",
+        )
+
+        unfrozen_entries = []
+        for path, report in entries:
+            unfrozen_report = dict(report)
+            for profile_name in ("default", "tight"):
+                unfrozen_profile = dict(unfrozen_report[profile_name])
+                unfrozen_metadata = dict(unfrozen_profile["metadata"])
+                unfrozen_metadata["shared_library_sha256"] = (
+                    "consistent-but-unfrozen"
+                )
+                unfrozen_profile["metadata"] = unfrozen_metadata
+                unfrozen_report[profile_name] = unfrozen_profile
+            unfrozen_entries.append((path, unfrozen_report))
+        require(
+            not aggregate(unfrozen_entries)["passed"],
+            "a consistent but unfrozen production library was accepted",
+        )
 
     print("MR Magnus gate parser regression passed")
 

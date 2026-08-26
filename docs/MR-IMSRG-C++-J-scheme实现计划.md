@@ -1094,6 +1094,9 @@ point7 唯一生产 checkout 已回到
 direct-flow 结果通过 `result/mr-jscheme-flow-legacy-e604e181` 链接统一
 访问。生产 executable SHA-256 为
 `a70a28582d232d675c41a8db26a327b6d29bde8e5cf0317695d7d26745218de5`。
+配套 `libIMSRG.so` SHA-256 为
+`c7eb668df585e96c29b0c7e659288ef16cbeecefcf358d9d390399488261927b`；
+最终聚合器要求四核全部逐字匹配这两个冻结哈希，而不只要求彼此相同。
 该 executable 构建于 `b15ac899`；从该提交到当前验收工具提交，
 `BCH.cc`、`IMSRGSolver.cc`、`MRCommutator.cc`、`MRReference.cc`、
 `Generator.cc`、`imsrg++.cc`、`Operator.cc` 和 `TwoBodyME.cc` 的
