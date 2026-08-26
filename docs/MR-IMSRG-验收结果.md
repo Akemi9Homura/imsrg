@@ -570,3 +570,35 @@ jobs `100441/100442` 均为 Slurm `COMPLETED`, exit `0:0`，墙钟
 Nmax24，本轮没有计算，因此没有 emax6 全空间漂移，也没有宣称完整
 `prototype_downstream_stability_v1` 通过。下一阶段可以评估 emax8 的
 实际资源和最大可行 NCSM 空间，但不能把本 pilot 外推成 emax8 物理验收。
+
+## 11. emax8 canonical input 与资源门禁
+
+emax8 canonical NNLOopt `hw=20,e2max=16` 输入从冻结 emax14 母 minipack
+直接抽取 3526624 条原始 records，文件 SHA-256 为
+`3fd1a0038e8c6f00cd93ec26113f02fcb19dd51268a95238da67b17e12fd4bda`。
+独立 `Hamiltonian::truncate(8)` 比较在 A=4 与 A=16 下均逐 channel 严格
+零差。对应 bare J64 SHA-256 为 `cd14cd4b...eb9cce`，嵌入参考为
+`9af7a6e0...a68b3`，后者保持原 emax2 NCSM 参考并让新增轨道占据/cumulant
+严格为零。
+
+point7 job `100444` 对 90 个 J-orbit、3526624 条 TBME 做固定
+`ds=smax=1e-4` RK4 一步。4 次完整 J-scheme RHS 用时 `17.28220 s`，峰值
+RSS `2070.297 MB`；流后 MR 零体项 `-17.017091905266 MeV`，真空物化零体
+核对为零，并产生 J64/no2bpack。若构造 660 个 m-orbit 的稠密两体 double
+张量则需约 `1.518 TB`；旧 lossless J64 validator 因而 `bad_alloc`，这条
+dense-m 诊断路径已明确排除，生产流本身没有构造该张量。
+
+native no2bpack NCSM Nmax8 jobs `100447/100448` 均为 Slurm
+`COMPLETED`, exit `0:0`，维数 44838。bare 与一步流后三态为：
+
+| 输入 | E0 (MeV) | E1 (MeV), 2J | E2 (MeV), 2J | wall | peak RSS |
+|---|---:|---:|---:|---:|---:|
+| bare | -26.217052992370 | -24.709627375508, 4 | -24.709627301702, 0 | 81 s | 2385856 KiB |
+| s=0.0001 | -26.217786322986 | -24.709987825043, 4 | -24.709967967694, 0 | 75 s | 2386220 KiB |
+
+一步流相对 bare 的基态变化为 `-0.733331 keV`。这一节只验收 canonical
+输入、pure J-scheme 资源、真空物化和 native reader 闭环；`s=1e-4` 不构成
+有限流的物理验收。下一步是实际运行 `s=0.02` 的 `1e-9/1e-10` 双容差流，
+再用相同 bare/flow Nmax 序列做到最大可行空间。若没有做到 emax8 四粒子
+全空间 Nmax32，只能报告最大可行 Nmax proxy，不能宣称完整 downstream
+stability 门禁通过。

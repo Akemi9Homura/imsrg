@@ -307,11 +307,29 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 - [x] 根据上述实测冻结 emax6 `s=0.02` finite-s pilot、完整三态谱、
       ODE/格式误差、输入/可执行文件/作业哈希和 claim limit；机器记录见
       `MR-IMSRG-Jscheme-large-space.json` schema v10。
-- [ ] 评估 emax8 的 canonical interaction、J-scheme direct-flow 资源与
-      最大可行后 NCSM 空间，再决定是否实际运行。不得从 emax6 pilot 外推
-      物理通过。Magnus 只能改善积分/重启成本，不能被当作修复 IMSRG(2)
-      长流谱漂移的办法；若确需接入，仍须从同一 RHS、短流、真空物化和
-      后 NCSM 谱重新验收。
+- [x] 建立并独立核对 emax8 canonical interaction：从冻结 emax14 母
+      minipack 流式保留 3526624 条原始 records，child SHA-256 为
+      `3fd1a003...d4bda`；A=4/16 的逐 channel 比较均严格零差。对应 bare
+      J64/ref/no2bpack 已冻结校验和，嵌入参考的收缩误差 `1.85e-15`。
+- [x] 完成 emax8 真实资源门禁。point7 job `100444` 对 90 个 J-orbit、
+      3526624 条 TBME 执行固定 `ds=1e-4` RK4 一步（4 次 RHS），墙钟
+      `17.282 s`、峰值 RSS `2070.297 MB`，真空物化零体核对为零；全程只走
+      J-scheme。稠密 m-scheme 两体张量解析需求约 `1.518 TB`，lossless
+      J64 validator 因该旧路径 `bad_alloc`，明确不作为 emax8 验收路径。
+- [x] 用下游 native no2bpack reader 完成 emax8 `Nmax=8` 资源/格式读回。
+      bare/固定一步流 jobs `100447/100448` 均 `COMPLETED 0:0`，维数
+      `44838`，三态谱分别为
+      `[-26.2170529924,-24.7096273755,-24.7096273017]` 与
+      `[-26.2177863230,-24.7099878250,-24.7099679677] MeV`；墙钟
+      `81/75 s`、峰值 RSS `2385856/2386220 KiB`。基态变化
+      `-0.733331 keV` 只证明生产物化/读回与资源可行，不是有限流物理门禁。
+- [ ] 用根目录单点生成器实际运行 emax8 `s=0.02` direct flow，先做
+      `rtol=atol=1e-9`，再以 `1e-10` 独立复算；比较 lossless J64 的
+      0B/1B/2B 和 native no2bpack NCSM 谱。然后按相同 bare/flow Nmax
+      序列逐点增加到资源允许的最大值，才评估 finite-s pilot。不得从
+      emax6 或 `s=1e-4` 资源点外推物理通过。Magnus 只能改善积分/重启成本，
+      不能被当作修复 IMSRG(2) 长流谱漂移的办法；若确需接入，仍须从同一
+      RHS、短流、真空物化和后 NCSM 谱重新验收。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

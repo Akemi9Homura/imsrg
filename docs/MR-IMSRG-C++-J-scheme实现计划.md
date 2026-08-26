@@ -390,6 +390,45 @@ emax4 已证明长流会放大 IMSRG(2) 截断误差，因此 emax6 不再先追
    修正项；是否实现只由 direct-flow 内存、checkpoint 和 wall 实测决定，
    并仍需重复 RHS、物化与后 NCSM 验收。
 
+### 5.3 当前执行边界：emax8 实测 finite-s pilot
+
+emax8 输入与资源前置已经完成。canonical NNLOopt `emax=8,e2max=16`
+minipack 从同一冻结 emax14 母文件直接抽取，SHA-256 为
+`3fd1a0038e8c6f00cd93ec26113f02fcb19dd51268a95238da67b17e12fd4bda`；
+独立 reader 在 A=4/16 下逐 channel 均为严格零差。bare J64 含 90 个
+J-orbit、3526624 条 TBME，SHA-256 为 `cd14cd4b...eb9cce`；嵌入参考 SHA-256
+为 `9af7a6e0...a68b3`，保持原 emax2 `Nrefmax=2` 参考的占据和 cumulant，
+新增块为空。
+
+point7 job `100444` 已完成 `ds=smax=1e-4` 固定 RK4 一步。4 次完整 RHS
+墙钟 `17.28220 s`、峰值 RSS `2070.297 MB`，初末 MR 零体项为
+`-17.0135029683/-17.0170919053 MeV`，`||eta2||` 从 `1.214269979` 降至
+`1.214014842`；真空导出零体一致性为零。该实测证明 pure J-scheme direct
+flow 可在 emax8 运行。相反，660 个 m-orbit 的稠密四指标 double 张量需要
+`1517978880000 bytes`，所以会 `bad_alloc` 的旧 lossless J64→dense-m
+validator 被明确排除；它不是生产 J-scheme 流失败，也不应成为 emax8 格式
+验收的依赖。
+
+下游 native no2bpack reader 的 Nmax8 jobs `100447/100448` 均完成，维数
+44838。bare 与固定一步流的三态谱分别为
+`[-26.2170529924,-24.7096273755,-24.7096273017]` 和
+`[-26.2177863230,-24.7099878250,-24.7099679677] MeV`，峰值 RSS 均约
+2.28 GiB。基态微移 `-0.733331 keV` 与正常读回只构成格式/资源门禁。
+
+下一步固定为：
+
+1. 用 `gen_job.py --mr-jscheme` 单点运行 `s=0→0.02`、
+   `rtol=atol=1e-9`，仍用同一 White-NCSM RHS、J64 checkpoint 和
+   no2bpack 物化；
+2. 用 `1e-10` 独立复算并比较 lossless 0/1/2B，ODE/NCSM 谱误差必须
+   `<1 keV`；
+3. 对 bare/flow 使用完全相同的 Nmax 序列，从 2/4/6/8 逐点增加到实测
+   资源允许的最大值；在没有 emax8 全空间（四粒子 Nmax32）时，只能按预先
+   声明的最大可行 Nmax proxy 报告，不能声称完整
+   `prototype_downstream_stability_v1` 通过；
+4. 只有 direct flow 的内存、wall 或 checkpoint 实测成为阻碍时才实现
+   Magnus；不得用 Magnus 解释或掩盖 IMSRG(2) 谱漂移。
+
 这一阶段继续保留两个独立结论：C++ J-scheme 公式与实现门禁已经通过；
 有限流能否作为更大空间下游 Hamiltonian，则由后 NCSM 数据单独决定。
 
@@ -402,8 +441,9 @@ emax4 已证明长流会放大 IMSRG(2) 截断误差，因此 emax6 不再先追
 5. White-NCSM generator 与 `Delta e` 掩码；
 6. solver/driver 集成和真实体系 `s=0`/short-flow 验收；
 7. 完整流、物化、NCSM 与性能验收。
-8. reference embedding、真实 emax4/6 RHS/短流和 profiler 驱动优化。
-9. QCombo 再审计、单点 Slurm 生成器、direct-flow 分段等价和 emax4
+8. reference embedding、真实 emax4/6/8 RHS/短流和 profiler 驱动优化。
+9. emax8 `s=0.02` 双容差流、真空物化及最大可行 Nmax 后 NCSM pilot。
+10. QCombo 再审计、单点 Slurm 生成器、direct-flow 分段等价和 emax4
    完整流/NCSM；依据实测再决定 emax6 direct flow 或 MR Magnus。
 
 每个边界在自身测试通过后立即独立 commit。任何一个未通过 Gate 1--4
