@@ -89,6 +89,9 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       CTest `MRPrototype`；54 项 RDM/正规序/commutator/J-coupling/
       generator/flow/Magnus/I/O 测试全部通过，不再依赖手工另跑 README 命令；
       注册后的 current-HEAD Release CTest `23/23` 以 `489.09 s` 通过。
+- [x] 从空目录以 `-fsanitize=address,undefined` 重建 current HEAD，执行
+      `MRPrototype/MRSRDriver/MRMagnus/MRJobGenerator/MRMagnusGate`；
+      `5/5` 以 `16.58 s` 通过，ASan/UBSan 均无诊断。
 
 ### M4. 生产收尾：级数失败不得静默接受
 
