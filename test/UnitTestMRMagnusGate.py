@@ -3,6 +3,7 @@
 
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 
@@ -134,6 +135,22 @@ def main():
         require(combined["passed"], "consistent four-nucleus gates were rejected")
         require(abs(combined["max_spectral_abs_keV"] - 0.4) < 1e-15,
                 "four-nucleus spectral maximum was aggregated incorrectly")
+        combined_path = root / "four_nucleus_gate.json"
+        subprocess.run(
+            [
+                sys.executable,
+                str(REPOSITORY / "prototype/mrimsrg/aggregate_magnus_gates.py"),
+                *(str(path) for path, _ in entries),
+                "--json", str(combined_path),
+            ],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        require(
+            json.loads(combined_path.read_text(encoding="utf-8"))["passed"],
+            "four-nucleus gate CLI did not write a passing report",
+        )
         broken_entries = list(entries)
         broken_report = dict(broken_entries[0][1])
         broken_default = dict(broken_report["default"])
