@@ -132,6 +132,9 @@ class IMSRGSolver
   void ClearMRReference(){mr_reference = nullptr;};
   bool HasMRReference() const {return mr_reference != nullptr;};
   Operator EvaluateCommutator(const Operator& X, const Operator& Y) const;
+  Operator EvaluateBCHTransform(const Operator& initial,
+                                const Operator& omega) const;
+  Operator EvaluateBCHProduct(Operator& d_omega, Operator& omega) const;
 
   size_t GetSystemDimension();
   double GetS(){return s;};

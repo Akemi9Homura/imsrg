@@ -1,6 +1,21 @@
 
 #include "BCH.hh"
 #include "Commutator.hh"
+#include "MRCommutator.hh"
+#include "MRReference.hh"
+
+#include <stdexcept>
+
+namespace
+{
+  Operator EvaluateScalarCommutator(const Operator &X, const Operator &Y,
+                                    const MRReference *mr_reference)
+  {
+    if (mr_reference == nullptr)
+      return Commutator::Commutator(X, Y);
+    return MRCommutator::Commutator(X, Y, *mr_reference);
+  }
+}
 
 namespace BCH
 {
@@ -87,17 +102,28 @@ namespace BCH
   /// We use the [Baker-Campbell-Hausdorff formula](http://en.wikipedia.org/wiki/Baker-Campbell-Hausdorff_formula)
   /// \f[ Z = X + [Y,X] + \frac{1}{2!}[Y,[Y,X]] + \frac{1}{3!}[Y,[Y,[Y,X]]] + \ldots \f]
   /// with all commutators truncated at the two-body level.
-  Operator BCH_Transform(const Operator &OpIn, const Operator &Omega)
+  Operator BCH_Transform(const Operator &OpIn, const Operator &Omega,
+                         const MRReference *mr_reference)
   {
-    return use_brueckner_bch ? Brueckner_BCH_Transform(OpIn, Omega) : Standard_BCH_Transform(OpIn, Omega);
+    if (mr_reference != nullptr && use_brueckner_bch)
+      throw std::invalid_argument("MR-Magnus does not support Brueckner BCH");
+    return use_brueckner_bch
+             ? Brueckner_BCH_Transform(OpIn, Omega)
+             : Standard_BCH_Transform(OpIn, Omega, mr_reference);
   }
 
   /// X.BCH_Transform(Y) returns \f$ Z = e^{Y} X e^{-Y} \f$.
   /// We use the [Baker-Campbell-Hausdorff formula](http://en.wikipedia.org/wiki/Baker-Campbell-Hausdorff_formula)
   /// \f[ Z = X + [Y,X] + \frac{1}{2!}[Y,[Y,X]] + \frac{1}{3!}[Y,[Y,[Y,X]]] + \ldots \f]
   /// with all commutators truncated at the two-body level.
-  Operator Standard_BCH_Transform(const Operator &OpIn, const Operator &Omega)
+  Operator Standard_BCH_Transform(const Operator &OpIn, const Operator &Omega,
+                                  const MRReference *mr_reference)
   {
+
+    if (mr_reference != nullptr &&
+        (use_goose_tank_correction || use_factorized_correction))
+      throw std::invalid_argument(
+          "MR-Magnus BCH does not support goose-tank or factorized corrections");
 
     double t_start = omp_get_wtime();
     int max_iter = 40;
@@ -171,7 +197,7 @@ namespace BCH
 //        OpNested_last_last = OpNested_last;
 //        OpNested_last = OpNested;
 
-        OpNested = Commutator::Commutator(Omega, OpNested); // the ith nested commutator
+        OpNested = EvaluateScalarCommutator(Omega, OpNested, mr_reference); // the ith nested commutator
 
         int i_min_factorized = bch_skip_ieq1 ? 2 : 1;
         if (i > i_min_factorized and use_factorized_correction)
@@ -279,8 +305,12 @@ namespace BCH
   /// by employing the [Baker-Campbell-Hausdorff formula](http://en.wikipedia.org/wiki/Baker-Campbell-Hausdorff_formula)
   /// \f[ Z = X + Y + \frac{1}{2}[X,Y] + \frac{1}{12}([X,[X,Y]]+[Y,[Y,X]]) + \ldots \f]
   //*****************************************************************************************
-  Operator BCH_Product(Operator &X, Operator &Y)
+  Operator BCH_Product(Operator &X, Operator &Y,
+                       const MRReference *mr_reference)
   {
+    if (mr_reference != nullptr && use_factorized_correction_BCH_Product)
+      throw std::invalid_argument(
+          "MR-Magnus BCH product does not support factorized corrections");
     double tstart = omp_get_wtime();
     double nx = X.Norm();
     double ny = Y.Norm();
@@ -298,13 +328,13 @@ namespace BCH
       Z.ThreeBody.Erase();
       Commutator::use_imsrg3 = false;
     }
-    Operator Nested = Commutator::Commutator(Y, X); // [Y,X]
+    Operator Nested = EvaluateScalarCommutator(Y, X, mr_reference); // [Y,X]
 
     double nxy = Nested.Norm();
     // We assume X is small, but just in case, we check if we should include the [X,[X,Y]] term.
     if (nxy * nx > bch_product_threshold)
     {
-      Z += (1. / 12) * Commutator::Commutator(Nested, X);
+      Z += (1. / 12) * EvaluateScalarCommutator(Nested, X, mr_reference);
       if (use_factorized_correction_BCH_Product)
       {
         Operator Op_2b1b = Nested;
@@ -343,7 +373,7 @@ namespace BCH
         chi = Nested; // save nested commutator from previous step
       }
 
-      Nested = Commutator::Commutator(Y, Nested);
+      Nested = EvaluateScalarCommutator(Y, Nested, mr_reference);
 
       if (k >= 2 and use_factorized_correction_BCH_Product)
       {

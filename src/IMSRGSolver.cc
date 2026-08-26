@@ -111,13 +111,13 @@ void IMSRGSolver::GatherOmega()
   auto &gatherer = Omega[Omega.size() - 2];
   if (hunter.Norm() > 1e-12) // SRS: changed this from 1e-6 to 1e-12. No reason for it to be so big.
   {
-    gatherer = BCH::BCH_Product(hunter, gatherer);
+    gatherer = EvaluateBCHProduct(hunter, gatherer);
   }
   hunter.Erase();
   H_saved = *H_0;
   for (size_t i = 0; i < Omega.size() - 1; i++)
   {
-    H_saved = BCH::BCH_Transform(H_saved, Omega[i]);
+    H_saved = EvaluateBCHTransform(H_saved, Omega[i]);
   }
 }
 
@@ -155,6 +155,18 @@ Operator IMSRGSolver::EvaluateCommutator(const Operator& X,
   if (mr_reference == nullptr)
     return Commutator::Commutator(X, Y);
   return MRCommutator::Commutator(X, Y, *mr_reference);
+}
+
+Operator IMSRGSolver::EvaluateBCHTransform(const Operator& initial,
+                                           const Operator& omega) const
+{
+  return BCH::BCH_Transform(initial, omega, mr_reference);
+}
+
+Operator IMSRGSolver::EvaluateBCHProduct(Operator& d_omega,
+                                         Operator& omega) const
+{
+  return BCH::BCH_Product(d_omega, omega, mr_reference);
 }
 
 void IMSRGSolver::SetOmega(size_t i, Operator &om)
@@ -224,12 +236,14 @@ void IMSRGSolver::Solve()
   if (mr_reference != nullptr)
   {
     if (method != "flow" && method != "flow_adaptive" &&
-        method != "flow_euler" && method != "flow_RK4")
-      throw std::invalid_argument("MR-IMSRG currently supports direct-flow solvers only");
+        method != "flow_euler" && method != "flow_RK4" &&
+        method != "magnus" && method != "magnus_euler")
+      throw std::invalid_argument(
+          "MR-IMSRG supports direct flow and the production Magnus solver only");
     if (FlowingOps.size() != 1)
-      throw std::invalid_argument("MR-IMSRG direct flow currently evolves only the Hamiltonian");
+      throw std::invalid_argument("MR-IMSRG currently evolves only the Hamiltonian");
     if (BCH::use_goose_tank_correction)
-      throw std::invalid_argument("MR-IMSRG direct flow does not support goose-tank corrections");
+      throw std::invalid_argument("MR-IMSRG does not support goose-tank corrections");
   }
 
   if (s < 1e-4)
@@ -330,16 +344,16 @@ void IMSRGSolver::Solve_magnus_euler()
     Eta *= ds; // Here's the Euler step.
 
     // accumulated generator (aka Magnus operator) exp(Omega) = exp(dOmega) * exp(Omega_last)
-    Omega.back() = BCH::BCH_Product(Eta, Omega.back());
+    Omega.back() = EvaluateBCHProduct(Eta, Omega.back());
 
     // transformed Hamiltonian H_s = exp(Omega) H_0 exp(-Omega)
     if ((Omega.size() + n_omega_written) < 2)
     {
-      FlowingOps[0] = BCH::BCH_Transform(*H_0, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
     }
     else
     {
-      FlowingOps[0] = BCH::BCH_Transform(H_saved, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
     }
 
     if (norm_eta < 1.0 and generator.GetType() == "shell-model-atan")
@@ -419,16 +433,16 @@ void IMSRGSolver::Solve_magnus_backoff()
 
     // accumulated generator (aka Magnus operator) exp(Omega) = exp(dOmega) *
     // exp(Omega_last)
-    Omega.back() = BCH::BCH_Product(Eta, Omega.back());
+    Omega.back() = EvaluateBCHProduct(Eta, Omega.back());
 
     // transformed Hamiltonian H_s = exp(Omega) H_0 exp(-Omega)
     if ((Omega.size() + n_omega_written) < 2)
     {
-      FlowingOps[0] = BCH::BCH_Transform(*H_0, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
     }
     else
     {
-      FlowingOps[0] = BCH::BCH_Transform(H_saved, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
     }
 
     //     if (norm_eta < 1.0 and generator.GetType() == "shell-model-atan") {
@@ -516,17 +530,17 @@ void IMSRGSolver::Solve_magnus_modified_euler()
 
     // accumulated generator (aka Magnus operator) exp(Omega) = exp(dOmega) * exp(Omega_last)
     //      Omega.back() = Eta.BCH_Product( Omega.back() );
-    Omega.back() = BCH::BCH_Product(Eta, Omega.back());
+    Omega.back() = EvaluateBCHProduct(Eta, Omega.back());
 
     if ((Omega.size() + n_omega_written) < 2)
     {
       //        FlowingOps[0] = H_0->BCH_Transform( Omega.back() );
-      FlowingOps[0] = BCH::BCH_Transform(*H_0, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
     }
     else
     {
       //        FlowingOps[0] = H_saved.BCH_Transform( Omega.back() );
-      FlowingOps[0] = BCH::BCH_Transform(H_saved, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
     }
 
     //      generator.Update(&FlowingOps[0],&Eta);
@@ -883,10 +897,10 @@ void IMSRGSolver::operator()(const std::deque<Operator> &x, std::deque<Operator>
     auto &Omega_s = x.back();
     Operator &H_s = FlowingOps[0];
     if ((Omega.size() + n_omega_written) > 1)
-      H_s = BCH::BCH_Transform(H_saved, Omega_s);
+      H_s = EvaluateBCHTransform(H_saved, Omega_s);
     //       H_s = H_saved.BCH_Transform(Omega_s);
     else
-      H_s = BCH::BCH_Transform(*H_0, Omega_s);
+      H_s = EvaluateBCHTransform(*H_0, Omega_s);
     //       H_s = H_0->BCH_Transform(Omega_s);
     //     generator.Update(&H_s,&Eta);
     generator.Update(H_s, Eta);
@@ -978,7 +992,7 @@ Operator IMSRGSolver::InverseTransform(Operator &OpIn)
   {
     Operator negomega = -(*omega);
     //    OpOut = OpOut.BCH_Transform( negomega );
-    OpOut = BCH::BCH_Transform(OpOut, negomega);
+    OpOut = EvaluateBCHTransform(OpOut, negomega);
   }
   return OpOut;
 }
@@ -1015,7 +1029,7 @@ Operator IMSRGSolver::Transform_Partial(Operator &OpIn, int n)
       omega.ReadBinary(ifs);
       //     if (OpIn.GetJRank()>0) cout << "step " << i << endl;
       //     OpOut = OpOut.BCH_Transform( omega );
-      OpOut = BCH::BCH_Transform(OpOut, omega);
+      OpOut = EvaluateBCHTransform(OpOut, omega);
       std::cout << "norm of omega = " << omega.Norm() << std::endl;
       std::cout << " op zero body = " << OpOut.ZeroBody << std::endl;
       //     if (OpIn.GetJRank()>0)cout << "done" << endl;
@@ -1036,7 +1050,7 @@ Operator IMSRGSolver::Transform_Partial(Operator &OpIn, int n)
 //       
 //       Omega[i].ThreeBody.SetMode("pn");
 //    }
-    OpOut = BCH::BCH_Transform(OpOut, Omega[i]);
+    OpOut = EvaluateBCHTransform(OpOut, Omega[i]);
     //     if (OpIn.GetJRank()>0)cout << "done" << endl;
   }
 
@@ -1063,14 +1077,14 @@ Operator IMSRGSolver::Transform_Partial(Operator &&OpIn, int n)
       std::ifstream ifs(filename.str(), std::ios::binary);
       omega.ReadBinary(ifs);
       //     OpOut = OpOut.BCH_Transform( omega );
-      OpOut = BCH::BCH_Transform(OpOut, omega);
+      OpOut = EvaluateBCHTransform(OpOut, omega);
     }
   }
 
   for (size_t i = std::max(n - n_omega_written, 0); i < Omega.size(); ++i)
   {
     //    OpOut = OpOut.BCH_Transform( Omega[i] );
-    OpOut = BCH::BCH_Transform(OpOut, Omega[i]);
+    OpOut = EvaluateBCHTransform(OpOut, Omega[i]);
   }
   return OpOut;
 }
@@ -1183,7 +1197,7 @@ double IMSRGSolver::CalculatePerturbativeTriples()
   // If we've split the Omegas up, we combine them here, implicitly summing the 3N generated by each.
   Operator omega = Omega[0];
 //  for (size_t n=1; n<Omega.size(); n++) omega += Omega[n];
-  for (size_t n=1; n<Omega.size(); n++) omega = BCH::BCH_Product(omega,Omega[n]);
+  for (size_t n=1; n<Omega.size(); n++) omega = EvaluateBCHProduct(omega,Omega[n]);
 
   Operator &Hs = FlowingOps[0];
 
@@ -1219,7 +1233,7 @@ double IMSRGSolver::CalculatePerturbativeTriples(Operator &Op_0)
   // If we've split the Omegas up, we combine them here, implicitly summing the 3N generated by each.
   Operator omega = Omega[0];
 //  for (size_t n=1; n<Omega.size(); n++) omega += Omega[n];
-  for (size_t n=1; n<Omega.size(); n++) omega = BCH::BCH_Product(omega,Omega[n]);
+  for (size_t n=1; n<Omega.size(); n++) omega = EvaluateBCHProduct(omega,Omega[n]);
 
   Operator &Hs = FlowingOps[0];
 

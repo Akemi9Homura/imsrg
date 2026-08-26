@@ -667,6 +667,10 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("HasMRReference", &IMSRGSolver::HasMRReference)
           .def("EvaluateCommutator", &IMSRGSolver::EvaluateCommutator,
                py::arg("X"), py::arg("Y"))
+          .def("EvaluateBCHTransform", &IMSRGSolver::EvaluateBCHTransform,
+               py::arg("initial"), py::arg("omega"))
+          .def("EvaluateBCHProduct", &IMSRGSolver::EvaluateBCHProduct,
+               py::arg("d_omega"), py::arg("omega"))
           .def("SetOnly2bEta", [](IMSRGSolver &self, bool tf)
                { self.GetGenerator().SetOnly2bEta(tf); })
           .def("SetDenominatorCutoff", &IMSRGSolver::SetDenominatorCutoff)
@@ -874,8 +878,12 @@ PYBIND11_MODULE(pyIMSRG, m)
 
 
       py::module BCH = m.def_submodule("BCH", "BCH namespace");
-       BCH.def("BCH_Transform", &BCH::BCH_Transform);
-       BCH.def("BCH_Product", &BCH::BCH_Product);
+       BCH.def("BCH_Transform",
+               [](const Operator &op, const Operator &omega)
+               { return BCH::BCH_Transform(op, omega); });
+       BCH.def("BCH_Product",
+               [](Operator &x, Operator &y)
+               { return BCH::BCH_Product(x, y); });
        BCH.def("SetUseFactorizedCorrection", &BCH::SetUseFactorizedCorrection);
        BCH.def("SetUseFactorizedCorrectionBCH_product", &BCH::SetUseFactorizedCorrectionBCH_product);
        BCH.def("SetUseFactorized_Correct_ZBTerm", &BCH::SetUseFactorized_Correct_ZBTerm);

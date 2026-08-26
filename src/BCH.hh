@@ -3,6 +3,8 @@
 
 #include "Operator.hh"
 
+class MRReference;
+
 namespace BCH
 {
 
@@ -22,9 +24,12 @@ namespace BCH
 
 
 
-    Operator BCH_Product(Operator &X, Operator &Y);
-    Operator BCH_Transform(const Operator &Op, const Operator &Omega);
-    Operator Standard_BCH_Transform(const Operator &Op, const Operator &Omega);
+    Operator BCH_Product(Operator &X, Operator &Y,
+                         const MRReference *mr_reference = nullptr);
+    Operator BCH_Transform(const Operator &Op, const Operator &Omega,
+                           const MRReference *mr_reference = nullptr);
+    Operator Standard_BCH_Transform(const Operator &Op, const Operator &Omega,
+                                    const MRReference *mr_reference = nullptr);
     Operator Brueckner_BCH_Transform(const Operator &Op, const Operator &Omega);
 
     double EstimateBCHError(Operator &Omega, Operator H);

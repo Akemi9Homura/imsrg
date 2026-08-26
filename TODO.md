@@ -24,10 +24,10 @@
 
 ### M1. Python m-scheme Magnus oracle
 
-- [ ] 基于 `prototype/mrimsrg/commutator.py` 实现最小 scalar MR-BCH：
+- [x] 基于 `prototype/mrimsrg/commutator.py` 实现最小 scalar MR-BCH：
       对固定 `Omega,O` 保存每阶 `ad_Omega^k(O)/k!`，检查 Hamiltonian
       Hermiticity、`Omega/eta` anti-Hermiticity 和逐阶收敛。
-- [ ] 实现与生产 `BCH_Product(dOmega,Omega)` 相同乘法顺序和截断的 oracle；
+- [x] 实现与生产 `BCH_Product(dOmega,Omega)` 相同乘法顺序和截断的 oracle；
       固定随机小模型逐阶验收 Bernoulli 项，且在 `Omega=0` 时严格满足
       `dOmega/ds=eta`。
 - [ ] 冻结 `He4/O16 Nrefmax=0` 以及 `Be8/C12 Nrefmax=0`、
@@ -36,18 +36,18 @@
 
 ### M2. 生产 C++ 接入
 
-- [ ] 为现有 scalar `BCH_Transform` 与 `BCH_Product` 增加显式 MR reference
+- [x] 为现有 scalar `BCH_Transform` 与 `BCH_Product` 增加显式 MR reference
       上下文；未提供 MR reference 时必须逐调用保持原 SR 路径，MR 时每个
       嵌套对易子必须调用 `MRCommutator::Commutator`。
-- [ ] 将 `Solve_magnus_euler`、`NewOmega`、`GatherOmega`、Hamiltonian
+- [x] 将 `Solve_magnus_euler`、`NewOmega`、`GatherOmega`、Hamiltonian
       重建与最终 `Transform` 接到同一 dispatcher；删除 driver 对 MR+Magnus
       的拒绝，同时继续拒绝 MR correction/IMSRG(3)/一般流动算符等未验收组合。
-- [ ] 保持现有 `method=magnus` 的 `ds_0/dsmax/domega/omega_norm_max`、分段
+- [x] 保持现有 `method=magnus` 的 `ds_0/dsmax/domega/omega_norm_max`、分段
       与 checkpoint 语义，不创造 MR 专用 ODE 参数或另一套求解器。
 
 ### M3. 分层验收
 
-- [ ] 随机 scalar J-scheme 输入展开到 m-scheme，逐阶比较 MR-BCH 与
+- [x] 随机 scalar J-scheme 输入展开到 m-scheme，逐阶比较 MR-BCH 与
       BCH product 的 0B/1B/2B，max-abs `<=1e-10 MeV`。
 - [ ] `lambda2=0` 的 MR 生产入口对 `He4/O16 Nrefmax=0` 逐元素退化到现有
       SR Magnus：每段 `Omega`、每阶 BCH、`eta` 和最终 Hamiltonian 均比较，

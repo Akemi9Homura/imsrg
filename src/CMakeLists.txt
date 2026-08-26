@@ -334,6 +334,8 @@ target_link_libraries(
     Operator
     PRIVATE
     Commutator
+    MRCommutator
+    MRReference
     OpenMP::OpenMP_CXX
 )
 
@@ -818,6 +820,8 @@ add_test(NAME MRCorrelatedDriver
                  $<TARGET_FILE:imsrg++>)
 add_test(NAME MRDenominators
          COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRDenominators.py)
+add_test(NAME MRMagnus
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRMagnus.py)
 add_test(NAME MRJobGenerator
          COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRJobGenerator.py
                  $<TARGET_FILE:imsrg++>)
@@ -835,7 +839,7 @@ add_test(NAME MRDownstreamWindow
 # point every MR Python test at the module from this build tree so a sanitizer
 # build cannot silently import the normal Release module.
 set(MR_PYTHON_TESTS
-    MRReference MRDriver MRSRDriver MRCorrelatedDriver MRDenominators
+    MRReference MRDriver MRSRDriver MRCorrelatedDriver MRDenominators MRMagnus
     MRJobGenerator MRTailDiagnostic MRDownstreamWindow)
 set(MR_PYTHON_TEST_ENVIRONMENT
     "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{PYTHONPATH}"

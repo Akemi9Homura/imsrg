@@ -402,11 +402,13 @@ int main(int argc, char** argv)
   {
     const int requested_target_mass = modelspace.GetTargetMass();
     const int requested_target_Z = modelspace.GetTargetZ();
-    const bool direct_method = method == "flow" || method == "flow_adaptive" ||
-                               method == "flow_euler" || method == "flow_RK4";
+    const bool supported_method = method == "flow" || method == "flow_adaptive" ||
+                                  method == "flow_euler" || method == "flow_RK4" ||
+                                  method == "magnus" || method == "magnus_euler";
     if (physical_system != "nuclear" || basis != "oscillator" ||
-        !direct_method || nsteps != 1 || input3bme != "none" || IMSRG3 ||
-        perturbative_triples || goose_tank || std::abs(BetaCM) > 1e-12 ||
+        !supported_method || nsteps != 1 || input3bme != "none" || IMSRG3 ||
+        perturbative_triples || goose_tank || use_brueckner_bch ||
+        std::abs(BetaCM) > 1e-12 ||
         core_generator != "white-ncsm" || !modelspace.valence.empty() ||
         eMax_imsrg != -1 || e2Max_imsrg != -1 || e3Max_imsrg != -1 ||
         eMax_3body_imsrg != -1 ||
@@ -414,7 +416,8 @@ int main(int argc, char** argv)
         !opnamesRPA.empty() || !opnamesTDA.empty())
     {
       std::cerr << "Explicit MR-IMSRG currently requires nuclear basis=oscillator, "
-                << "a one-step direct flow, 3bme=none, IMSRG(2), BetaCM=0, "
+                << "a one-step direct flow or production Magnus flow, 3bme=none, "
+                << "IMSRG(2), BetaCM=0, "
                 << "core_generator=white-ncsm, no secondary IMSRG-space "
                 << "truncation, no valence space, and no flowing extra operators."
                 << std::endl;
