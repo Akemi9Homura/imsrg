@@ -39,7 +39,6 @@ try:
     )
     from .normal_order import VacuumHamiltonian, normal_order
     from .reference_io import load_reference
-    from .sr_imsrgpp_check import operator_to_mscheme
 except ImportError:
     from basis import prepare_natural_basis, transform_hamiltonian
     from densities import compute_densities, validate_densities
@@ -50,7 +49,6 @@ except ImportError:
     )
     from normal_order import VacuumHamiltonian, normal_order
     from reference_io import load_reference
-    from sr_imsrgpp_check import operator_to_mscheme
 
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -168,6 +166,11 @@ def add_entry(
 
 def strict_residual_norm(vacuum, source_reference, natural_basis) -> float:
     """Evaluate the lambda2-dependent masked D-D^dagger norm in m-scheme."""
+
+    try:
+        from .sr_imsrgpp_check import operator_to_mscheme
+    except ImportError:
+        from sr_imsrgpp_check import operator_to_mscheme
 
     vacuum_m = operator_to_mscheme(vacuum, source_reference.orbits)
     vacuum_nat_m = transform_hamiltonian(

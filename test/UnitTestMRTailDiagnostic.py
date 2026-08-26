@@ -3,6 +3,7 @@
 """Exercise the White-NCSM channel diagnostic on the real He4 fixture."""
 
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 
@@ -22,6 +23,21 @@ from prototype.mrimsrg.reference_io import load_reference  # noqa: E402
 
 
 def main() -> None:
+    blocked_sympy_import = r'''\
+import builtins
+original_import = builtins.__import__
+def blocked_import(name, *args, **kwargs):
+    if name == "sympy" or name.startswith("sympy."):
+        raise ModuleNotFoundError("blocked by dependency-isolation regression")
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = blocked_import
+import prototype.mrimsrg.diagnose_white_ncsm_tail
+'''
+    subprocess.run(
+        [sys.executable, "-c", blocked_sympy_import],
+        cwd=REPOSITORY,
+        check=True,
+    )
     fixture = REPOSITORY / "prototype/mrimsrg/data/He4_Nrefmax2"
     data = load_reference(fixture)
     with tempfile.TemporaryDirectory() as temporary_directory:
