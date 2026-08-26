@@ -316,7 +316,8 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `17.282 s`、峰值 RSS `2070.297 MB`，真空物化零体核对为零；全程只走
       J-scheme。稠密 m-scheme 两体张量解析需求约 `1.518 TB`，lossless
       J64 validator 因该旧路径 `bad_alloc`，明确不作为 emax8 验收路径。
-- [x] 用下游 native no2bpack reader 完成 emax8 `Nmax=8` 资源/格式读回。
+- [x] 用隔离的 `simple-ncsm` native no2bpack reader 完成 emax8 `Nmax=8`
+      资源/格式 smoke test；该简化求解器不作为正式 NCSM 谱验收。
       bare/固定一步流 jobs `100447/100448` 均 `COMPLETED 0:0`，维数
       `44838`，三态谱分别为
       `[-26.2170529924,-24.7096273755,-24.7096273017]` 与
@@ -327,12 +328,13 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `rtol=atol=1e-9/1e-10` 独立复算。point7 jobs `100451/100452` 均
       `COMPLETED 0:0`；25/31 次 scalar commutator 用时 `67.67/85.04 s`、
       峰值 RSS `5194.719/5227.641 MB`。lossless J64 的 0B/1B/2B 最坏差为
-      `4.80e-14/6.53e-14/1.90e-13 MeV`。native no2bpack Nmax8 正式 jobs
-      `100458/100456` 的三态最大差 `4.97e-11 keV`，通过 `<1 keV` 门禁。
+      `4.80e-14/6.53e-14/1.90e-13 MeV`。native no2bpack Nmax8 lightweight
+      jobs `100458/100456` 的三态最大差 `4.97e-11 keV`，只作为格式/ODE
+      smoke test；正式谱门禁改由 BIGSTICK 重做。
       初次松容差读回 job `100454` 因未知非零子进程返回码失败，虽打印相同
       谱也不计入成功；正式结果来自 `max_iter=500` 的成功重跑 `100458`。
 - [ ] 对 emax8 按相同 bare/`s=0.02` Nmax 序列逐点增加到资源允许的最大值，
-      才评估 finite-s pilot。不得从
+      正式谱统一改由 BIGSTICK 计算，才评估 finite-s pilot。不得从
       emax6 或 `s=1e-4` 资源点外推物理通过。Magnus 只能改善积分/重启成本，
       不能被当作修复 IMSRG(2) 长流谱漂移的办法；若确需接入，仍须从同一
       RHS、短流、真空物化和后 NCSM 谱重新验收。

@@ -409,20 +409,24 @@ flow 可在 emax8 运行。相反，660 个 m-orbit 的稠密四指标 double �
 validator 被明确排除；它不是生产 J-scheme 流失败，也不应成为 emax8 格式
 验收的依赖。
 
-下游 native no2bpack reader 的 Nmax8 jobs `100447/100448` 均完成，维数
+隔离的 `simple-ncsm` native no2bpack reader 的 Nmax8 jobs
+`100447/100448` 均完成，维数
 44838。bare 与固定一步流的三态谱分别为
 `[-26.2170529924,-24.7096273755,-24.7096273017]` 和
 `[-26.2177863230,-24.7099878250,-24.7099679677] MeV`，峰值 RSS 均约
-2.28 GiB。基态微移 `-0.733331 keV` 与正常读回只构成格式/资源门禁。
+2.28 GiB。基态微移 `-0.733331 keV` 与正常读回只构成轻量格式/资源 smoke
+test；该简化求解器不再作为正式 NCSM 谱验收。
 
 下一步固定为：
 
 1. 用 `gen_job.py --mr-jscheme` 单点运行 `s=0→0.02`、
    `rtol=atol=1e-9`，仍用同一 White-NCSM RHS、J64 checkpoint 和
    no2bpack 物化；已由 job `100451` 完成；
-2. 用 `1e-10` 独立复算并比较 lossless 0/1/2B，ODE/NCSM 谱误差必须
-   `<1 keV`；job `100452` 及 Nmax8 jobs `100458/100456` 已通过；
-3. 对 bare/flow 使用完全相同的 Nmax 序列，从 2/4/6/8 逐点增加到实测
+2. 用 `1e-10` 独立复算并比较 lossless 0/1/2B；job `100452` 已通过，
+   Nmax8 jobs `100458/100456` 的 `<1 keV` 谱一致性只保留为 lightweight
+   smoke test，不替代下一项 BIGSTICK 门禁；
+3. 由 BIGSTICK 对 bare/flow 使用完全相同的 Nmax 序列，从 2/4/6/8
+   逐点增加到实测
    资源允许的最大值；在没有 emax8 全空间（四粒子 Nmax32）时，只能按预先
    声明的最大可行 Nmax proxy 报告，不能声称完整
    `prototype_downstream_stability_v1` 通过；
