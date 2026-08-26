@@ -1082,4 +1082,7 @@ CTest `21/21` 以 `499.20 s` 通过，其中相关参考态验收项
 验收，单点生成器另提供 `--mr-tight-validation`布尔 profile；它只在
 复算脚本中写入既有 `ode_tolerance=1e-7`，不改步长参数，并将
 唯一 override 和 profile 写入 metadata。这不把 ODE 参数重新变成
-默认生产必填项。
+默认生产必填项。tight 复算必须以 default 流实际停止的 `s`
+为固定 `target_s`，并设 `eta_criterion<=1e-20` 禁用残差提前停止；
+否则两个容差会在略有不同的 `s` 越过门槛，其 Hamiltonian 差混入
+真实流变化，不再是纯 ODE 误差。生成器对该条件作强制检查。

@@ -321,6 +321,11 @@ def _validate_mr_jscheme_settings(settings: MRJschemeSettings) -> None:
         raise ValueError("MR J-scheme requires 0 <= start_s < target_s")
     if settings.eta_criterion <= 0.0:
         raise ValueError("MR eta criterion must be positive")
+    if settings.tight_validation and settings.eta_criterion > 1e-20:
+        raise ValueError(
+            "tight MR validation must disable residual-based early stopping "
+            "with eta_criterion<=1e-20 and target the production final s"
+        )
     if settings.cpus < 1:
         raise ValueError("MR J-scheme cpus must be positive")
     if settings.partition not in ("c128m1024", "c128m512", "compute_C", "compute_A"):

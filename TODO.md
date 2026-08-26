@@ -111,6 +111,8 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       代替读回对角化。默认 profile 不写 ODE 参数；
       `--mr-tight-validation` 只用于独立验收复算，显式将既有
       `ode_tolerance=1e-6` 收紧为 `1e-7`，不改 `ds_0/dsmax`。
+      tight 必须把 `target_s` 固定为 default 的实际停止点并用
+      `eta_criterion<=1e-20` 禁用提前停止，禁止比较两个不同流时刻。
 - [ ] 四核均必须达到目标掩码内解耦残差相对初值 `<1e-6`，
       十倍收紧后 NCSM 验收能级变化 `<1 keV`，并保持 Hermiticity、
       anti-Hermiticity、J64/no2bpack 读回窗和已验收的 m-scheme/SR 极限。

@@ -156,6 +156,7 @@ def main():
         tight_settings = replace(
             settings,
             tight_validation=True,
+            eta_criterion=1e-30,
             label="validation",
             result_root=root / "tight-result",
         )
@@ -175,6 +176,21 @@ def main():
         require(tight_metadata["ode_parameter_overrides"] ==
                 ["ode_tolerance=1e-7"],
                 "tight validation override is not explicit in metadata")
+
+        invalid_tight = replace(
+            settings,
+            tight_validation=True,
+            result_root=root / "invalid-tight-result",
+        )
+        try:
+            generate_mr_jscheme_slurm(invalid_tight)
+        except ValueError as error:
+            require("disable residual-based early stopping" in str(error),
+                    "tight endpoint validation failed for the wrong reason")
+        else:
+            raise AssertionError(
+                "tight validation accepted an independently stopped endpoint"
+            )
 
         invalid = replace(settings, nucleus="Be8", nrefmax=2,
                           result_root=root / "invalid")
