@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Unit checks for the MR-Magnus gate report parsers."""
 
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -14,6 +15,10 @@ from prototype.mrimsrg.summarize_magnus_gate import (  # noqa: E402
     parse_energies,
     parse_flow,
     parse_resource_usage,
+)
+from prototype.mrimsrg.aggregate_magnus_gates import (  # noqa: E402
+    EXPECTED_NREFMAX,
+    aggregate,
 )
 
 
@@ -79,6 +84,61 @@ def main():
             ),
             "an empty Omega segment was accepted",
         )
+
+        entries = []
+        for index, (nucleus, nrefmax) in enumerate(EXPECTED_NREFMAX.items()):
+            profile = {
+                "metadata": {
+                    "executable_sha256": "exe-sha",
+                    "shared_library_sha256": "library-sha",
+                },
+                "log": f"/result/log_{nucleus}_{1000 + index}.txt",
+                "flow": {"final": {"s": 10.0 + index,
+                                     "eta_ratio_to_initial": 9e-7}},
+                "packing_max_abs_mev": 2e-6,
+                "omega_files": index + 1,
+                "omega_validation": {
+                    "zero_body_max_abs": 1e-22,
+                    "one_body_antihermiticity_max_abs": 0.0,
+                    "two_body_antihermiticity_max_abs": 0.0,
+                },
+                "magnus_series_rejections": 0,
+            }
+            report = {
+                "schema": "mrimsrg_magnus_gate_v1",
+                "nucleus": nucleus,
+                "nrefmax": nrefmax,
+                "nmax": index,
+                "interaction_sha256": "interaction-sha",
+                "downstream_validator": {"sha256": "validator-sha"},
+                "thresholds": {"spectral_tolerance_mev": 1e-3},
+                "spectral_max_abs_mev": (index + 1) * 1e-4,
+                "default": dict(profile),
+                "tight": dict(profile),
+                "passed": True,
+            }
+            path = root / f"{nucleus}.json"
+            path.write_text(json.dumps(report), encoding="utf-8")
+            entries.append((path, report))
+
+        combined = aggregate(entries)
+        require(combined["passed"], "consistent four-nucleus gates were rejected")
+        require(abs(combined["max_spectral_abs_keV"] - 0.4) < 1e-15,
+                "four-nucleus spectral maximum was aggregated incorrectly")
+        broken_entries = list(entries)
+        broken_report = dict(broken_entries[0][1])
+        broken_default = dict(broken_report["default"])
+        broken_metadata = dict(broken_default["metadata"])
+        broken_metadata["executable_sha256"] = "different-executable"
+        broken_default["metadata"] = broken_metadata
+        broken_report["default"] = broken_default
+        broken_entries[0] = (broken_entries[0][0], broken_report)
+        try:
+            aggregate(broken_entries)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("inconsistent production executables were accepted")
 
     print("MR Magnus gate parser regression passed")
 

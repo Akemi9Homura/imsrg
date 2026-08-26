@@ -131,7 +131,10 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       停止 `s` 生成同终点 tight 复算。
 - [ ] 四核均必须达到目标掩码内解耦残差相对初值 `<1e-6`，
       十倍收紧后 NCSM 验收能级变化 `<1 keV`，并保持 Hermiticity、
-      anti-Hermiticity、J64/no2bpack 读回窗和已验收的 m-scheme/SR 极限。
+      anti-Hermiticity、J64/no2bpack 读回窗和已验收的 m-scheme/SR 极限；
+      最后由 `aggregate_magnus_gates.py` 强制核种/Nrefmax、interaction、
+      production executable/library、NCSM validator 与阈值一致并生成
+      单一四核 JSON，不手工拼接完成结论。
 
 ## P0：生产版 C++ J-scheme MR-IMSRG(2)
 

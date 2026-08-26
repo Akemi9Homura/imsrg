@@ -1137,3 +1137,11 @@ anti-Hermiticity 违例均为零，0B 最大绝对值仅
 ASan+UBSan Debug 构建中读取 Be8/C12 的真实 production `Omega_0`；
 两次均无 sanitizer 诊断，1B/2B 违例为零，0B 分别为
 `1.212e-23/4.019e-23`。
+
+最终四核完成判据由 `prototype/mrimsrg/aggregate_magnus_gates.py`
+聚合，不从日志手工摘录。它要求恰有 `He4/Be8/C12/O16`，对应
+`Nrefmax=2/0/0/2`，并强制固定 interaction、生产 executable、
+`libIMSRG.so`、下游 NCSM validator 与全部阈值逐字一致；任一单核
+`passed=false` 或 provenance 不一致即拒绝。输出同时汇总四核最大
+残差比、tight/default 谱差、packing 差、Omega anti-Hermiticity、
+拒步计数、作业号和产物哈希。

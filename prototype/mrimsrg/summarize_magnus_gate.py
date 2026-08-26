@@ -287,6 +287,10 @@ def summarize(args: argparse.Namespace) -> dict[str, object]:
         "states": args.states,
         "interaction": str(args.interaction.resolve()),
         "interaction_sha256": sha256(args.interaction),
+        "downstream_validator": {
+            "path": str(args.validator.resolve()),
+            "sha256": sha256(args.validator),
+        },
         "default": default,
         "tight": tight,
         "matrix_difference": matrix,
