@@ -1132,7 +1132,9 @@ J64 0B/1B/2B，并分别对角化 J64/no2bpack 后输出 JSON。
 metadata 门同时要求两条流均为 `magnus_adaptive`、default 无 ODE override、
 tight 只含 `ode_tolerance=1e-7`、`eta_criterion<=1e-20`，且 tight 的配置
 终点逐字对应 default 的实际停止点；因此不能用两个偶然在同一时刻输出、
-但实际 profile 不同的目录冒充十倍收紧验收。新增
+但实际 profile 不同的目录冒充十倍收紧验收。单核 schema 因此升级为
+`mrimsrg_magnus_gate_v2`；最终聚合器要求完整 13 项门且全部为真，拒绝
+缺少新门的旧 JSON，即使旧文件的顶层 `passed` 曾为真。新增
 `imsrg_operator_validate` 通过同一生产 `Operator::ReadBinary` 读回每段，
 要求 scalar rank/parity、anti-Hermitian metadata、有限矩阵元、零 0B，
 以及完整 1B/各 J-channel 2B 的数值 anti-Hermiticity 均在 `1e-10`

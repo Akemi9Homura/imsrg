@@ -13,6 +13,22 @@ from typing import Optional
 
 EXPECTED_NREFMAX = {"He4": 2, "Be8": 0, "C12": 0, "O16": 2}
 EXPECTED_NMAX = {"He4": 8, "Be8": 0, "C12": 0, "O16": 2}
+EXPECTED_SINGLE_GATE_SCHEMA = "mrimsrg_magnus_gate_v2"
+EXPECTED_SINGLE_GATES = {
+    "clean_exit",
+    "default_residual_ratio_below_limit",
+    "default_uses_solver_ode_defaults",
+    "matched_endpoint",
+    "metadata_matches_requested_system",
+    "omega_antihermiticity",
+    "omega_segments_materialized",
+    "packing_readback",
+    "solver_is_adaptive_magnus",
+    "spectral_stability",
+    "tight_configured_for_default_endpoint",
+    "tight_early_stop_disabled",
+    "tight_uses_only_tenfold_ode_tolerance",
+}
 EXPECTED_INTERACTION_SHA256 = (
     "76b7243ef53d30955c0293d29da73688dc3839942143ccf147739108bb58ff84"
 )
@@ -66,8 +82,15 @@ def job_id(log_path: str) -> Optional[int]:
 def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
     by_nucleus: dict[str, tuple[Path, dict]] = {}
     for path, report in entries:
-        if report.get("schema") != "mrimsrg_magnus_gate_v1":
+        if report.get("schema") != EXPECTED_SINGLE_GATE_SCHEMA:
             raise ValueError(f"unsupported gate schema in {path}")
+        gates = report.get("gates")
+        if not isinstance(gates, dict) or set(gates) != EXPECTED_SINGLE_GATES:
+            raise ValueError(f"incomplete single-nucleus gates in {path}")
+        if report.get("passed") is not True or not all(
+            value is True for value in gates.values()
+        ):
+            raise ValueError(f"failed single-nucleus gate in {path}")
         nucleus = report.get("nucleus")
         if not isinstance(nucleus, str):
             raise ValueError(f"gate does not name a nucleus: {path}")
@@ -181,7 +204,8 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
 
     consistency_gates = {
         "all_single_nucleus_gates_passed": all(
-            report["passed"] for report in reports
+            report["passed"] and all(report["gates"].values())
+            for report in reports
         ),
         "interaction_is_frozen": (
             interaction_sha256 == EXPECTED_INTERACTION_SHA256

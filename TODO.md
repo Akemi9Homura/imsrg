@@ -115,6 +115,8 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       `eta_criterion<=1e-20` 禁用提前停止，禁止比较两个不同流时刻。
       单核 gate 直接从 metadata 强制上述 solver/profile/override/终点条件，
       不把生成器单元测试当成生产结果确实使用这些设置的替代证据。
+      四核聚合只接受包含完整 13 项门的 `mrimsrg_magnus_gate_v2`，拒绝
+      旧 schema 或仅手填顶层 `passed=true` 的报告。
 - [x] `Be8 Nrefmax=0` 与 `C12 Nrefmax=0` 的完整 default/同终点
       tight Magnus 流和 NCSM 读回已通过。二者 default 分别在
       `s=330.08347/226.53612` 达到残差比

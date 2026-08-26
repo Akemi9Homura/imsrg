@@ -18,6 +18,7 @@ except ImportError:
 
 
 ENERGY_PATTERN = re.compile(r"^state=(\d+) E=([-+0-9.eE]+)", re.MULTILINE)
+GATE_SCHEMA = "mrimsrg_magnus_gate_v2"
 DEFAULT_ODE_PARAMETER_SOURCE = "imsrg++ adaptive Magnus runtime defaults"
 TIGHT_ODE_PARAMETER_SOURCE = (
     "explicit tenfold validation override of the imsrg++ default"
@@ -354,7 +355,7 @@ def summarize(args: argparse.Namespace) -> dict[str, object]:
         ),
     })
     return {
-        "schema": "mrimsrg_magnus_gate_v1",
+        "schema": GATE_SCHEMA,
         "nucleus": args.nucleus,
         "nrefmax": args.nrefmax,
         "nmax": args.nmax,

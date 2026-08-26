@@ -26,6 +26,8 @@ from prototype.mrimsrg.aggregate_magnus_gates import (  # noqa: E402
     EXPECTED_PRODUCTION_EXECUTABLE_SHA256,
     EXPECTED_PRODUCTION_LIBRARY_SHA256,
     EXPECTED_REFERENCE_SHA256,
+    EXPECTED_SINGLE_GATES,
+    EXPECTED_SINGLE_GATE_SCHEMA,
     EXPECTED_THRESHOLDS,
     aggregate,
 )
@@ -192,7 +194,7 @@ def main():
                 "magnus_series_rejections": 0,
             }
             report = {
-                "schema": "mrimsrg_magnus_gate_v1",
+                "schema": EXPECTED_SINGLE_GATE_SCHEMA,
                 "nucleus": nucleus,
                 "nrefmax": nrefmax,
                 "nmax": EXPECTED_NMAX[nucleus],
@@ -201,6 +203,7 @@ def main():
                 "downstream_validator": {"sha256": "validator-sha"},
                 "thresholds": EXPECTED_THRESHOLDS,
                 "spectral_max_abs_mev": (index + 1) * 1e-4,
+                "gates": {gate: True for gate in EXPECTED_SINGLE_GATES},
                 "default": dict(profile),
                 "tight": dict(profile),
                 "passed": True,
@@ -243,6 +246,17 @@ def main():
             pass
         else:
             raise AssertionError("inconsistent production executables were accepted")
+
+        stale_entries = list(entries)
+        stale_report = dict(stale_entries[0][1])
+        stale_report["schema"] = "mrimsrg_magnus_gate_v1"
+        stale_entries[0] = (stale_entries[0][0], stale_report)
+        try:
+            aggregate(stale_entries)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("a stale single-nucleus gate schema was accepted")
 
         unfrozen_entries = []
         for path, report in entries:
