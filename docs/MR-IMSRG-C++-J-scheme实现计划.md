@@ -417,6 +417,20 @@ validator 被明确排除；它不是生产 J-scheme 流失败，也不应成为
 2.28 GiB。基态微移 `-0.733331 keV` 与正常读回只构成轻量格式/资源 smoke
 test；该简化求解器不再作为正式 NCSM 谱验收。
 
+这不再意味着 `simple-ncsm` 的正确性问题被搁置。其 emax8/Nmax2
+sanitizer 故障已定位为用单个 `uint64_t` 编码 90 个 J-orbit occupation
+导致的移位未定义行为，现改为 collision-free occupation vector key。用原
+emax8、660 m-orbit、59 维输入复跑后，三态逐位复现且进程正常 `exit 0`。
+此外新增 `ncsm_bigstick_no2_compare`：在 He4 N2LOopt
+`hw20/emax2/e2max4/Nmax2` 上让两个程序直接读取同一 SHA-256 为
+`5cadb860...e01de` 的 no2bpack，比较全部 59 个行列式、59 条谱和每个
+BIGSTICK 波函数残差。最大谱差/最大残差为
+`4.165e-6/4.137e-6 MeV`，通过 `1e-5 MeV` 门禁。差值来自 BIGSTICK
+version-1 `.wfn` 的 float32 能量/振幅；用该振幅在 simple-ncsm double
+Hamiltonian 上重算的 Rayleigh 商相对 exact 谱最坏仅
+`3.340e-7 MeV`。因此小空间两个 NCSM 实现已严格对齐；大空间 finite-s
+正式谱仍必须由 BIGSTICK 完成，不能以 simple-ncsm 单边结果替代。
+
 下一步固定为：
 
 1. 用 `gen_job.py --mr-jscheme` 单点运行 `s=0→0.02`、

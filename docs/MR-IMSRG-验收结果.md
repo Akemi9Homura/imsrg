@@ -571,6 +571,44 @@ Nmax24，本轮没有计算，因此没有 emax6 全空间漂移，也没有宣�
 `prototype_downstream_stability_v1` 通过。下一阶段可以评估 emax8 的
 实际资源和最大可行 NCSM 空间，但不能把本 pilot 外推成 emax8 物理验收。
 
+## 10.1 simple-ncsm 与 BIGSTICK 同 Hamiltonian 严格核对
+
+此前 emax8/Nmax2 sanitizer 运行在 90 个 J-orbit 上触发
+`shift exponent 65 is too large for 64-bit type`。原因不是 NCSM 物理空间，
+而是 `CIspace` 用一个 `uint64_t` 打包任意长度 occupation partition。隔离的
+`/home/mengziyan/simple-ncsm` 已改用 `std::vector<int>` 作为 collision-free
+key。用原 SHA-256 为 `e1653533...6946` 的 emax8 bare no2bpack、660 个
+m-orbit、He4 `Nmax=2` 复跑，维数仍为 59，三态为
+`[-17.013502881259512,-13.761246467855941,-13.761246401684351] MeV`，
+进程正常 `exit 0`，未再出现非法移位。
+
+为排除“两个程序实际用了不同相互作用”，严格核对另冻结一份 He4
+Hamiltonian。源文件是固定 N2LOopt `A=4,hw=20,emax=2,e2max=4,
+BetaCM=0` minipack，SHA-256 为
+`76b7243ef53d30955c0293d29da73688dc3839942143ccf147739108bb58ff84`。
+identity 导出的普通真空 0B+1B+2B no2bpack SHA-256 为
+`5cadb860e75c58662832bc7cceb78b3d8bb778a268cc262a814748bf6c8e01de`；
+simple-ncsm 和 BIGSTICK 都直接读取这一份文件，没有分别重写相互作用。
+
+BIGSTICK 在正宇称、`2M=0,Nmax=2` 的 59 维空间执行 exact full
+diagonalization 并保留全部 59 态；`simple-ncsm` 对同一空间做 double
+precision full diagonalization。新增检查器还把 BIGSTICK `.bas/.wfn`
+的每个行列式和振幅映射回 simple-ncsm 顺序，结果为：
+
+| 检查量 | 最坏值 |
+|---|---:|
+| determinant set / dimension | 完全相同，59 / 59 |
+| 完整谱差 | `4.164634e-6 MeV` |
+| BIGSTICK 振幅 Rayleigh 商与 simple exact 谱差 | `3.339867e-7 MeV` |
+| BIGSTICK 振幅在 simple Hamiltonian 下残差 | `4.136186e-6 MeV` |
+| 波函数 norm 误差 | `2.491691e-8` |
+
+门禁为 `1e-5 MeV`，覆盖 BIGSTICK version-1 `.wfn` 固有的 float32
+能量与振幅；两边共享的 no2bpack 本身没有二次量化差。检查器位于
+`simple-ncsm` commit `fcc6070`。因此 simple-ncsm 的占据分区故障与
+small-space NCSM/BIGSTICK 一致性问题均已关闭。该结论不改变大空间规则：
+生产谱仍以 BIGSTICK 为正式求解器，simple-ncsm 作为独立交叉检查。
+
 ## 11. emax8 canonical input 与资源门禁
 
 emax8 canonical NNLOopt `hw=20,e2max=16` 输入从冻结 emax14 母 minipack

@@ -324,6 +324,17 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `[-26.2177863230,-24.7099878250,-24.7099679677] MeV`；墙钟
       `81/75 s`、峰值 RSS `2385856/2386220 KiB`。基态变化
       `-0.733331 keV` 只证明生产物化/读回与资源可行，不是有限流物理门禁。
+- [x] 解决 `simple-ncsm` 的大轨道表占据分区未定义行为，并用同一
+      Hamiltonian 与 BIGSTICK 做严格小空间闭环。原先把 90 个 J-orbit
+      occupation 塞进 `uint64_t` 会产生 `shift exponent 65`；隔离分支现用
+      `std::vector<int>` collision-free key。原 emax8、660 m-orbit、
+      `Nmax=2` 故障输入已正常 `exit 0` 并逐位复现三态。随后冻结 He4
+      N2LOopt A=4、hw20、emax2/e2max4、BetaCM=0 的同一 no2bpack
+      (`SHA-256 5cadb860...e01de`) 给两个求解器；二者行列式和完整谱均为
+      59 维/59 态，最大谱差 `4.165e-6 MeV`，BIGSTICK 波函数在
+      simple-ncsm Hamiltonian 下最大残差 `4.137e-6 MeV`。检查器随
+      `simple-ncsm` commit `fcc6070` 提交；小空间 NCSM 问题已关闭，但
+      大空间生产谱仍由 BIGSTICK 正式验收。
 - [x] 用根目录单点生成器实际运行 emax8 `s=0.02` direct flow，并以
       `rtol=atol=1e-9/1e-10` 独立复算。point7 jobs `100451/100452` 均
       `COMPLETED 0:0`；25/31 次 scalar commutator 用时 `67.67/85.04 s`、
