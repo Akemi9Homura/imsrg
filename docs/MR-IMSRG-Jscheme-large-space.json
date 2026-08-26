@@ -1,5 +1,5 @@
 {
-  "schema": "mrimsrg_jscheme_large_space_acceptance_v9",
+  "schema": "mrimsrg_jscheme_large_space_acceptance_v10",
   "implementation_commit": "6e02676ce00e237efdbf6cb71df9315f7c576143",
   "baseline_profiler_commit": "1f02961a2c8ab9560ece346284ab4dd2d7a25337",
   "shell_model_obs_commit": "4b10afab0218711b0278ef66ad73e88bc7791c34",
@@ -307,6 +307,161 @@
     },
     "dense_mscheme_hamiltonian_constructed": false,
     "full_emax6_flow_claimed": false
+  },
+  "emax6_finite_s_pilot": {
+    "status": "maximum_feasible_nmax_proxy_passed_exact_full_space_not_tested",
+    "nucleus": "He4",
+    "nrefmax": 2,
+    "reference_definition": "validated emax2 Nrefmax=2 NCSM reference embedded in emax6; added occupations and lambda2 are zero and the added NAT block is the identity",
+    "interaction_sha256": "199d5a7a3e060427582d112bd2ab36688db199629ddebb6e097a4676980b913b",
+    "input_jcoupled64_sha256": "c9fe9aa915b2021e2273092809b40e3e33a86ea891c4d4673710e5c74dd78776",
+    "reference_sha256": "4d61bca6fee4255b287d71a62ba761e914b2c51852fadafb457884745ce6482a",
+    "flow": {
+      "job": 100432,
+      "repository_commit_recorded_by_generator": "c07645cea9455e189868332565d332905785b9e7",
+      "executable_sha256": "ec23d40cae0171908edc2539abcab2d05d1759a47b9b357333628e51d8d50aac",
+      "shared_library_sha256": "c7eb668df585e96c29b0c7e659288ef16cbeecefcf358d9d390399488261927b",
+      "environment_script_sha256": "a7bf1fd3710323c472158a38e049660502fa7cd2b48ca35b39e927688b65f471",
+      "method": "direct adaptive ODE",
+      "generator": "white-ncsm",
+      "cumulative_start_s": 0.0,
+      "cumulative_target_s": 0.02,
+      "ode_tolerance": 1e-9,
+      "eta_criterion": 1e-6,
+      "scalar_commutators": 25,
+      "wall_seconds": 10.48084,
+      "maximum_rss_mb": 886.555,
+      "initial_mr_zero_body_mev": -17.0135029683,
+      "final_mr_zero_body_mev": -17.647652206934,
+      "initial_h_norm_mev": 10983.183256021,
+      "final_h_norm_mev": 10983.131266136,
+      "initial_eta_one_body_norm": 0.174704917,
+      "initial_eta_two_body_norm": 1.184367907,
+      "initial_eta_norm": 1.197183840166387,
+      "final_eta_one_body_norm": 0.168573392,
+      "final_eta_two_body_norm": 1.138064530,
+      "final_eta_norm": 1.1504815787028086,
+      "eta_norm_ratio_to_initial": 0.9609898998828053,
+      "strict_eta_target_reached": false,
+      "export_zero_body_consistency_mev": 0.0,
+      "jcoupled64_sha256": "7d85afb66797f066c536d5e563ff2210ef60630f91206d1eb3f9beb6af786e60",
+      "no2bpack_sha256": "055529426538a0d64a4a472b1706aeea679e37f944f3ce562bc35e1d4968e6ee",
+      "completed_normally": true
+    },
+    "ode_tolerance_gate": {
+      "tight_job": 100434,
+      "compared_tolerances": [1e-9, 1e-10],
+      "tight_wall_seconds": 10.59893,
+      "tight_maximum_rss_mb": 886.730,
+      "tight_jcoupled64_sha256": "0f1b50baa84233e6f03c237ff9b1376aed2f57bc706795dc03c66661c542093b",
+      "tight_no2bpack_sha256": "4a5219e6dc147d96e7cbe1d823196a2a9d26ab04fff415613acf861e867d584a",
+      "jcoupled64_max_abs_mev": {
+        "zero_body": 1.1812772982011666e-13,
+        "one_body": 1.1254192022747131e-13,
+        "two_body": 4.156675004196586e-13
+      },
+      "nmax8_tight_lowest_three_mev": [
+        -26.274719477423861,
+        -24.644862164914279,
+        -24.568058723542215
+      ],
+      "maximum_ncsm_energy_abs_kev": 1.2e-10,
+      "target_kev": 1.0,
+      "passed": true
+    },
+    "format_gate": {
+      "bare_no2bpack_sha256": "9e0a4ff620f6421fbf027a14c7df15a3dd021e6008bd0f61d63853f5df56fca0",
+      "production_no2bpack_sha256": "055529426538a0d64a4a472b1706aeea679e37f944f3ce562bc35e1d4968e6ee",
+      "independent_exporter_no2bpack_sha256": "037dff8c77637769af287be24d6f123fd587ab650a9bb1ca5337d12a4781aa38",
+      "production_and_independent_bytes_identical": false,
+      "nmax8_lowest_three_spectra_identical_within_printed_double_precision": true,
+      "interpretation": "byte equality is not claimed; the independent write paths reproduce the same tested Nmax8 low spectrum after NCSM readback",
+      "passed": true
+    },
+    "ncsm_readback": {
+      "executable_sha256": "94e3a43364026f0827725c77ba960d910ae5de820412ff7f0593ad70519c24c0",
+      "environment_script_sha256": "a7bf1fd3710323c472158a38e049660502fa7cd2b48ca35b39e927688b65f471",
+      "m_orbits": 336,
+      "basis_dimensions": {
+        "Nmax2": 59,
+        "Nmax4": 952,
+        "Nmax6": 7916,
+        "Nmax8": 44350,
+        "Nmax10": 183866
+      },
+      "lowest_three_mev": {
+        "s0": {
+          "Nmax2": [-17.013502881259512, -13.761246467855941, -13.761246401684351],
+          "Nmax4": [-22.36179373346409, -17.013503365606475, -17.01350330063476],
+          "Nmax6": [-24.709626730047656, -22.361794426919182, -22.361794354140788],
+          "Nmax8": [-26.172002205647026, -24.58842893251818, -24.518402577919915],
+          "Nmax10": [-26.790750085985497, -25.724162227169941, -25.685500172685412]
+        },
+        "s0.02": {
+          "Nmax2": [-17.64989570260116, -13.968772994597295, -13.966632777151661],
+          "Nmax4": [-22.710357794851848, -17.189905744161859, -17.189883358403964],
+          "Nmax6": [-24.902818276284233, -22.461091855718426, -22.455373576790695],
+          "Nmax8": [-26.274719477423741, -24.64486216491418, -24.56805872354213],
+          "Nmax10": [-26.860681522445383, -25.759991076790971, -25.716247291042066]
+        }
+      },
+      "two_j": {
+        "s0_Nmax10": [0, 4, 0],
+        "s0.02_Nmax10": [0, 4, 0]
+      },
+      "nmax10_jobs": {
+        "s0": {
+          "job": 100441,
+          "repository_commit": "48453e4feaa4144d41b34610e1d2a96febadcb06",
+          "script_sha256": "9b984c1ffbd0a0ad768469c5cb3f5f02fbfe129e6f860c832989b9c37f323742",
+          "log_sha256": "71cdd41e1edc856d6e9ad98f472953bec85554c8f804ee80ca2ae5bcc546b7b6",
+          "wall_seconds": 174,
+          "maximum_rss_kib": 448636,
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        },
+        "s0.02": {
+          "job": 100442,
+          "repository_commit": "48453e4feaa4144d41b34610e1d2a96febadcb06",
+          "script_sha256": "829e19250fe8c6b718a6818b5987971d8a14a9ca8105def94b66e99b3b9c273d",
+          "log_sha256": "3736589a262a5c4a7a29b1ed48ee132c9d374d136e7b7238c7e879358b595de3",
+          "wall_seconds": 175,
+          "maximum_rss_kib": 449508,
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        }
+      }
+    },
+    "maximum_feasible_nmax_proxy": {
+      "maximum_tested_nmax": 10,
+      "full_emax6_space_nmax": 24,
+      "full_space_run": false,
+      "adjacent_ground_state_gap_mev": {
+        "s0": [5.348290852204578, 2.347832996583566, 1.462375475599369, 0.618747880338471],
+        "s0.02": [5.060462092250688, 2.192460481432384, 1.371901201139508, 0.585962045021642]
+      },
+      "adjacent_gap_improvement_kev": [
+        287.828759953889,
+        155.372515151182,
+        90.474274459861,
+        32.785835316830
+      ],
+      "flow_minus_bare_ground_state_kev": {
+        "Nmax2": -636.392821341648,
+        "Nmax4": -348.564061387759,
+        "Nmax6": -193.191546236577,
+        "Nmax8": -102.717271776715,
+        "Nmax10": -69.931436459886
+      },
+      "requirements": {
+        "each_adjacent_gap_must_not_worsen": true,
+        "maximum_abs_flow_minus_bare_at_largest_nmax_kev": 100.0
+      },
+      "each_adjacent_gap_improved": true,
+      "largest_nmax_abs_flow_minus_bare_kev": 69.931436459886,
+      "passed": true,
+      "claim_limit": "highest-feasible-Nmax pilot only; no emax6 full-space drift or exact prototype_downstream_stability_v1 pass is claimed"
+    }
   },
   "direct_flow_restart": {
     "workflow_commit": "fee05bdf39d1dea355d2b7119ef979aa80cf2722",

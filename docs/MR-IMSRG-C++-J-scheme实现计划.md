@@ -376,15 +376,17 @@ emax4 已证明长流会放大 IMSRG(2) 截断误差，因此 emax6 不再先追
    `1e-9` 对 `1e-10` 的 J64 0/1/2B 最坏差为
    `1.18e-13/1.13e-13/4.16e-13 MeV`，谱差约 `1.2e-10 keV`。
 4. 裸与流后 Hamiltonian 使用完全相同的 NCSM 截断序列。`Nmax=2,4,6,8`
-   的相邻 gap 均得到改善，但 Nmax8 流/裸基态差为 `-102.717 keV`，尚不能
-   在 100 keV 预算内作出代理判定。Nmax10 jobs `100441/100442` 用带输入、
-   executable 和环境哈希的 `--mr-ncsm-readback` 单点脚本运行；计算节点
-   不提供 `/usr/bin/time`，生成器已改用 `/proc/<pid>/status` 采样 VmHWM。
-5. 若 Nmax10 的流后 `Nmax8->10` gap 不大于裸 gap，且 Nmax10 流/裸差
-   `<=100 keV`，则只记为“emax6 最大可算 Nmax 代理通过”；若任一项失败，
-   拒绝 `s=0.02` 并缩短流窗。由于 emax6 的全空间是 Nmax24，任何一种
-   结果都不能写成 emax6 完整 `prototype_downstream_stability_v1` 通过。
-6. 只有上述物理/格式/ODE 门都通过后才评估 emax8。Magnus 不是谱漂移
+   的相邻 gap 均得到改善；Nmax8 流/裸基态差为 `-102.717 keV`，因此继续
+   到 Nmax10。jobs `100441/100442` 用带输入、executable 和环境哈希的
+   `--mr-ncsm-readback` 单点脚本运行；计算节点不提供 `/usr/bin/time`，
+   生成器使用 `/proc/<pid>/status` 采样 VmHWM。
+5. 两个 Nmax10 job 均以 exit `0:0` 完成，维数 `183866`；裸/流后基态为
+   `-26.790750086/-26.860681522 MeV`，`Nmax8->10` gap 从
+   `618.748` 降为 `585.962 keV`，Nmax10 流/裸差为 `-69.931 keV`。
+   所以“emax6 最大可算 Nmax 代理”通过。由于全空间是 Nmax24，这不等于
+   emax6 完整 `prototype_downstream_stability_v1` 通过，也不提供全空间
+   谱漂移结论。
+6. 上述物理/格式/ODE 门均已固化，下一步才评估 emax8。Magnus 不是谱漂移
    修正项；是否实现只由 direct-flow 内存、checkpoint 和 wall 实测决定，
    并仍需重复 RHS、物化与后 NCSM 验收。
 
