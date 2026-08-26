@@ -419,15 +419,24 @@ validator 被明确排除；它不是生产 J-scheme 流失败，也不应成为
 
 1. 用 `gen_job.py --mr-jscheme` 单点运行 `s=0→0.02`、
    `rtol=atol=1e-9`，仍用同一 White-NCSM RHS、J64 checkpoint 和
-   no2bpack 物化；
+   no2bpack 物化；已由 job `100451` 完成；
 2. 用 `1e-10` 独立复算并比较 lossless 0/1/2B，ODE/NCSM 谱误差必须
-   `<1 keV`；
+   `<1 keV`；job `100452` 及 Nmax8 jobs `100458/100456` 已通过；
 3. 对 bare/flow 使用完全相同的 Nmax 序列，从 2/4/6/8 逐点增加到实测
    资源允许的最大值；在没有 emax8 全空间（四粒子 Nmax32）时，只能按预先
    声明的最大可行 Nmax proxy 报告，不能声称完整
    `prototype_downstream_stability_v1` 通过；
 4. 只有 direct flow 的内存、wall 或 checkpoint 实测成为阻碍时才实现
    Magnus；不得用 Magnus 解释或掩盖 IMSRG(2) 谱漂移。
+
+两条完整流的 25/31 次 scalar commutator 分别用时 `67.67063/85.03911 s`，
+峰值 RSS `5194.719/5227.641 MB`；终点 `E=-17.70238931537 MeV`、
+`||eta||/||eta(0)||=0.959464`，所以仍只称 finite-s point。双容差 J64 的
+0B/1B/2B 最坏差为 `4.80e-14/6.53e-14/1.90e-13 MeV`。native no2bpack
+Nmax8 三态在两套容差间最大差 `4.97e-11 keV`。松容差第一次读回 job
+`100454` 有完整谱但子进程返回非零，正式重跑 job `100458` 以
+`COMPLETED 0:0` 得到同一谱；验收只采用后者。现在唯一未完成的是步骤 3 的
+匹配 Nmax 序列与最大可行空间判定。
 
 这一阶段继续保留两个独立结论：C++ J-scheme 公式与实现门禁已经通过；
 有限流能否作为更大空间下游 Hamiltonian，则由后 NCSM 数据单独决定。

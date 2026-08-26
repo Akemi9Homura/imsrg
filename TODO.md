@@ -323,10 +323,16 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `[-26.2177863230,-24.7099878250,-24.7099679677] MeV`；墙钟
       `81/75 s`、峰值 RSS `2385856/2386220 KiB`。基态变化
       `-0.733331 keV` 只证明生产物化/读回与资源可行，不是有限流物理门禁。
-- [ ] 用根目录单点生成器实际运行 emax8 `s=0.02` direct flow，先做
-      `rtol=atol=1e-9`，再以 `1e-10` 独立复算；比较 lossless J64 的
-      0B/1B/2B 和 native no2bpack NCSM 谱。然后按相同 bare/flow Nmax
-      序列逐点增加到资源允许的最大值，才评估 finite-s pilot。不得从
+- [x] 用根目录单点生成器实际运行 emax8 `s=0.02` direct flow，并以
+      `rtol=atol=1e-9/1e-10` 独立复算。point7 jobs `100451/100452` 均
+      `COMPLETED 0:0`；25/31 次 scalar commutator 用时 `67.67/85.04 s`、
+      峰值 RSS `5194.719/5227.641 MB`。lossless J64 的 0B/1B/2B 最坏差为
+      `4.80e-14/6.53e-14/1.90e-13 MeV`。native no2bpack Nmax8 正式 jobs
+      `100458/100456` 的三态最大差 `4.97e-11 keV`，通过 `<1 keV` 门禁。
+      初次松容差读回 job `100454` 因未知非零子进程返回码失败，虽打印相同
+      谱也不计入成功；正式结果来自 `max_iter=500` 的成功重跑 `100458`。
+- [ ] 对 emax8 按相同 bare/`s=0.02` Nmax 序列逐点增加到资源允许的最大值，
+      才评估 finite-s pilot。不得从
       emax6 或 `s=1e-4` 资源点外推物理通过。Magnus 只能改善积分/重启成本，
       不能被当作修复 IMSRG(2) 长流谱漂移的办法；若确需接入，仍须从同一
       RHS、短流、真空物化和后 NCSM 谱重新验收。

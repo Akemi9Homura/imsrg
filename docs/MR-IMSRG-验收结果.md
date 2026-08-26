@@ -598,7 +598,28 @@ native no2bpack NCSM Nmax8 jobs `100447/100448` 均为 Slurm
 
 一步流相对 bare 的基态变化为 `-0.733331 keV`。这一节只验收 canonical
 输入、pure J-scheme 资源、真空物化和 native reader 闭环；`s=1e-4` 不构成
-有限流的物理验收。下一步是实际运行 `s=0.02` 的 `1e-9/1e-10` 双容差流，
-再用相同 bare/flow Nmax 序列做到最大可行空间。若没有做到 emax8 四粒子
-全空间 Nmax32，只能报告最大可行 Nmax proxy，不能宣称完整 downstream
-stability 门禁通过。
+有限流的物理验收。资源门通过后才进入下面的 `s=0.02` 双容差流；即使该流
+通过 ODE 门，也仍须用相同 bare/flow Nmax 序列做到最大可行空间。若没有
+做到 emax8 四粒子全空间 Nmax32，只能报告最大可行 Nmax proxy，不能宣称
+完整 downstream stability 门禁通过。
+
+同一 emax8 输入随后完成 `s=0→0.02` 双容差 direct flow。point7 jobs
+`100451/100452` 分别使用 `rtol=atol=1e-9/1e-10`，25/31 次 scalar
+commutator 的墙钟为 `67.67063/85.03911 s`，峰值 RSS
+`5194.719/5227.641 MB`。两者终点 MR 零体项均为
+`-17.70238931537 MeV`，真空导出零体核对为零；生成元 norm 比值为
+`0.959464`，所以该点不是严格脱耦结果。
+
+lossless J64 逐元素比较的 0B/1B/2B 最坏差为
+`4.80e-14/6.53e-14/1.90e-13 MeV`。native no2bpack Nmax8 正式读回为：
+
+| ODE 容差 | job | 三态 (MeV) | Slurm |
+|---:|---:|---|---|
+| 1e-9 | 100458 | -26.356103569741, -24.779063666931, -24.775134512563 | COMPLETED 0:0 |
+| 1e-10 | 100456 | -26.356103569741, -24.779063666931, -24.775134512563 | COMPLETED 0:0 |
+
+三态最大差 `4.97e-14 MeV = 4.97e-11 keV`，ODE 门通过。初次松容差作业
+`100454` 虽打印相同三态，但子进程最终返回 1、Slurm 标为 FAILED；它不计入
+正式成功，重跑 `100458` 将 `max_iter` 提到 500 后以 exit `0:0` 完成。
+下一门禁仍是 bare/flow 匹配 Nmax 序列和最大可行 Nmax proxy；目前不能据
+Nmax8 单点宣称 emax8 downstream physics 通过。

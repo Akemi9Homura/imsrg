@@ -1,5 +1,5 @@
 {
-  "schema": "mrimsrg_jscheme_large_space_acceptance_v11",
+  "schema": "mrimsrg_jscheme_large_space_acceptance_v12",
   "implementation_commit": "6e02676ce00e237efdbf6cb71df9315f7c576143",
   "baseline_profiler_commit": "1f02961a2c8ab9560ece346284ab4dd2d7a25337",
   "shell_model_obs_commit": "4b10afab0218711b0278ef66ad73e88bc7791c34",
@@ -829,7 +829,111 @@
       "claim": "native format/resource readback only; s=1e-4 is not a downstream physics acceptance point",
       "passed": true
     },
-    "next_gate": "run s=0.02 at ODE tolerances 1e-9 and 1e-10, then compare J64/no2bpack and matched bare/flow Nmax sequences through the largest feasible Nmax",
+    "finite_s_flow": {
+      "target_s": 0.02,
+      "generator": "white-ncsm",
+      "denominator_partitioning": "Epstein_Nesbet",
+      "ds_0": 0.001,
+      "dsmax": 0.01,
+      "eta_criterion": 1e-6,
+      "initial_eta_norm": 1.2267875904259313,
+      "final_eta_norm": 1.177058295336264,
+      "eta_norm_ratio_to_initial": 0.9594638098088344,
+      "strict_relative_eta_target": 1e-6,
+      "strict_target_reached": false,
+      "runs": {
+        "tol1e-9": {
+          "job": 100451,
+          "ode_tolerance": 1e-9,
+          "scalar_commutators": 25,
+          "wall_seconds": 67.67063,
+          "maximum_rss_mb": 5194.719,
+          "final_mr_zero_body_mev": -17.702389315370,
+          "final_h_norm_mev": 31413.438082568,
+          "final_eta_one_body_norm": 0.168842095,
+          "final_eta_two_body_norm": 1.164885650,
+          "export_zero_body_consistency_mev": 0.0,
+          "script_sha256": "463dbf4758b65d3a7793329072c805653a3e16cabd5ff3b3d872c2006d2257eb",
+          "metadata_sha256": "c6d1d418b3142a40ca323cb3d6231388aaa48fd290b33ee8bae6ae440f6f83ee",
+          "log_sha256": "5042a2e28b2fc6aa7806454b221bb70b99430dda21c9d9618dade55c69397bc7",
+          "flow_sha256": "66bf9c5bf0c3c27b1a3c6a7e2a943b50f15bbe5beac4717da011bb2b9b9ebeb1",
+          "jcoupled64_sha256": "ac7dacb7ffe324d403042bccc1b4e20a3c389d560bc4f3bb3770a219e811f049",
+          "no2bpack_sha256": "247c5587d595d90606c8501a427bc8879c37238903180db4898d26d31ba5e7ba",
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        },
+        "tol1e-10": {
+          "job": 100452,
+          "ode_tolerance": 1e-10,
+          "scalar_commutators": 31,
+          "wall_seconds": 85.03911,
+          "maximum_rss_mb": 5227.641,
+          "final_mr_zero_body_mev": -17.702389315371,
+          "final_h_norm_mev": 31413.438082568,
+          "final_eta_one_body_norm": 0.168842095,
+          "final_eta_two_body_norm": 1.164885650,
+          "export_zero_body_consistency_mev": 0.0,
+          "script_sha256": "c7b4ba0853ee0620ab93fc6eb49a766153ac81c214a3fe3e5a6a9110a56f3090",
+          "metadata_sha256": "34ac4a4f08343fa36e44d5780422b89be67a8b4e58d5d2ff5a1305aec8756ca8",
+          "log_sha256": "d16d29e315e79b232d2b90347b730861940cb4a611c875a6219245056def33f1",
+          "flow_sha256": "d803eac4e0658c2e05e926c3613b41a690882f022d771b615f91913fd1d832e6",
+          "jcoupled64_sha256": "afaee59509bc55b59dd418f5133637f6b01a0e587fd6feeb8137190c3a62048e",
+          "no2bpack_sha256": "94f9523b94b800f3761ddcda325ef2fcb33d70c469df637402d23403d9fd368c",
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        }
+      },
+      "jcoupled64_ode_comparison": {
+        "tool_commit": "1ff267bd93883d8428864c2d8e00d94e77a9e360",
+        "zero_body_max_abs_mev": 4.796163466380676e-14,
+        "one_body_max_abs_mev": 6.532274721138265e-14,
+        "two_body_max_abs_mev": 1.900701818158268e-13,
+        "two_body_relative_frobenius": 8.282582824138365e-16,
+        "absolute_tolerance_mev": 1e-10,
+        "passed": true
+      },
+      "native_no2bpack_nmax8_ode_gate": {
+        "dimension": 44838,
+        "tol1e-9": {
+          "job": 100458,
+          "max_iter": 500,
+          "states_mev": [-26.356103569740927, -24.779063666930607, -24.775134512563209],
+          "two_j": [0, 4, 0],
+          "wall_seconds": 75,
+          "maximum_rss_kib": 2384720,
+          "script_sha256": "3110d75a6a3c1851ce8b0318b6f754d2863930db33e54a5fcc4aec992aa8e957",
+          "metadata_sha256": "ff2ae3a85fd5a73b08f6fe98dc7274cb4f4ef380cbfc7caa3180b517761bb9d7",
+          "log_sha256": "0652554e60facfbeaee2bcaf402e0b8cd210bcc5669b97de75c42ca64060ab53",
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        },
+        "tol1e-10": {
+          "job": 100456,
+          "max_iter": 400,
+          "states_mev": [-26.356103569740977, -24.779063666930597, -24.77513451256317],
+          "two_j": [0, 4, 0],
+          "wall_seconds": 72,
+          "maximum_rss_kib": 2384780,
+          "script_sha256": "4ee5511d3e7ae5ce148d3d099c4a0b9c462d505241808a09c5aee96c2fd34ce5",
+          "metadata_sha256": "c0e9988fcce34b28930091fd41c41d9774c3fc6ca022df5426c28689c96e1996",
+          "log_sha256": "12d1270be21f45735cfcee7a5438fd947b6376590072dfc4fe5c123cb54aad2f",
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        },
+        "maximum_energy_abs_kev": 4.973799150320701e-11,
+        "target_kev": 1.0,
+        "discarded_attempt": {
+          "job": 100454,
+          "max_iter": 400,
+          "slurm_state": "FAILED",
+          "exit_code": "1:0",
+          "reason": "nonzero child status despite a complete printed spectrum; not used as accepted evidence"
+        },
+        "passed": true
+      },
+      "claim": "finite-s integration and Nmax8 ODE gate only; downstream physics acceptance still requires matched bare/flow Nmax sequences"
+    },
+    "next_gate": "compare matched bare and s=0.02 Nmax sequences through the largest feasible Nmax; without Nmax32 no full-space emax8 downstream-stability pass may be claimed",
     "physics_acceptance_claimed": false
   },
   "capacity_claim": {
