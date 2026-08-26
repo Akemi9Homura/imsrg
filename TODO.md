@@ -54,6 +54,11 @@
       `ode_tolerance/dsmax/omega_norm_max` 做 RK45 与分段；原一阶
       `method=magnus` 保留为独立 Euler oracle，不用极小 `domega` 掩盖误差。
 
+出处注：完整 Bernoulli ODE/BCH 见 Morris--Parzuchowski--Bogner 2015
+Eqs. (28),(30)；Magnus(2) 截断、级数停止和自动步长 RKF45 见
+Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
+本地 PDF 与“文献事实/仓库工程决策”边界见实现计划 Sec. 8.1。
+
 ### M3. 分层验收
 
 - [x] 随机 scalar J-scheme 输入展开到 m-scheme，逐阶比较 MR-BCH 与

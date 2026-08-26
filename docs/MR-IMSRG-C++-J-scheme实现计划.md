@@ -898,6 +898,51 @@ Dormand--Prince RK45 和分段。每个 RHS 仍由
 `exp(Omega) Hstart exp(-Omega)` 的 MR-BCH 重建 Hamiltonian。direct flow
 保留作独立交叉验证。
 
+#### 出处与本仓库决策的边界
+
+上述数学与数值选择的出处如下；“论文公式”和“本仓库根据验收做出的
+工程决策”不得混为一谈。
+
+1. T. D. Morris, N. M. Parzuchowski, and S. K. Bogner,
+   *Magnus expansion and in-medium similarity renormalization group*,
+   Phys. Rev. C **92**, 034331 (2015),
+   [doi:10.1103/PhysRevC.92.034331](https://doi.org/10.1103/PhysRevC.92.034331),
+   [arXiv:1507.06725](https://arxiv.org/abs/1507.06725)。Eq. (28) 给出完整
+   Bernoulli 形式的 `dOmega/ds`，Eq. (30) 给出用 `Omega` 变换
+   Hamiltonian 的 BCH 级数；论文紧接 Eq. (29) 后明确说实际计算通过
+   数值积分 Eq. (28) 构造 `Omega`。本地原文为
+   `refs/papers/2015_Morris_Magnus_IMSRG_arXiv1507.06725.pdf`。
+2. K. Vobig, *Electromagnetic Observables and Open-Shell Nuclei from the
+   In-Medium No-Core Shell Model*, TU Darmstadt dissertation (published 2020),
+   [URN:nbn:de:tuda-tuprints-113758](https://nbn-resolving.org/urn:nbn:de:tuda-tuprints-113758)。
+   Eq. (4.5.7) 是完整 Magnus ODE，Eq. (4.5.14) 是 BCH 观测量变换；
+   Eqs. (4.6.1)--(4.6.4) 定义 Magnus(2) 中对 `Omega`、导数和每个
+   嵌套对易子的 NO2B 截断，Eqs. (4.6.7),(4.6.8) 给出相对
+   `1e-2` 项阈值与嵌套对易子范数递减条件。Appendix B.2 明确
+   说明他们在每个 `Omega` ODE 积分步用 BCH 计算 `H(s)`，并用
+   GSL 的自动步长 RKF45。本地原文为
+   `refs/theses/2020_Vobig_IMNCSM_PhD.pdf`。
+3. T. Mongelli, *The In-Medium No-Core Shell Model as Comprehensive Ab-Initio
+   Tool*, TU Darmstadt dissertation (2022),
+   [URN:nbn:de:tuda-tuprints-216719](https://nbn-resolving.org/urn:nbn:de:tuda-tuprints-216719)。
+   Eqs. (5.92),(5.94),(5.96),(5.97) 独立复述了 Bernoulli ODE、BCH 及
+   Magnus(2) 截断；Sec. 5.6 明确用同一套 MR-IMSRG commutator
+   equations 计算 Magnus/BCH 中的嵌套对易子。本地原文为
+   `refs/theses/2022_Mongelli_IMNCSM_PhD.pdf`。
+4. `method=magnus` 的有限步算法不是从上述论文反推出来的，而是
+   现有 `imsrg++` 代码 `IMSRGSolver::Solve_magnus_euler()` 的直接语义：
+   `Eta *= ds` 后调用 `BCH_Product(Eta,Omega)`。Vobig Sec. 4.6 和
+   Appendix B.2 仅说固定步长 Euler 在形式上可以使用，但他们的实际
+   实现选用自动步长 RKF45。
+
+因此，将 `method=magnus_adaptive` 作为本项目的生产入口是“按上述文献
+实现完整 ODE，再由 keV 稳定性验收决定”，不是论文规定的命令行
+名称。本仓库用 Boost odeint 的 Dormand--Prince 5(4)，而 Vobig 用
+GSL RKF45；两者都是带局部误差控制的显式嵌入式 5(4) Runge--Kutta，
+但 Butcher tableau 不同，不宣称数值步进逐项复刻 Vobig。将原
+`method=magnus` 保留为 Euler/BCH-product oracle 同样是本仓库根据
+He4 `76.8 keV` 步长敏感性测试做出的工程决策，不是文献结论。
+
 ### 8.2 源码最小改动边界
 
 1. `BCH_Transform`/`BCH_Product` 增加显式、非全局的 MR reference 上下文；

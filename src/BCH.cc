@@ -395,6 +395,13 @@ namespace BCH
 
   /// Evaluate dOmega/ds = sum_k B_k/k! ad_Omega^k(Eta).
   ///
+  /// Sources: Morris--Parzuchowski--Bogner, Phys. Rev. C 92, 034331
+  /// (2015), Eq. (28), doi:10.1103/PhysRevC.92.034331; Vobig,
+  /// TU Darmstadt dissertation (2020), Eqs. (4.6.4)--(4.6.8),
+  /// urn:nbn:de:tuda-tuprints-113758. Magnus(2) requires every nested
+  /// commutator in this series to be truncated with the same NO2B/MR
+  /// commutator used by the flow.
+  ///
   /// The finite list is the same Bernoulli sequence already used by
   /// BCH_Product.  Following Vobig Eq. (4.6.7), production stops only at a
   /// nonzero Bernoulli order k>=2 when the new term is small relative to the

@@ -292,6 +292,13 @@ void IMSRGSolver::UpdateEta()
 }
 
 // This is the default solver
+/// Legacy imsrg++ finite-step Magnus path. The algorithm below explicitly
+/// forms dOmega = ds*Eta and composes exp(Omega_new) =
+/// exp(dOmega)*exp(Omega_old) with BCH_Product, i.e. exponential Euler.
+/// Vobig's dissertation (2020), Sec. 4.6 and Appendix B.2, notes that fixed
+/// step Euler is possible but reports using adaptive GSL RKF45 instead. Its
+/// retention as an algebra oracle (rather than the MR production solver) is
+/// this repository's tested engineering choice, not a literature mandate.
 void IMSRGSolver::Solve_magnus_euler()
 {
   istep = 0;
@@ -959,6 +966,17 @@ void IMSRGSolver::operator()(const std::deque<Operator> &x, std::deque<Operator>
   WriteFlowStatus(std::cout);
 }
 
+/// Integrate the full Bernoulli Magnus ODE and reconstruct H(s) by BCH in
+/// every RHS evaluation. This follows Morris--Parzuchowski--Bogner,
+/// Phys. Rev. C 92, 034331 (2015), Eqs. (28),(30), and Vobig's TU Darmstadt
+/// dissertation (2020), Eq. (4.6.4) and Appendix B.2
+/// (urn:nbn:de:tuda-tuprints-113758).
+///
+/// Vobig used GSL RKF45. We reuse imsrg++'s Boost odeint infrastructure and
+/// use controlled Dormand--Prince 5(4): the same class of adaptive embedded
+/// 5(4) Runge--Kutta method, but not the same Butcher tableau. The public
+/// name "magnus_adaptive" and its selection as the MR production path are
+/// repository choices, not terminology prescribed by those references.
 void IMSRGSolver::Solve_ode_magnus()
 {
   ode_mode = "Omega";
