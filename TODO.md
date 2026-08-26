@@ -499,6 +499,28 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       emax12 容量门只放大已通过这些回归的相同 C++ 路径，没有再引入算法
       改动；输入/可执行文件/输出哈希、wall/RSS 与 profiler 已写入
       `docs/MR-IMSRG-Jscheme-large-space.json` schema v14，本轮 P3 完成。
+- [x] **MR-P4：生产 C++ J-scheme 严格脱耦门禁。** 固定同一个
+      `He4, Nrefmax=2, hw=20, emax=2/e2max=4` 相关参考态、NNLOopt 输入、
+      White-NCSM/EN 分母和 `Delta e != 0` 掩码，从 `s=0` 先流到 `1000`，
+      再由 lossless J64 checkpoint 继续，直到预先冻结的
+      `Rgen/Rgen(0)<=1e-6`。point7 jobs `100548/100550` 用完全相同输入和
+      executable，分别以 `rtol=atol=1e-10/1e-9` 单线程完成；独立逐通道
+      重算得到终点比值 `9.94895896e-7/9.94895893e-7`，两条均严格通过，
+      不是 flowfile 的打印舍入。终点 `Rgen` 为约 `7.0e-7`，`eta1` 仅
+      `1.26e-11`，没有小分母通道；物理流在累计 `s≈4.0774e5` 过线，随后
+      generator 被停止判据置零，ODE 只快速前进到名义输出点。
+      两种容差的 lossless J64 最坏 0B/1B/2B 差为
+      `5.80e-12/3.19e-12/4.28e-10 MeV`，Nmax2 三态最大变化
+      `2.38e-8 keV`。生产 driver 从严格终点 J64 重启后执行 0 次
+      commutator，0B/1B/2B round-trip 最坏差低于 `1.60e-14 MeV`；MR
+      反正规序零体核对为零。J64/no2bpack 由同一个 NCSM reader 读回，
+      59 维三态最大格式差 `9.35e-4 keV`。最后
+      `MRReference/MRDriver/MRSRDriver/MRCorrelatedDriver/MRDenominators/
+      MRJobGenerator/MRTailDiagnostic` 七项以 `417.82 s` 全通过，其中四核
+      m-scheme oracle 用时 `373.60 s`。完整哈希、资源和诊断见
+      `docs/MR-IMSRG-Jscheme-large-space.json` schema v15。该门禁只验收
+      MR-IMSRG 实现、停止判据、重启和物化，不重新启动 finite-s IM-NCSM
+      效果研究。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

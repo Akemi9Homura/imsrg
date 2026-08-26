@@ -767,6 +767,63 @@ MRJobGenerator/MRTailDiagnostic/MRDownstreamWindow` 六项合计 `46.85 s`
 对应七项测试合计 `41.40 s` 通过。至此 sanitizer 环境不再是 MR-P0 的
 未决项。
 
+### 6.3 emax2 严格脱耦门禁闭环
+
+emax4 的 `s=1000` 流只把 `Rgen/Rgen(0)` 降到 `1.31e-3`，因此此前生产
+C++ J-scheme 路径仍缺一份真正达到项目 `1e-6` 相对门槛的证据。这里不再
+扩展 finite-s IM-NCSM 研究，而是选择仍能由 Python m-scheme oracle 独立
+检查、同时具有非零 `lambda2` 的 `He4 Nrefmax=2, emax=2/e2max=4`，专门
+关闭实现验收缺口。输入固定为 NNLOopt、`hw=20 MeV`、White-NCSM/EN 分母、
+`Delta e != 0` 放松掩码和 `lambda3=0`；bare J64/reference SHA-256 分别为
+`55a3c161...44e2` 与 `1c9934aa...8898`。
+
+初始独立重算为
+`Rgen(0)=0.7035911887073647`，所以相对 `1e-6` 对应绝对上界
+`7.0359118871e-7`。作业停止值预先取更严格的 `7.0e-7`。point7 job
+`100540` 先以 `rtol=atol=1e-10` 流到 `s=1000`，得到
+`Rgen/Rgen(0)=1.13293852e-3`；lossless J64 SHA-256 为
+`7b02f677...44df0`。随后 jobs `100548/100550` 从同一个 J64 Hamiltonian
+checkpoint 继续，除 ODE 容差 `1e-10/1e-9` 外输入、reference、executable
+和物理参数完全相同。两条单线程作业分别用 `8037/8099 s`、峰值
+`20348/22504 KiB`，均正常 `exit 0`。28 线程重复轨迹数值一致但在这个
+极小空间更慢，单线程反超后被取消；它不计作终点证据，也说明 emax2 不应
+默认用大 OpenMP 线程数。
+
+终点 J64 由 `diagnose_white_ncsm_tail.py` 重新读取并逐通道构造生产
+White-NCSM generator，而不是采用 flowfile 的九位小数：
+
+- `rtol=1e-10`：`Rgen=6.99999986354e-7`，相对初值
+  `9.94895896352e-7`；
+- `rtol=1e-9`：`Rgen=6.99999983706e-7`，相对初值
+  `9.94895892588e-7`；
+- 两条的 `eta1≈1.26e-11`，终点最小绝对分母约 `18.929 MeV`，不存在
+  denominator cutoff 伪停止；
+- 物理流约在累计 `s≈4.0774e5` 过线；其后停止判据把 generator 置零，
+  adaptive solver 快速前进到名义输出点而 Hamiltonian 不再变化；
+- White-NCSM 未除分母的 numerator norm 相对初值为 `3.14690e-7`。
+
+含 `lambda2` 的 `D-D†` 诊断从 `19.1285` 降到 `10.8775 MeV`，也随
+机器记录保存，但它不是 Vobig White-NCSM 生成元的固定点定义，不能事后
+替换预先冻结的 `Rgen` 门槛。正式结论只按上述 `Rgen/Rgen(0)`，两条均
+严格通过。
+
+数值稳定、重启与物化门禁也同时关闭：`1e-10` 对 `1e-9` 的 lossless J64
+最坏 0B/1B/2B 差为 `5.80e-12/3.19e-12/4.28e-10 MeV`，`Nmax=2` 三态
+最大差 `2.38e-8 keV`。生产 driver 从严格终点 J64 重启，停止判据使其执行
+0 次 commutator；输出相对输入的 0B/1B/2B 最坏差为
+`1.60e-14/8.88e-15/7.11e-15 MeV`，反正规序零体核对严格为零。同一个
+NCSM reader 对 J64/no2bpack 的 59 维三态读回最大格式差
+`9.35e-4 keV`，低于 `1 keV` 门槛。最后七项
+`MRReference/MRDriver/MRSRDriver/MRCorrelatedDriver/MRDenominators/
+MRJobGenerator/MRTailDiagnostic` 以 `417.82 s` 全通过，其中完整四体系
+m-scheme oracle 为 `373.60 s`。
+
+因此生产 C++ J-scheme MR-IMSRG 已获得一份非平凡相关参考态的严格脱耦、
+十倍 ODE 容差、J64 restart、真空物化、SR 退化和 m-scheme oracle 的闭环
+证据。该结论验收的是 MR 实现本身，不把此长流 Hamiltonian 宣称为下游
+IM-NCSM 生产结果。完整机器记录见
+`MR-IMSRG-Jscheme-large-space.json` schema v15。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和
