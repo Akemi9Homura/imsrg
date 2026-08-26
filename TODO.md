@@ -521,6 +521,19 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `docs/MR-IMSRG-Jscheme-large-space.json` schema v15。该门禁只验收
       MR-IMSRG 实现、停止判据、重启和物化，不重新启动 finite-s IM-NCSM
       效果研究。
+- [x] **MR-P5：完成审计与整库回归。** 逐条把当前 `CLAUDE.md`、本文件
+      P0--P4 和实现计划映射到生产源码与机器证据；确认 production driver
+      使用 `MRReference -> Generator::ConstructGenerator_WhiteNCSM ->
+      IMSRGSolver::EvaluateCommutator -> MRCommutator::Commutator`，其中公共
+      收缩复用原 SR 路径、`lambda2=0` 直接返回原 SR commutator，相关参考
+      只增加经过 oracle 验证的 `lambda2` 项，生产 RHS 不展开 m-scheme。
+      审计发现 `src/CMakeLists.txt` 的六个重复上游测试仍用相对 build 目录的
+      错误脚本路径；改成 `${CMAKE_SOURCE_DIR}/test/...` 后，从当前 checkout
+      重新配置并执行完整 CTest，上游 SR/通用测试和八项 MR 测试共 20/20
+      通过，总用时 `658.08 s`，四核相关参考 oracle 用时 `505.11 s`；完整
+      命令记录在实现计划 Sec. 6.4。
+      TODO 中唯一 `[~]` 是用户已明确终止的 emax8 finite-s NCSM 研究，不是
+      MR 实现遗留项；当前声明范围内没有未关闭的实现或验收任务。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

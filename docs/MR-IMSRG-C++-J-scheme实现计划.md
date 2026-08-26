@@ -824,6 +824,36 @@ m-scheme oracle 为 `373.60 s`。
 IM-NCSM 生产结果。完整机器记录见
 `MR-IMSRG-Jscheme-large-space.json` schema v15。
 
+### 6.4 完成审计与整库回归
+
+严格门关闭后又从生产入口向下做了一次源码级审计。显式 MR 参数只在
+`imsrg++.cc` 中启用 `MRReference`；`IMSRGSolver` 无参考态时仍调用原
+`Commutator::Commutator`，有参考态时先执行相同 SR commutator，再由
+`MRCommutator` 加入 `lambda2` 的 1B/0B 收缩。`lambda2=0` 分支在任何
+MR 浮点加减之前直接返回 SR 结果。White-NCSM 继续使用现有
+`Generator`/Epstein--Nesbet 分母和球形 HO `Delta e != 0` 掩码；输出先在
+自然基反 MR 正规序，再转回 HO 并由同一真空算符写 J64/no2bpack。因此
+生产流中不存在测试专用核分支、Python 后端或完整 m-scheme tensor。
+
+审计同时发现 `src/CMakeLists.txt` 中六个重复上游测试把脚本路径写成
+`../test/...`；从 `build/src` 执行时会错误解析到不存在的 `build/test`。
+把它们改为 `${CMAKE_SOURCE_DIR}/test/...` 后，从当前 checkout 重新执行：
+
+```bash
+source ./sourceme.sh
+cmake -S . -B build
+ctest --test-dir build --output-on-failure
+```
+
+结果为 `20/20` 通过、总用时 `658.08 s`。其中既有上游 SR/通用测试、真实
+He4/O16 单参考生产退化、四核相关参考 m-scheme oracle（`505.11 s`）、
+分母、作业生成器、严格尾部诊断和下游格式窗均在同一次 CTest 中通过。
+结合 P0--P4 的 QCombo/显式 Fock-space、十倍 ODE 容差、严格残差、NCSM
+读回以及 emax12 容量证据，当前声明的 `Jref=0, lambda3=0, NN/NO2B,
+direct-flow` 生产 C++ J-scheme MR-IMSRG 范围没有未关闭的实现或验收项。
+这不扩大范围到显式 3N、`lambda3`、非标量参考、Magnus 或有限-s IM-NCSM
+效果研究。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和

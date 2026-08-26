@@ -796,12 +796,18 @@ install(FILES ${HEADERS}
 include(CTest)
 list(APPEND CMAKE_CTEST_ARGUMENTS "--verbose")
 # Unit Tests
-add_test(NAME Commutators2 COMMAND  python3 ../test/UnitTestCommutators2.py )
-add_test(NAME Commutators3 COMMAND  python3 ../test/UnitTestCommutators3.py )
-add_test(NAME Factorized   COMMAND  python3 ../test/UnitTestFactorized.py )
-add_test(NAME Triples      COMMAND  python3 ../test/UnitTestTriples.py )
-add_test(NAME Tensor       COMMAND  python3 ../test/UnitTestTensor.py )
-add_test(NAME NormalOrdering    COMMAND  python3 ../test/UnitTestNormalOrdering.py )
+add_test(NAME Commutators2
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestCommutators2.py)
+add_test(NAME Commutators3
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestCommutators3.py)
+add_test(NAME Factorized
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestFactorized.py)
+add_test(NAME Triples
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestTriples.py)
+add_test(NAME Tensor
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestTensor.py)
+add_test(NAME NormalOrdering
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestNormalOrdering.py)
 add_test(NAME MRReference COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRReference.py)
 add_test(NAME MRDriver COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRDriver.py
                                --imsrg-executable $<TARGET_FILE:imsrg++>)
