@@ -170,9 +170,11 @@ Operator IMSRGSolver::EvaluateBCHProduct(Operator& d_omega,
 }
 
 Operator IMSRGSolver::EvaluateMagnusDerivative(const Operator& omega,
-                                                const Operator& eta) const
+                                                const Operator& eta,
+                                                double relative_threshold) const
 {
-  return BCH::MagnusDerivative(omega, eta, mr_reference);
+  return BCH::MagnusDerivative(
+      omega, eta, mr_reference, relative_threshold);
 }
 
 void IMSRGSolver::SetOmega(size_t i, Operator &om)

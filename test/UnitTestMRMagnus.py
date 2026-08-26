@@ -172,10 +172,11 @@ def main():
         assert max(product_errors) < 1e-10
 
         actual_derivative = operator_to_mscheme(
-            solver.EvaluateMagnusDerivative(omega, d_omega), orbits
+            solver.EvaluateMagnusDerivative(omega, d_omega, 0.0), orbits
         )
         expected_derivative = magnus_derivative(
-            oracle_omega, oracle_domega, densities
+            oracle_omega, oracle_domega, densities,
+            relative_threshold=0.0,
         )
         derivative_errors = errors(actual_derivative, expected_derivative)
         print(
@@ -185,6 +186,16 @@ def main():
             f"two={derivative_errors[2]:.3e}"
         )
         assert max(derivative_errors) < 1e-10
+
+        actual_production_derivative = operator_to_mscheme(
+            solver.EvaluateMagnusDerivative(omega, d_omega), orbits
+        )
+        expected_production_derivative = magnus_derivative(
+            oracle_omega, oracle_domega, densities
+        )
+        assert max(errors(
+            actual_production_derivative, expected_production_derivative
+        )) < 1e-10
     finally:
         pyIMSRG.BCH.Set_BCH_Transform_Threshold(1e-9)
         pyIMSRG.BCH.Set_BCH_Product_Threshold(1e-4)

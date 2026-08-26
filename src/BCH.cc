@@ -396,13 +396,17 @@ namespace BCH
   /// Evaluate dOmega/ds = sum_k B_k/k! ad_Omega^k(Eta).
   ///
   /// The finite list is the same Bernoulli sequence already used by
-  /// BCH_Product.  Keeping every term through k=8 avoids an accidental early
-  /// stop at a vanishing odd Bernoulli number.  Production Magnus integration
-  /// keeps each Omega segment small, for which the retained k=8 contribution
-  /// is far below the ODE tolerance.
+  /// BCH_Product.  Following Vobig Eq. (4.6.7), production stops only at a
+  /// nonzero Bernoulli order k>=2 when the new term is small relative to the
+  /// accumulated derivative and all nested-commutator norms have decreased.
+  /// A zero threshold is the exact k<=8 algebra-test mode.
   Operator MagnusDerivative(const Operator &Omega, const Operator &Eta,
-                             const MRReference *mr_reference)
+                             const MRReference *mr_reference,
+                             double relative_threshold)
   {
+    if (relative_threshold < 0.0)
+      throw std::invalid_argument(
+          "MagnusDerivative relative threshold must be non-negative");
     if (Omega.GetJRank() != 0 || Omega.GetTRank() != 0 ||
         Omega.GetParity() != 0 || Eta.GetJRank() != 0 ||
         Eta.GetTRank() != 0 || Eta.GetParity() != 0)
@@ -417,11 +421,25 @@ namespace BCH
 
     Operator derivative = Eta;
     Operator nested = Eta;
+    double previous_nested_norm = nested.Norm();
+    bool monotonically_decreasing = true;
     for (size_t order = 1; order < bernoulli.size(); ++order)
     {
       nested = EvaluateScalarCommutator(Omega, nested, mr_reference);
+      const double nested_norm = nested.Norm();
+      if (previous_nested_norm > 0.0 &&
+          nested_norm >= previous_nested_norm)
+        monotonically_decreasing = false;
       if (bernoulli[order] != 0.0)
-        derivative += (bernoulli[order] / factorial[order]) * nested;
+      {
+        Operator term = (bernoulli[order] / factorial[order]) * nested;
+        derivative += term;
+        if (relative_threshold > 0.0 && order >= 2 &&
+            monotonically_decreasing &&
+            term.Norm() < relative_threshold * derivative.Norm())
+          return derivative;
+      }
+      previous_nested_norm = nested_norm;
     }
     return derivative;
   }

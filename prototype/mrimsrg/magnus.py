@@ -169,19 +169,36 @@ def magnus_derivative(
     omega: MRHamiltonian,
     eta: MRHamiltonian,
     densities: Densities,
+    *,
+    relative_threshold: float = 1e-2,
 ) -> MRHamiltonian:
-    """Return the k<=8 Bernoulli series for ``dOmega/ds``.
+    """Return the production Bernoulli series for ``dOmega/ds``.
 
-    This mirrors the production scalar implementation exactly and is kept
-    separate from the finite-step BCH-product oracle.
+    Set ``relative_threshold=0`` to retain every term through k=8.  Positive
+    values implement Vobig Eq. (4.6.7) together with the monotonic nested-norm
+    guard of Eq. (4.6.8).
     """
+    if relative_threshold < 0.0:
+        raise ValueError("relative_threshold must be non-negative")
     derivative = eta
     nested = eta
+    previous_nested_norm = operator_norm(nested)
+    monotonically_decreasing = True
     for order in range(1, len(BERNOULLI)):
         nested = commutator(omega, nested, densities)
+        nested_norm = operator_norm(nested)
+        if previous_nested_norm > 0.0 and nested_norm >= previous_nested_norm:
+            monotonically_decreasing = False
         if BERNOULLI[order] != 0.0:
-            derivative = add(
-                derivative,
-                scale(nested, BERNOULLI[order] / FACTORIAL[order]),
-            )
+            term = scale(nested, BERNOULLI[order] / FACTORIAL[order])
+            derivative = add(derivative, term)
+            if (
+                relative_threshold > 0.0
+                and order >= 2
+                and monotonically_decreasing
+                and operator_norm(term)
+                < relative_threshold * operator_norm(derivative)
+            ):
+                return derivative
+        previous_nested_norm = nested_norm
     return derivative

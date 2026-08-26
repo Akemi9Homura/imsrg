@@ -75,8 +75,11 @@
       最大变化 `0.4668 keV`；所有分段 `Omega` anti-Hermitian、Hamiltonian
       Hermitian，真空物化/J64/no2bpack 均读回，float32 packing 误差最多
       `1.09 eV`。
-- [ ] 完整 CTest、sanitizer、emax4/6 性能门通过；资源超过本机能力时按
-      `CLAUDE.md` 使用 point7 Slurm，最后更新机器证据、commit 并 push。
+- [x] 完整 Release CTest `21/21` 以 `411.32 s` 通过；ASan+UBSan 的
+      `MRMagnus/MRSRDriver/MRJobGenerator` 以 `10.03 s` 通过。论文
+      Bernoulli 停止条件下，emax4/6 的 `s=1e-4` 单线程生产短流分别为
+      `0.64/5.59 s`、峰值 `61.5/390.1 MiB`，均写出 J64；相对固定做到
+      `k=8` 的输出逐位相同，scalar commutator 数从 `65` 降到 `23`。
 
 ## P0：生产版 C++ J-scheme MR-IMSRG(2)
 

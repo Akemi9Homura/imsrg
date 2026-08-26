@@ -890,8 +890,10 @@ BCH 另造近似收缩。当前不处理 rank-J 非零张量算符。
 以 `BCH_Product(ds*eta,Omega_old)` 合成有限变换。它适合检查 BCH-product
 代数，但真实 He4 有限流表明默认 `domega=0.1` 没有达到 keV 稳定性。因此
 它保留为 oracle，生产入口改用论文中的完整 Bernoulli ODE：已有
-`method=magnus_adaptive` 现在逐阶计算到 `k=8`，每层 scalar commutator 均
-接到 MR dispatcher，并以原生 `ode_tolerance/dsmax/omega_norm_max` 做
+`method=magnus_adaptive` 现在最多逐阶计算到 `k=8`，并按 Vobig
+Eqs. (4.6.7),(4.6.8) 在非零 Bernoulli 阶用相对 `1e-2` 项阈值和嵌套范数
+单调性停止；每层 scalar commutator 均接到 MR dispatcher，并以原生
+`ode_tolerance/dsmax/omega_norm_max` 做
 Dormand--Prince RK45 和分段。每个 RHS 仍由
 `exp(Omega) Hstart exp(-Omega)` 的 MR-BCH 重建 Hamiltonian。direct flow
 保留作独立交叉验证。
@@ -979,3 +981,17 @@ J-scheme 导数展开到 m-scheme 的最坏差为 `2.17e-19`。同一 He4 点用
 最大矩阵元变化 `0.2708 keV`，三条 `Nmax=8` 能级最大变化 `0.4668 keV`；
 J64/no2bpack 差最多 `1.09 eV`。因此生产生成器最终固定为
 `method=magnus_adaptive`，Euler 仅保留为代数与收敛 oracle。
+
+完整 Release CTest 的 `21/21` 项以 `411.32 s` 通过，其中四核相关参考
+oracle 为 `411.32 s`；Bernoulli 停止条件改动后又单独通过
+`MRMagnus/MRSRDriver/MRJobGenerator`，`He4/O16 Nrefmax=0` 的 adaptive
+MR/SR driver 在 `s=0,1e-4` 的所有 J64 rank 均为零差。独立 ASan+UBSan
+构建下这三项以 `10.03 s` 通过。真实相关 He4 adaptive driver 与同参数
+library 路径的 0B/1B/2B 最坏差为 `3.55e-15 MeV`。
+
+Vobig Eqs. (4.6.7),(4.6.8) 的 Bernoulli 相对项停止门将 emax4/6
+`s=1e-4` 单线程流的 scalar commutator 数从固定 `k=8` 的 `65` 降至 `23`。
+emax4 wall 从 `1.63` 降至 `0.64 s`，峰值约 `61.5 MiB`；emax6 从
+`14.31` 降至 `5.59 s`，峰值约 `390.1 MiB`。两空间停止版与固定做到
+`k=8` 的 J64 输出在 0B/1B/2B 上均逐位相同。这是计算能力/实现门，不把
+`s=1e-4` 称作已脱耦的物理 Hamiltonian。
