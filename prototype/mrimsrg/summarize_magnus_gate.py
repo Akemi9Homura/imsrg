@@ -133,6 +133,49 @@ def diagonalize(
     return energies
 
 
+def validate_omega_files(
+    executable: Path,
+    root: Path,
+    *,
+    nucleus: str,
+    emax: int,
+    hw: float,
+    tolerance: float,
+) -> dict[str, object]:
+    omega_paths = sorted(root.glob("*_Omega_*"))
+    if not omega_paths:
+        return {
+            "schema": "imsrg_scalar_omega_validation_v1",
+            "files": 0,
+            "passed": False,
+            "reason": "no Omega segments were materialized",
+            "executable": str(executable.resolve()),
+            "executable_sha256": sha256(executable),
+            "returncode": None,
+        }
+    command = [
+        str(executable),
+        "--emax", str(emax),
+        "--hw", str(hw),
+        "--reference", nucleus,
+        "--tolerance", str(tolerance),
+        *(str(path) for path in omega_paths),
+    ]
+    completed = subprocess.run(command, text=True, capture_output=True)
+    json_lines = [
+        line for line in completed.stdout.splitlines() if line.startswith("{")
+    ]
+    if not json_lines:
+        raise RuntimeError(
+            "Omega validator returned no JSON report:\n" + completed.stderr
+        )
+    report = json.loads(json_lines[-1])
+    report["executable"] = str(executable.resolve())
+    report["executable_sha256"] = sha256(executable)
+    report["returncode"] = completed.returncode
+    return report
+
+
 def profile(root: Path) -> dict[str, object]:
     flow = parse_flow(unique(root, "flow_*.dat"))
     log_path = unique(root, "log_*.txt")
@@ -168,6 +211,14 @@ def summarize(args: argparse.Namespace) -> dict[str, object]:
     tight = profile(args.tight)
     matrix = compare_jcoupled64(default["jcoupled64"], tight["jcoupled64"])
     for entry in (default, tight):
+        entry["omega_validation"] = validate_omega_files(
+            args.omega_validator,
+            Path(entry["root"]),
+            nucleus=args.nucleus,
+            emax=matrix["emax"],
+            hw=matrix["hw"],
+            tolerance=args.omega_tolerance,
+        )
         entry["jcoupled64_sha256"] = sha256(entry["jcoupled64"])
         entry["no2bpack_sha256"] = sha256(entry["no2bpack"])
         entry["jcoupled64_energies_mev"] = diagonalize(
@@ -221,6 +272,12 @@ def summarize(args: argparse.Namespace) -> dict[str, object]:
         "omega_segments_materialized": omega_segments_are_materialized(
             default, tight
         ),
+        "omega_antihermiticity": (
+            default["omega_validation"]["passed"]
+            and tight["omega_validation"]["passed"]
+            and default["omega_validation"]["returncode"] == 0
+            and tight["omega_validation"]["returncode"] == 0
+        ),
     }
     return {
         "schema": "mrimsrg_magnus_gate_v1",
@@ -255,6 +312,7 @@ def main() -> None:
     parser.add_argument("--tight", required=True, type=Path)
     parser.add_argument("--interaction", required=True, type=Path)
     parser.add_argument("--validator", required=True, type=Path)
+    parser.add_argument("--omega-validator", required=True, type=Path)
     parser.add_argument("--Z", dest="proton_number", required=True, type=int)
     parser.add_argument("--N", dest="neutron_number", required=True, type=int)
     parser.add_argument("--nmax", required=True, type=int)
@@ -263,6 +321,7 @@ def main() -> None:
     parser.add_argument("--endpoint-tolerance", type=float, default=1e-4)
     parser.add_argument("--spectral-tolerance-mev", type=float, default=1e-3)
     parser.add_argument("--packing-tolerance-mev", type=float, default=5e-6)
+    parser.add_argument("--omega-tolerance", type=float, default=1e-10)
     parser.add_argument("--json", required=True, type=Path)
     args = parser.parse_args()
     report = summarize(args)

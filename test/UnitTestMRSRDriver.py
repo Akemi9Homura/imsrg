@@ -4,6 +4,7 @@
 
 import os
 from pathlib import Path
+import json
 import subprocess
 import sys
 import tempfile
@@ -83,6 +84,48 @@ def run_driver(
         omega_files = tuple(root.glob(int_prefix.name + "_Omega_*"))
         if not omega_files or any(path.stat().st_size == 0 for path in omega_files):
             raise RuntimeError(f"{label} did not materialize Omega")
+        omega_validator = executable.parent / "imsrg_operator_validate"
+        completed = subprocess.run(
+            [
+                str(omega_validator),
+                "--emax", "2",
+                "--hw", "20",
+                "--reference", nucleus,
+                *(str(path) for path in sorted(omega_files)),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            print(completed.stdout)
+            print(completed.stderr, file=sys.stderr)
+            raise RuntimeError(f"{label} wrote an invalid Omega payload")
+        report = json.loads(completed.stdout.splitlines()[-1])
+        if not report["passed"] or report["files"] != len(omega_files):
+            raise RuntimeError(f"{label} Omega validation report is inconsistent")
+        if mr and nucleus == "He4" and method == "magnus_adaptive" and smax == 0.0:
+            invalid_path = root / "invalid_antihermitian_omega.bin"
+            invalid_modelspace = pyIMSRG.ModelSpace(2, nucleus, nucleus)
+            invalid_omega = pyIMSRG.Operator(invalid_modelspace)
+            invalid_omega.ReadBinary(str(sorted(omega_files)[0]))
+            invalid_omega.SetOneBodyME(0, 0, 1e-3)
+            invalid_omega.WriteBinary(str(invalid_path))
+            rejected = subprocess.run(
+                [
+                    str(omega_validator),
+                    "--emax", "2",
+                    "--hw", "20",
+                    "--reference", nucleus,
+                    str(invalid_path),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            rejected_report = json.loads(rejected.stdout.splitlines()[-1])
+            if rejected.returncode == 0 or rejected_report["passed"]:
+                raise RuntimeError("Omega validator accepted a numerical symmetry violation")
     return output
 
 

@@ -758,6 +758,17 @@ target_link_libraries(
     OpenMP::OpenMP_CXX
 )
 
+add_executable(
+    imsrg_operator_validate
+    imsrg_operator_validate.cc
+)
+target_link_libraries(
+    imsrg_operator_validate
+    PRIVATE
+    IMSRG
+    OpenMP::OpenMP_CXX
+)
+
 
 #target_link_libraries(
 #    UnitTest

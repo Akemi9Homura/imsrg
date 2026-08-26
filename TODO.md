@@ -122,7 +122,9 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       拒步计数均为零；point7 原生 gate JSON 已写入被忽略的结果目录
       `result/mr-jscheme-magnus/gates/`。当前 Release 完整回归含新增 gate
       测试，`22/22` 以 `518.68 s` 通过；gate 同时要求 default/tight
-      均实际写出至少一个非空 `Omega` 段。
+      均实际写出至少一个非空 `Omega` 段，并由链接生产 `Operator` 的
+      C++ checker 读回检查标量量子数、有限性及 0B/1B/2B
+      anti-Hermiticity；测试同时确认人为破坏的对角 1B 元素会被拒绝。
 - [ ] `He4/O16 Nrefmax=2` default 长流 jobs `100600/100606` 已启动并
       通过输入、参考态和 `Omega` 写出检查；完成后以各自实际
       停止 `s` 生成同终点 tight 复算。
