@@ -173,15 +173,19 @@ namespace
     return result;
   }
 
-  double MatrixElement(const arma::mat &matrix, const TwoBodyChannel &channel,
-                       index_t a, index_t b, index_t c, index_t d)
+  void MatrixElements(const arma::mat &first, const arma::mat &second,
+                      const TwoBodyChannel &channel,
+                      index_t a, index_t b, index_t c, index_t d,
+                      double &first_value, double &second_value)
   {
+    first_value = 0.0;
+    second_value = 0.0;
     Orbit &oa = channel.modelspace->GetOrbit(a);
     Orbit &ob = channel.modelspace->GetOrbit(b);
     Orbit &oc = channel.modelspace->GetOrbit(c);
     Orbit &od = channel.modelspace->GetOrbit(d);
     if (!channel.CheckChannel_ket(&oa, &ob) || !channel.CheckChannel_ket(&oc, &od))
-      return 0.0;
+      return;
     double phase = 1.0;
     if (a > b)
     {
@@ -199,7 +203,8 @@ namespace
       phase *= std::sqrt(2.0);
     if (c == d)
       phase *= std::sqrt(2.0);
-    return phase * matrix(ibra, iket);
+    first_value = phase * first(ibra, iket);
+    second_value = phase * second(ibra, iket);
   }
 
   struct StandardProducts
@@ -234,18 +239,22 @@ namespace
     }
   };
 
-  double ActiveRowMatrixElement(const arma::mat &active_rows,
-                                const std::vector<int> &pair_to_active_row,
-                                const TwoBodyChannel &channel,
-                                index_t a, index_t b, index_t c, index_t d)
+  void ActiveRowMatrixElements(const arma::mat &first_active_rows,
+                               const arma::mat &second_active_rows,
+                               const std::vector<int> &pair_to_active_row,
+                               const TwoBodyChannel &channel,
+                               index_t a, index_t b, index_t c, index_t d,
+                               double &first_value, double &second_value)
   {
+    first_value = 0.0;
+    second_value = 0.0;
     Orbit &oa = channel.modelspace->GetOrbit(a);
     Orbit &ob = channel.modelspace->GetOrbit(b);
     Orbit &oc = channel.modelspace->GetOrbit(c);
     Orbit &od = channel.modelspace->GetOrbit(d);
     if (!channel.CheckChannel_ket(&oa, &ob) ||
         !channel.CheckChannel_ket(&oc, &od))
-      return 0.0;
+      return;
     double phase = 1.0;
     if (a > b)
     {
@@ -260,13 +269,14 @@ namespace
     const size_t ibra = channel.GetLocalIndex(a, b);
     const int active_row = pair_to_active_row[ibra];
     if (active_row < 0)
-      return 0.0;
+      return;
     const size_t iket = channel.GetLocalIndex(c, d);
     if (a == b)
       phase *= std::sqrt(2.0);
     if (c == d)
       phase *= std::sqrt(2.0);
-    return phase * active_rows(active_row, iket);
+    first_value = phase * first_active_rows(active_row, iket);
+    second_value = phase * second_active_rows(active_row, iket);
   }
 
   StandardProducts BuildStandardProducts(const Operator &X, const Operator &Y,
@@ -613,17 +623,21 @@ namespace MRCommutator
       const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
       const double angular_weight = 2 * channel.J + 1.0;
       for (index_t one : modelspace.all_orbits)
-        for (index_t two : modelspace.all_orbits)
+      {
+        const Orbit &o1 = modelspace.GetOrbit(one);
+        for (index_t two : X.GetOneBodyChannel(o1.l, o1.j2, o1.tz2))
         {
-          const Orbit &o1 = modelspace.GetOrbit(one);
-          const Orbit &o2 = modelspace.GetOrbit(two);
-          if (o1.l != o2.l || o1.j2 != o2.j2 || o1.tz2 != o2.tz2)
-            continue;
           for (index_t t : modelspace.all_orbits)
+          {
+            double xly = 0.0;
+            double ylx = 0.0;
+            MatrixElements(products.XLY[ch], products.YLX[ch], channel,
+                           one, t, two, t, xly, ylx);
             raw(one, two, 0) += 0.5 * angular_weight / (o1.j2 + 1.0) *
-                                (MatrixElement(products.XLY[ch], channel, one, t, two, t) -
-                                 MatrixElement(products.YLX[ch], channel, one, t, two, t));
+                                (xly - ylx);
+          }
         }
+      }
     }
     X.profiler.timer["MR comm221 lambda2 IV"] += omp_get_wtime() - section_start;
 
@@ -663,12 +677,10 @@ namespace MRCommutator
           const double angular_weight = 2 * block.J + 1.0;
           v_part_start = omp_get_wtime();
           for (index_t one : modelspace.all_orbits)
-            for (index_t two : modelspace.all_orbits)
+          {
+            const Orbit &o1 = modelspace.GetOrbit(one);
+            for (index_t two : X.GetOneBodyChannel(o1.l, o1.j2, o1.tz2))
             {
-              const Orbit &o1 = modelspace.GetOrbit(one);
-              const Orbit &o2 = modelspace.GetOrbit(two);
-              if (o1.l != o2.l || o1.j2 != o2.j2 || o1.tz2 != o2.tz2)
-                continue;
               for (index_t t : modelspace.all_orbits)
               {
                 const int ibra = block.Find(one, t);
@@ -679,6 +691,7 @@ namespace MRCommutator
                                     (xly(ibra, iket) - ylx(ibra, iket));
               }
             }
+          }
           v_trace_seconds += omp_get_wtime() - v_part_start;
         }
     X.profiler.timer["MR comm221 lambda2 V build"] += v_build_seconds;
@@ -713,32 +726,31 @@ namespace MRCommutator
               continue;
             const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
             const double weight = (2 * J2 + 1.0) / (ot.j2 + 1.0);
-            ly_trace(s, t) += weight *
-                              ActiveRowMatrixElement(
-                                  products.LY_active_rows[ch],
-                                  products.pair_to_active_row[ch],
-                                  channel, s, w, t, w);
-            lx_trace(s, t) += weight *
-                              ActiveRowMatrixElement(
-                                  products.LX_active_rows[ch],
-                                  products.pair_to_active_row[ch],
-                                  channel, s, w, t, w);
+            double ly = 0.0;
+            double lx = 0.0;
+            ActiveRowMatrixElements(
+                products.LY_active_rows[ch], products.LX_active_rows[ch],
+                products.pair_to_active_row[ch], channel,
+                s, w, t, w, ly, lx);
+            ly_trace(s, t) += weight * ly;
+            lx_trace(s, t) += weight * lx;
           }
       }
     X.profiler.timer["MR comm221 lambda2 VI trace"] +=
         omp_get_wtime() - trace_start;
 
     for (index_t one : modelspace.all_orbits)
-      for (index_t two : modelspace.all_orbits)
+    {
+      const Orbit &o1 = modelspace.GetOrbit(one);
+      for (index_t two : X.GetOneBodyChannel(o1.l, o1.j2, o1.tz2))
       {
-        const Orbit &o1 = modelspace.GetOrbit(one);
-        const Orbit &o2 = modelspace.GetOrbit(two);
-        if (o1.l != o2.l || o1.j2 != o2.j2 || o1.tz2 != o2.tz2)
-          continue;
         for (int J1 = 0; J1 <= max_J; ++J1)
           for (index_t t : modelspace.all_orbits)
           {
             const Orbit &ot = modelspace.GetOrbit(t);
+            if (2 * J1 < std::abs(o1.j2 - ot.j2) ||
+                2 * J1 > o1.j2 + ot.j2)
+              continue;
             for (index_t s : modelspace.all_orbits)
             {
               if (ot.j2 != modelspace.GetOrbit(s).j2)
@@ -747,8 +759,10 @@ namespace MRCommutator
               const double lx = lx_trace(s, t);
               if (ly == 0.0 && lx == 0.0)
                 continue;
-              const double x = X.TwoBody.GetTBME_J(J1, J1, one, t, two, s);
-              const double y = Y.TwoBody.GetTBME_J(J1, J1, one, t, two, s);
+              double x = 0.0;
+              double y = 0.0;
+              X.TwoBody.GetTBME_J_twoOps(
+                  Y.TwoBody, J1, J1, one, t, two, s, x, y);
               if (x == 0.0 && y == 0.0)
                 continue;
               raw(one, two, 2) -= (2 * J1 + 1.0) / (o1.j2 + 1.0) *
@@ -756,6 +770,7 @@ namespace MRCommutator
             }
           }
       }
+    }
     X.profiler.timer["MR comm221 lambda2 VI"] += omp_get_wtime() - section_start;
     MR1BResult result = CompleteOneBodyParts(raw, output_hermiticity);
     X.profiler.timer["MR comm221 lambda2 total"] += omp_get_wtime() - total_start;
