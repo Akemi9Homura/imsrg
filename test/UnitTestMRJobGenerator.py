@@ -87,6 +87,7 @@ def main():
             "ode_tolerance=1.0000000000000001e-09",
             "write_H_jcoupled64=",
             "write_H_no2bpack=",
+            "test \"$(git rev-parse HEAD)\" =",
             "/proc/$flow_pid/status",
             "echo wall_seconds=",
             "echo maximum_rss_kib=",
@@ -152,6 +153,7 @@ def main():
         for token in (
             "#SBATCH --partition=c128m1024",
             "#SBATCH --cpus-per-task=128",
+            "test \"$(git rev-parse HEAD)\" =",
             "run_with_rss()",
             "/proc/$sampled_pid/status",
             "echo wall_seconds=",
@@ -162,6 +164,8 @@ def main():
             "--output",
             "--A 4",
             "embed_jref.py",
+            "jref_format.py",
+            "pyimsrg_utils.py",
             "--source",
             "--pyimsrg-dir",
             "converter.time",
@@ -175,10 +179,14 @@ def main():
                 "point7 MR input script still requires unavailable /usr/bin/time")
         for key in (
             "minipack_sha256", "source_reference_sha256", "converter_sha256",
-            "pyimsrg_sha256", "embedder_sha256", "environment_script_sha256",
+            "pyimsrg_sha256", "embedder_sha256", "format_module_sha256",
+            "pyimsrg_loader_sha256", "environment_script_sha256",
         ):
             require(len(input_metadata[key]) == 64,
                     "MR input metadata lost SHA-256: " + key)
+        for key in ("format_module", "pyimsrg_loader"):
+            require(input_metadata[key] in input_contents,
+                    "MR input script does not verify dependency: " + key)
         blocked_sympy_import = r'''\
 import builtins
 original_import = builtins.__import__
@@ -226,6 +234,7 @@ import prototype.mrimsrg.embed_jref
         for token in (
             "#SBATCH --partition=compute_C",
             "#SBATCH --cpus-per-task=64",
+            "test \"$(git rev-parse HEAD)\" =",
             "start_seconds=$SECONDS",
             "maximum_rss_kib=0",
             "/proc/$ncsm_pid/status",

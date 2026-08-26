@@ -367,6 +367,7 @@ export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{library_paths}"
 
 echo repository_commit={repository_commit}
+test "$(git rev-parse HEAD)" = "{repository_commit}"
 echo cumulative_start_s={settings.start_s:.17g}
 echo cumulative_target_s={settings.target_s:.17g}
 echo '{interaction_sha256}  {interaction}' | sha256sum -c -
@@ -460,6 +461,8 @@ def _validate_mr_jscheme_input_settings(settings: MRJschemeInputSettings) -> Non
         (settings.converter, "minipack-to-J64 converter"),
         (settings.pyimsrg_dir / "pyIMSRG.so", "pyIMSRG module"),
         (REPO_ROOT / "prototype" / "mrimsrg" / "embed_jref.py", "jref embedder"),
+        (REPO_ROOT / "prototype" / "mrimsrg" / "jref_format.py", "jref format module"),
+        (REPO_ROOT / "prototype" / "mrimsrg" / "pyimsrg_utils.py", "pyIMSRG loader"),
         (REPO_ROOT / "sourceme.sh", "repository environment"),
     ):
         if not path.is_file():
@@ -475,6 +478,8 @@ def generate_mr_jscheme_input_slurm(settings: MRJschemeInputSettings) -> Path:
     pyimsrg_module = (settings.pyimsrg_dir / "pyIMSRG.so").resolve()
     pyimsrg_dir = pyimsrg_module.parent
     embedder = (REPO_ROOT / "prototype" / "mrimsrg" / "embed_jref.py").resolve()
+    format_module = (REPO_ROOT / "prototype" / "mrimsrg" / "jref_format.py").resolve()
+    pyimsrg_loader = (REPO_ROOT / "prototype" / "mrimsrg" / "pyimsrg_utils.py").resolve()
     environment_script = (REPO_ROOT / "sourceme.sh").resolve()
     result_root = settings.result_root.resolve()
     repository_commit = _repository_commit(REPO_ROOT)
@@ -504,6 +509,8 @@ def generate_mr_jscheme_input_slurm(settings: MRJschemeInputSettings) -> Path:
         "converter_sha256": _sha256(converter),
         "pyimsrg_sha256": _sha256(pyimsrg_module),
         "embedder_sha256": _sha256(embedder),
+        "format_module_sha256": _sha256(format_module),
+        "pyimsrg_loader_sha256": _sha256(pyimsrg_loader),
         "environment_script_sha256": _sha256(environment_script),
     }
     nodelist_line = (
@@ -526,6 +533,8 @@ def generate_mr_jscheme_input_slurm(settings: MRJschemeInputSettings) -> Path:
             (hashes["converter_sha256"], converter),
             (hashes["pyimsrg_sha256"], pyimsrg_module),
             (hashes["embedder_sha256"], embedder),
+            (hashes["format_module_sha256"], format_module),
+            (hashes["pyimsrg_loader_sha256"], pyimsrg_loader),
             (hashes["environment_script_sha256"], environment_script),
         )
     )
@@ -546,6 +555,7 @@ export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pyimsrg_dir}:{converter.parent}"
 
 echo repository_commit={repository_commit}
+test "$(git rev-parse HEAD)" = "{repository_commit}"
 {checks}
 if ldd {shlex.quote(str(converter))} | grep 'not found'; then
   exit 1
@@ -603,6 +613,8 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_reference))} {s
         **hashes,
         "pyimsrg_module": str(pyimsrg_module),
         "embedder": str(embedder),
+        "format_module": str(format_module),
+        "pyimsrg_loader": str(pyimsrg_loader),
         "environment_script": str(environment_script),
         "output_jcoupled64": str(output_j64),
         "output_reference": str(output_reference),
@@ -717,6 +729,7 @@ export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
 export OPENBLAS_NUM_THREADS=1
 
 echo repository_commit={repository_commit}
+test "$(git rev-parse HEAD)" = "{repository_commit}"
 echo '{no2bpack_sha256}  {no2bpack}' | sha256sum -c -
 echo '{executable_sha256}  {executable}' | sha256sum -c -
 echo '{environment_script_sha256}  {environment_script}' | sha256sum -c -
