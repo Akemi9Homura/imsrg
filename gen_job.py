@@ -199,6 +199,7 @@ class MRNCSMReadbackSettings:
     cpus: int = 64
     nodelist: Optional[str] = None
     label: Optional[str] = None
+    sample_rss: bool = True
     result_root: Path = REPO_ROOT / "result" / "mr-ncsm-readback"
     executable: Path = REPO_ROOT / "prototype" / "mrimsrg" / "build-emax6" / "mrimsrg_validate"
 
@@ -446,6 +447,32 @@ def generate_mr_ncsm_readback_slurm(settings: MRNCSMReadbackSettings) -> Path:
         "--states", str(settings.states),
         "--max-iter", str(settings.max_iter),
     ])
+    if settings.sample_rss:
+        execution_block = f"""{command} &
+ncsm_pid=$!
+maximum_rss_kib=0
+while kill -0 \"$ncsm_pid\" 2>/dev/null; do
+  current_rss_kib=$(awk '/^VmHWM:/ {{print $2}}' \"/proc/$ncsm_pid/status\" 2>/dev/null || true)
+  if [[ \"$current_rss_kib\" =~ ^[0-9]+$ ]] && (( current_rss_kib > maximum_rss_kib )); then
+    maximum_rss_kib=$current_rss_kib
+  fi
+  sleep 1
+done
+set +e
+wait \"$ncsm_pid\"
+ncsm_status=$?
+set -e
+echo wall_seconds=$((SECONDS - start_seconds))
+echo maximum_rss_kib=$maximum_rss_kib
+exit \"$ncsm_status\""""
+    else:
+        execution_block = f"""set +e
+{command}
+ncsm_status=$?
+set -e
+echo wall_seconds=$((SECONDS - start_seconds))
+echo maximum_rss_kib=not_sampled
+exit \"$ncsm_status\""""
     nodelist_line = (
         f"#SBATCH --nodelist={settings.nodelist}\n" if settings.nodelist else ""
     )
@@ -472,23 +499,7 @@ if ldd {shlex.quote(str(executable))} | grep 'not found'; then
   exit 1
 fi
 start_seconds=$SECONDS
-{command} &
-ncsm_pid=$!
-maximum_rss_kib=0
-while kill -0 "$ncsm_pid" 2>/dev/null; do
-  current_rss_kib=$(awk '/^VmHWM:/ {{print $2}}' "/proc/$ncsm_pid/status" 2>/dev/null || true)
-  if [[ "$current_rss_kib" =~ ^[0-9]+$ ]] && (( current_rss_kib > maximum_rss_kib )); then
-    maximum_rss_kib=$current_rss_kib
-  fi
-  sleep 1
-done
-set +e
-wait "$ncsm_pid"
-ncsm_status=$?
-set -e
-echo wall_seconds=$((SECONDS - start_seconds))
-echo maximum_rss_kib=$maximum_rss_kib
-exit "$ncsm_status"
+{execution_block}
 """
     script_file.write_text(contents, encoding="utf-8")
     script_file.chmod(0o755)
@@ -621,6 +632,10 @@ def parse_args():
     parser.add_argument("--mr-nmax", type=int)
     parser.add_argument("--mr-states", type=int, default=3)
     parser.add_argument("--mr-max-iter", type=int, default=300)
+    parser.add_argument(
+        "--mr-ncsm-no-rss-sampling", action="store_true",
+        help="run the NCSM validator in the foreground without /proc RSS sampling",
+    )
     parser.add_argument("--mr-ncsm-executable", type=Path)
     return parser.parse_args()
 
@@ -721,6 +736,7 @@ if __name__ == "__main__":
                 cpus=args.mr_cpus,
                 nodelist=args.mr_nodelist,
                 label=args.mr_label,
+                sample_rss=not args.mr_ncsm_no_rss_sampling,
                 result_root=(
                     args.mr_result_root
                     if args.mr_result_root is not None

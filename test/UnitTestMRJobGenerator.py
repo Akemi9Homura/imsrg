@@ -161,6 +161,26 @@ def main():
         require(len(ncsm_metadata["executable_sha256"]) == 64,
                 "NCSM executable SHA-256 was not recorded")
 
+        foreground_settings = replace(
+            ncsm_settings,
+            label="flow_s0p02_foreground",
+            sample_rss=False,
+            result_root=root / "ncsm-foreground-result",
+        )
+        foreground_script = generate_mr_ncsm_readback_slurm(foreground_settings)
+        foreground_contents = foreground_script.read_text(encoding="utf-8")
+        foreground_metadata = json.loads(
+            (foreground_script.parent / "metadata.json").read_text(encoding="utf-8")
+        )
+        require("/proc/$ncsm_pid/status" not in foreground_contents,
+                "foreground NCSM script unexpectedly samples /proc")
+        require("maximum_rss_kib=not_sampled" in foreground_contents,
+                "foreground NCSM script does not label RSS as unsampled")
+        require("--nmax 10" in foreground_contents,
+                "foreground NCSM script lost the requested calculation")
+        require(foreground_metadata["settings"]["sample_rss"] is False,
+                "foreground NCSM mode is not recorded in metadata")
+
         try:
             generate_mr_ncsm_readback_slurm(ncsm_settings)
         except FileExistsError:
