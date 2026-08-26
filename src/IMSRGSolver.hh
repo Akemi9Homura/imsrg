@@ -135,6 +135,8 @@ class IMSRGSolver
   Operator EvaluateBCHTransform(const Operator& initial,
                                 const Operator& omega) const;
   Operator EvaluateBCHProduct(Operator& d_omega, Operator& omega) const;
+  Operator EvaluateMagnusDerivative(const Operator& omega,
+                                     const Operator& eta) const;
 
   size_t GetSystemDimension();
   double GetS(){return s;};

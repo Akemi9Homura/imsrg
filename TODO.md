@@ -42,12 +42,17 @@
 - [x] 将 `Solve_magnus_euler`、`NewOmega`、`GatherOmega`、Hamiltonian
       重建与最终 `Transform` 接到同一 dispatcher；删除 driver 对 MR+Magnus
       的拒绝，同时继续拒绝 MR correction/IMSRG(3)/一般流动算符等未验收组合。
-- [x] 保持现有 `method=magnus` 的 `ds_0/dsmax/domega/omega_norm_max`、分段
-      与 checkpoint 语义，不创造 MR 专用 ODE 参数或另一套求解器。
-- [x] 将 `gen_job.py --mr-jscheme` 的唯一生产入口切换为原生
-      `method=magnus`，启用已有 `write_omega`/scratch 输出并在 manifest 中
+- [x] 保持现有 Magnus 的 `ds_0/dsmax/ode_tolerance/omega_norm_max`、分段
+      与 checkpoint 语义，不创造 MR 专用 ODE 参数；原一阶 `method=magnus`
+      保留为有限步 BCH-product oracle。
+- [x] 将 `gen_job.py --mr-jscheme` 的唯一生产入口切换为
+      `method=magnus_adaptive`，启用已有 `write_omega`/scratch 输出并在 manifest 中
       明确记录为本段 `Omega`；生成器不暴露或覆盖 MR 专用步长参数，driver
       回归测试同时验证非空 `Omega` 文件确实写出。
+- [x] 修复已有但未完成的 `magnus_adaptive`：按 Vobig Eq. (4.6.4) 逐阶计算
+      完整 Bernoulli 导数，以 MR dispatcher 计算每个嵌套对易子，并用现有
+      `ode_tolerance/dsmax/omega_norm_max` 做 RK45 与分段；原一阶
+      `method=magnus` 保留为独立 Euler oracle，不用极小 `domega` 掩盖误差。
 
 ### M3. 分层验收
 
@@ -65,9 +70,11 @@
       Magnus(2) 与
       direct-flow IMSRG(2) 长流不要求 bitwise 相同，但差异必须随数值阈值
       稳定并有矩阵元级记录。
-- [ ] 收紧 `ds/domega` 与 BCH 阈值十倍后，变换后 Hamiltonian 和 NCSM
-      低能谱达到既有容差（能量变化 `<1 keV`）；最终 `Omega` anti-Hermitian、
-      Hamiltonian Hermitian，真空物化/J64/no2bpack 读回通过。
+- [x] `He4 Nrefmax=2, s=1` 将 `dsmax/ode_tolerance` 与 BCH 阈值十倍收紧后，
+      Hamiltonian 最大矩阵元变化 `0.2708 keV`，NCSM `Nmax=8` 三条低能级
+      最大变化 `0.4668 keV`；所有分段 `Omega` anti-Hermitian、Hamiltonian
+      Hermitian，真空物化/J64/no2bpack 均读回，float32 packing 误差最多
+      `1.09 eV`。
 - [ ] 完整 CTest、sanitizer、emax4/6 性能门通过；资源超过本机能力时按
       `CLAUDE.md` 使用 point7 Slurm，最后更新机器证据、commit 并 push。
 

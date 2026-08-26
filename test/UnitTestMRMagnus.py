@@ -17,7 +17,11 @@ from prototype.mrimsrg.jcoupling import (  # noqa: E402
     couple_scalar_two_body,
     extract_j_orbits,
 )
-from prototype.mrimsrg.magnus import bch_product, bch_transform  # noqa: E402
+from prototype.mrimsrg.magnus import (  # noqa: E402
+    bch_product,
+    bch_transform,
+    magnus_derivative,
+)
 from prototype.mrimsrg.sr_imsrgpp_check import operator_to_mscheme  # noqa: E402
 
 
@@ -166,6 +170,21 @@ def main():
             f"two={product_errors[2]:.3e}"
         )
         assert max(product_errors) < 1e-10
+
+        actual_derivative = operator_to_mscheme(
+            solver.EvaluateMagnusDerivative(omega, d_omega), orbits
+        )
+        expected_derivative = magnus_derivative(
+            oracle_omega, oracle_domega, densities
+        )
+        derivative_errors = errors(actual_derivative, expected_derivative)
+        print(
+            "MR-Magnus derivative random J->m: "
+            f"zero={derivative_errors[0]:.3e} "
+            f"one={derivative_errors[1]:.3e} "
+            f"two={derivative_errors[2]:.3e}"
+        )
+        assert max(derivative_errors) < 1e-10
     finally:
         pyIMSRG.BCH.Set_BCH_Transform_Threshold(1e-9)
         pyIMSRG.BCH.Set_BCH_Product_Threshold(1e-4)

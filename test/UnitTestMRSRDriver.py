@@ -60,7 +60,7 @@ def run_driver(
         f"intfile={int_prefix}",
         f"write_H_jcoupled64={output}",
     ]
-    if method == "magnus":
+    if method.startswith("magnus"):
         scratch = root / ("scratch_" + label)
         scratch.mkdir()
         command.extend((f"scratch={scratch}", "write_omega=true"))
@@ -79,7 +79,7 @@ def run_driver(
         print(completed.stdout)
         print(completed.stderr, file=sys.stderr)
         raise RuntimeError(f"{label} failed")
-    if method == "magnus":
+    if method.startswith("magnus"):
         omega_files = tuple(root.glob(int_prefix.name + "_Omega_*"))
         if not omega_files or any(path.stat().st_size == 0 for path in omega_files):
             raise RuntimeError(f"{label} did not materialize Omega")
@@ -126,7 +126,7 @@ def main():
             )
             assert reference.Lambda2.Norm() == 0.0
 
-            for method in ("flow_RK4", "magnus"):
+            for method in ("flow_RK4", "magnus", "magnus_adaptive"):
                 for smax in (0.0, 1e-4):
                     mr_output = run_driver(
                         executable,

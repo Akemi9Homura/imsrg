@@ -404,7 +404,8 @@ int main(int argc, char** argv)
     const int requested_target_Z = modelspace.GetTargetZ();
     const bool supported_method = method == "flow" || method == "flow_adaptive" ||
                                   method == "flow_euler" || method == "flow_RK4" ||
-                                  method == "magnus" || method == "magnus_euler";
+                                  method == "magnus" || method == "magnus_euler" ||
+                                  method == "magnus_adaptive";
     if (physical_system != "nuclear" || basis != "oscillator" ||
         !supported_method || nsteps != 1 || input3bme != "none" || IMSRG3 ||
         perturbative_triples || goose_tank || use_brueckner_bch ||

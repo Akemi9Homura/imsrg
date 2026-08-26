@@ -62,9 +62,9 @@ def main():
         require(metadata["cumulative_start_s"] == 40.0, "lost cumulative start s")
         require(metadata["cumulative_target_s"] == 100.0, "lost cumulative target s")
         require(metadata["segment_smax"] == 60.0, "restart segment length is wrong")
-        require(metadata["solver_method"] == "magnus",
+        require(metadata["solver_method"] == "magnus_adaptive",
                 "MR production solver is not fixed to the existing Magnus path")
-        require(metadata["ode_parameter_source"] == "imsrg++ Magnus runtime defaults",
+        require(metadata["ode_parameter_source"] == "imsrg++ adaptive Magnus runtime defaults",
                 "MR Magnus does not record the source of its ODE parameters")
         require(metadata["ode_parameter_overrides"] == [],
                 "MR flow still records wrapper-level ODE overrides")
@@ -79,7 +79,7 @@ def main():
             "hw=20",
             "emax=4",
             "basis=oscillator",
-            "method=magnus",
+            "method=magnus_adaptive",
             "nsteps=1",
             "core_generator=white-ncsm",
             "denominator_partitioning=Epstein_Nesbet",

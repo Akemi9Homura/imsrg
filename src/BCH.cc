@@ -393,6 +393,39 @@ namespace BCH
     return Z;
   }
 
+  /// Evaluate dOmega/ds = sum_k B_k/k! ad_Omega^k(Eta).
+  ///
+  /// The finite list is the same Bernoulli sequence already used by
+  /// BCH_Product.  Keeping every term through k=8 avoids an accidental early
+  /// stop at a vanishing odd Bernoulli number.  Production Magnus integration
+  /// keeps each Omega segment small, for which the retained k=8 contribution
+  /// is far below the ODE tolerance.
+  Operator MagnusDerivative(const Operator &Omega, const Operator &Eta,
+                             const MRReference *mr_reference)
+  {
+    if (Omega.GetJRank() != 0 || Omega.GetTRank() != 0 ||
+        Omega.GetParity() != 0 || Eta.GetJRank() != 0 ||
+        Eta.GetTRank() != 0 || Eta.GetParity() != 0)
+      throw std::invalid_argument(
+          "MagnusDerivative currently supports scalar operators only");
+
+    const std::vector<double> bernoulli = {
+        1.0, -0.5, 1. / 6, 0.0, -1. / 30, 0.0, 1. / 42, 0.0,
+        -1. / 30};
+    const std::vector<double> factorial = {
+        1.0, 1.0, 2.0, 6.0, 24.0, 120.0, 720.0, 5040.0, 40320.0};
+
+    Operator derivative = Eta;
+    Operator nested = Eta;
+    for (size_t order = 1; order < bernoulli.size(); ++order)
+    {
+      nested = EvaluateScalarCommutator(Omega, nested, mr_reference);
+      if (bernoulli[order] != 0.0)
+        derivative += (bernoulli[order] / factorial[order]) * nested;
+    }
+    return derivative;
+  }
+
   double EstimateBCHError(Operator &Omega, Operator H)
   {
      return 0; // This is not ready for prime time.

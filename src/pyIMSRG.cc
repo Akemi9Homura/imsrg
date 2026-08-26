@@ -671,6 +671,8 @@ PYBIND11_MODULE(pyIMSRG, m)
                py::arg("initial"), py::arg("omega"))
           .def("EvaluateBCHProduct", &IMSRGSolver::EvaluateBCHProduct,
                py::arg("d_omega"), py::arg("omega"))
+          .def("EvaluateMagnusDerivative", &IMSRGSolver::EvaluateMagnusDerivative,
+               py::arg("omega"), py::arg("eta"))
           .def("SetOnly2bEta", [](IMSRGSolver &self, bool tf)
                { self.GetGenerator().SetOnly2bEta(tf); })
           .def("SetDenominatorCutoff", &IMSRGSolver::SetDenominatorCutoff)

@@ -169,6 +169,12 @@ Operator IMSRGSolver::EvaluateBCHProduct(Operator& d_omega,
   return BCH::BCH_Product(d_omega, omega, mr_reference);
 }
 
+Operator IMSRGSolver::EvaluateMagnusDerivative(const Operator& omega,
+                                                const Operator& eta) const
+{
+  return BCH::MagnusDerivative(omega, eta, mr_reference);
+}
+
 void IMSRGSolver::SetOmega(size_t i, Operator &om)
 {
   if ((i + 1) > Omega.size())
@@ -237,7 +243,8 @@ void IMSRGSolver::Solve()
   {
     if (method != "flow" && method != "flow_adaptive" &&
         method != "flow_euler" && method != "flow_RK4" &&
-        method != "magnus" && method != "magnus_euler")
+        method != "magnus" && method != "magnus_euler" &&
+        method != "magnus_adaptive")
       throw std::invalid_argument(
           "MR-IMSRG supports direct flow and the production Magnus solver only");
     if (FlowingOps.size() != 1)
@@ -906,7 +913,7 @@ void IMSRGSolver::operator()(const std::deque<Operator> &x, std::deque<Operator>
     generator.Update(H_s, Eta);
     if (dxdt.size() < x.size())
       dxdt.resize(x.size());
-    dxdt.back() = Eta - 0.5 * Commutator::Commutator(Omega_s, Eta);
+    dxdt.back() = EvaluateMagnusDerivative(Omega_s, Eta);
   }
   else if (ode_mode == "Restored")
   {
@@ -953,18 +960,74 @@ void IMSRGSolver::operator()(const std::deque<Operator> &x, std::deque<Operator>
 void IMSRGSolver::Solve_ode_magnus()
 {
   ode_mode = "Omega";
+  istep = 0;
+  Elast = H_0->ZeroBody;
+  cumulative_error = 0.0;
+  generator.Update(FlowingOps[0], Eta);
   WriteFlowStatus(std::cout);
   WriteFlowStatus(flowfile);
-  //   using namespace boost::numeric::odeint;
   namespace odeint = boost::numeric::odeint;
-  namespace pl = std::placeholders;
-  //   runge_kutta4<vector<Operator>, double, vector<Operator>, double, vector_space_algebra> stepper;
-  odeint::runge_kutta4<std::deque<Operator>, double, std::deque<Operator>, double, odeint::vector_space_algebra> stepper;
-  auto system = *this;
-  auto monitor = ode_monitor;
-  //   size_t steps = integrate_const(stepper, system, Omega, s, smax, ds, monitor);
-  odeint::integrate_const(stepper, system, Omega, s, smax, ds, monitor);
-  monitor.report();
+  using error_stepper = odeint::runge_kutta_dopri5<
+      std::deque<Operator>, double, std::deque<Operator>, double,
+      odeint::vector_space_algebra>;
+  auto controlled = odeint::make_controlled<error_stepper>(
+      ode_e_abs, ode_e_rel);
+
+  std::deque<Operator> state{Omega.back()};
+  double current_s = s;
+  double trial_step = std::min(ds, ds_max);
+  auto system = [this](const std::deque<Operator>& x,
+                       std::deque<Operator>& dxdt, const double)
+  {
+    const Operator& omega = x.back();
+    if ((Omega.size() + n_omega_written) > 1)
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, omega);
+    else
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, omega);
+    generator.Update(FlowingOps[0], Eta);
+    if (dxdt.size() != 1)
+      dxdt.resize(1);
+    if (Eta.Norm() < eta_criterion)
+      dxdt.back() = 0.0 * Eta;
+    else
+      dxdt.back() = EvaluateMagnusDerivative(omega, Eta);
+  };
+
+  while (current_s < smax)
+  {
+    Omega.back() = state.back();
+    if ((Omega.size() + n_omega_written) > 1)
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
+    else
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
+    generator.Update(FlowingOps[0], Eta);
+    if (Eta.Norm() < eta_criterion)
+      break;
+
+    trial_step = std::min({trial_step, ds_max, smax - current_s});
+    const auto result = controlled.try_step(
+        system, state, current_s, trial_step);
+    if (result != odeint::success)
+      continue;
+
+    s = current_s;
+    ++istep;
+    Omega.back() = state.back();
+    if ((Omega.size() + n_omega_written) > 1)
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
+    else
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
+    generator.Update(FlowingOps[0], Eta);
+    WriteFlowStatus(flowfile);
+    WriteFlowStatus(std::cout);
+
+    if (Omega.back().Norm() > omega_norm_max && current_s < smax)
+    {
+      NewOmega();
+      state.back() = Omega.back();
+    }
+  }
+  ds = trial_step;
 }
 
 #endif

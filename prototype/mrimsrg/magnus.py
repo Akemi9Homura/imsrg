@@ -163,3 +163,25 @@ def bch_product(
         nested_norm = operator_norm(nested)
 
     return BCHProductResult(result, tuple(contributions))
+
+
+def magnus_derivative(
+    omega: MRHamiltonian,
+    eta: MRHamiltonian,
+    densities: Densities,
+) -> MRHamiltonian:
+    """Return the k<=8 Bernoulli series for ``dOmega/ds``.
+
+    This mirrors the production scalar implementation exactly and is kept
+    separate from the finite-step BCH-product oracle.
+    """
+    derivative = eta
+    nested = eta
+    for order in range(1, len(BERNOULLI)):
+        nested = commutator(omega, nested, densities)
+        if BERNOULLI[order] != 0.0:
+            derivative = add(
+                derivative,
+                scale(nested, BERNOULLI[order] / FACTORIAL[order]),
+            )
+    return derivative

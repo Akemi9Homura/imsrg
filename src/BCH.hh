@@ -30,6 +30,8 @@ namespace BCH
                            const MRReference *mr_reference = nullptr);
     Operator Standard_BCH_Transform(const Operator &Op, const Operator &Omega,
                                     const MRReference *mr_reference = nullptr);
+    Operator MagnusDerivative(const Operator &Omega, const Operator &Eta,
+                              const MRReference *mr_reference = nullptr);
     Operator Brueckner_BCH_Transform(const Operator &Op, const Operator &Omega);
 
     double EstimateBCHError(Operator &Omega, Operator H);
