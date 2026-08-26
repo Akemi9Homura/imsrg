@@ -57,15 +57,15 @@ def main():
         contents = script.read_text(encoding="utf-8")
         metadata = json.loads((script.parent / "metadata.json").read_text(encoding="utf-8"))
 
-        require(metadata["schema"] == "mrimsrg_cpp_jscheme_slurm_v2",
+        require(metadata["schema"] == "mrimsrg_cpp_jscheme_slurm_v3",
                 "unexpected manifest schema")
         require(metadata["cumulative_start_s"] == 40.0, "lost cumulative start s")
         require(metadata["cumulative_target_s"] == 100.0, "lost cumulative target s")
         require(metadata["segment_smax"] == 60.0, "restart segment length is wrong")
-        require(metadata["solver_method"] == "flow",
-                "MR production solver is not fixed to the existing flow path")
-        require(metadata["ode_parameter_source"] == "imsrg++ runtime defaults",
-                "MR flow does not record the source of its ODE parameters")
+        require(metadata["solver_method"] == "magnus",
+                "MR production solver is not fixed to the existing Magnus path")
+        require(metadata["ode_parameter_source"] == "imsrg++ Magnus runtime defaults",
+                "MR Magnus does not record the source of its ODE parameters")
         require(metadata["ode_parameter_overrides"] == [],
                 "MR flow still records wrapper-level ODE overrides")
         required_tokens = (
@@ -79,7 +79,7 @@ def main():
             "hw=20",
             "emax=4",
             "basis=oscillator",
-            "method=flow",
+            "method=magnus",
             "nsteps=1",
             "core_generator=white-ncsm",
             "denominator_partitioning=Epstein_Nesbet",
@@ -90,6 +90,9 @@ def main():
             "smax=60",
             "write_H_jcoupled64=",
             "write_H_no2bpack=",
+            "write_omega=true",
+            "scratch=",
+            "compgen -G",
             "echo repository_commit=",
             "/proc/$flow_pid/status",
             "echo wall_seconds=",
@@ -124,6 +127,14 @@ def main():
                 "generated script does not verify sourceme.sh")
         require(metadata["resource_usage"] in contents,
                 "generated script does not preserve sampled flow resources")
+        require(metadata["omega_represents"] == "segment",
+                "Magnus metadata does not identify a segment Omega")
+        require(metadata["omega_segment_start_s"] == 40.0,
+                "Magnus metadata lost its segment start")
+        require(metadata["omega_segment_target_s"] == 100.0,
+                "Magnus metadata lost its segment target")
+        require(metadata["omega_prefix"] in contents,
+                "generated script does not verify written Omega files")
 
         try:
             generate_mr_jscheme_slurm(settings)

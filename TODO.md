@@ -44,6 +44,10 @@
       的拒绝，同时继续拒绝 MR correction/IMSRG(3)/一般流动算符等未验收组合。
 - [x] 保持现有 `method=magnus` 的 `ds_0/dsmax/domega/omega_norm_max`、分段
       与 checkpoint 语义，不创造 MR 专用 ODE 参数或另一套求解器。
+- [x] 将 `gen_job.py --mr-jscheme` 的唯一生产入口切换为原生
+      `method=magnus`，启用已有 `write_omega`/scratch 输出并在 manifest 中
+      明确记录为本段 `Omega`；生成器不暴露或覆盖 MR 专用步长参数，driver
+      回归测试同时验证非空 `Omega` 文件确实写出。
 
 ### M3. 分层验收
 

@@ -37,6 +37,7 @@ def run_driver(
         f"{smax:.8g}_ds{step:.8g}"
     )
     output = root / f"{label}.jcoupled64"
+    int_prefix = root / ("int_" + label)
     command = [
         str(executable),
         f"2bme={input_file}",
@@ -56,9 +57,13 @@ def run_driver(
         "eta_criterion=0",
         "BetaCM=0",
         f"flowfile={root / ('flow_' + label + '.txt')}",
-        f"intfile={root / ('int_' + label)}",
+        f"intfile={int_prefix}",
         f"write_H_jcoupled64={output}",
     ]
+    if method == "magnus":
+        scratch = root / ("scratch_" + label)
+        scratch.mkdir()
+        command.extend((f"scratch={scratch}", "write_omega=true"))
     if mr:
         command.append(f"mr_reference_file={reference_file}")
     environment = os.environ.copy()
@@ -74,6 +79,10 @@ def run_driver(
         print(completed.stdout)
         print(completed.stderr, file=sys.stderr)
         raise RuntimeError(f"{label} failed")
+    if method == "magnus":
+        omega_files = tuple(root.glob(int_prefix.name + "_Omega_*"))
+        if not omega_files or any(path.stat().st_size == 0 for path in omega_files):
+            raise RuntimeError(f"{label} did not materialize Omega")
     return output
 
 

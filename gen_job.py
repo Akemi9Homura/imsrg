@@ -178,7 +178,7 @@ class MRJschemeSettings:
     cpus: int = 64
     nodelist: Optional[str] = None
     label: Optional[str] = None
-    result_root: Path = REPO_ROOT / "result" / "mr-jscheme-flow"
+    result_root: Path = REPO_ROOT / "result" / "mr-jscheme-magnus"
     executable: Path = REPO_ROOT / "build" / "src" / "imsrg++"
 
 
@@ -329,7 +329,7 @@ def _validate_mr_jscheme_settings(settings: MRJschemeSettings) -> None:
 
 
 def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
-    """Generate one production C++ J-scheme MR direct-flow Slurm script."""
+    """Generate one production C++ J-scheme MR-Magnus Slurm script."""
     _validate_mr_jscheme_settings(settings)
     interaction = settings.interaction.resolve()
     reference_file = settings.reference_file.resolve()
@@ -361,6 +361,9 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
     prefix = result_dir / tag
     output_j64 = result_dir / f"H_{tag}.jcoupled64"
     output_no2bpack = result_dir / f"H_{tag}.no2bpack"
+    omega_scratch = result_dir / "omega_scratch"
+    omega_scratch.mkdir()
+    omega_prefix = f"{prefix}_Omega_"
     resource_usage = result_dir / "resource_usage.txt"
     manifest = result_dir / "metadata.json"
     nucleus_a = int(re.search(r"\d+", settings.nucleus).group())
@@ -374,7 +377,7 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
         "hw=20",
         f"emax={settings.emax}",
         "basis=oscillator",
-        "method=flow",
+        "method=magnus",
         "nsteps=1",
         "core_generator=white-ncsm",
         "denominator_partitioning=Epstein_Nesbet",
@@ -387,6 +390,8 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
         f"eta_criterion={settings.eta_criterion:.17g}",
         f"flowfile={flow_file}",
         f"intfile={prefix}",
+        f"scratch={omega_scratch}",
+        "write_omega=true",
         f"write_H_jcoupled64={output_j64}",
         f"write_H_no2bpack={output_no2bpack}",
     ]
@@ -448,12 +453,14 @@ if (( flow_status != 0 )); then
 fi
 test -s {shlex.quote(str(output_j64))}
 test -s {shlex.quote(str(output_no2bpack))}
+compgen -G {shlex.quote(omega_prefix + '*')} >/dev/null
 sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
+sha256sum {shlex.quote(omega_prefix)}*
 """
     script_file.write_text(contents, encoding="utf-8")
     script_file.chmod(0o755)
     metadata = {
-        "schema": "mrimsrg_cpp_jscheme_slurm_v2",
+        "schema": "mrimsrg_cpp_jscheme_slurm_v3",
         "repository_commit": repository_commit,
         "repository_state_files": [
             {"path": str(path), "sha256": digest}
@@ -469,9 +476,14 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
         "cumulative_start_s": settings.start_s,
         "cumulative_target_s": settings.target_s,
         "segment_smax": segment_smax,
-        "solver_method": "flow",
-        "ode_parameter_source": "imsrg++ runtime defaults",
+        "solver_method": "magnus",
+        "ode_parameter_source": "imsrg++ Magnus runtime defaults",
         "ode_parameter_overrides": [],
+        "omega_represents": "segment",
+        "omega_segment_start_s": settings.start_s,
+        "omega_segment_target_s": settings.target_s,
+        "omega_prefix": omega_prefix,
+        "omega_scratch": str(omega_scratch),
         "interaction_sha256": interaction_sha256,
         "reference_sha256": reference_sha256,
         "executable_sha256": executable_sha256,
@@ -897,7 +909,7 @@ def parse_args():
     parser.add_argument("--smoke-test", action="store_true", help="run a lightweight script that calls imsrg++ help")
     parser.add_argument(
         "--mr-jscheme", action="store_true",
-        help="generate one production C++ J-scheme MR direct-flow job",
+        help="generate one production C++ J-scheme MR-Magnus job",
     )
     parser.add_argument(
         "--mr-prepare-jscheme", action="store_true",
@@ -989,7 +1001,7 @@ if __name__ == "__main__":
                 result_root=(
                     args.mr_result_root
                     if args.mr_result_root is not None
-                    else REPO_ROOT / "result" / "mr-jscheme-flow"
+                    else REPO_ROOT / "result" / "mr-jscheme-magnus"
                 ),
                 executable=(
                     args.mr_executable

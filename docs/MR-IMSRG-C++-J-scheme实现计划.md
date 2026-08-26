@@ -954,3 +954,11 @@ Hamiltonian，排除 White 分母 cutoff 的非光滑影响。生产 RK4 direct 
 Magnus 步相对 RK4 的 `O(ds^2)` 局部差一致，验证两条实现趋向同一个连续
 MR 流；此前无隙随机 Hamiltonian 会触发 denominator cutoff，不能用作
 ODE 阶数测试。
+
+生产作业生成器现固定调用原生 `method=magnus`，不增加 MR 专用 ODE 输入；
+它启用原 driver 的 `write_omega=true`，使用作业私有 scratch，并逐个校验和
+复制出的 `<intfile>_Omega_*` 文件。manifest schema v3 明确把这些文件标为
+`segment` 变换及其累计流起止点，避免将重启段的 `Omega` 误认为从裸
+Hamiltonian 开始的单一总变换。`UnitTestMRJobGenerator.py` 锁定脚本和
+metadata，`UnitTestMRSRDriver.py` 已由实际 MR/SR Magnus executable 验证
+`Omega` 文件存在且非空。
