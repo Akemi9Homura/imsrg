@@ -1033,6 +1033,10 @@ oracle 为 `411.32 s`；Bernoulli 停止条件改动后又单独通过
 MR/SR driver 在 `s=0,1e-4` 的所有 J64 rank 均为零差。独立 ASan+UBSan
 构建下这三项以 `10.03 s` 通过。真实相关 He4 adaptive driver 与同参数
 library 路径的 0B/1B/2B 最坏差为 `3.55e-15 MeV`。
+独立 Python m-scheme 原型的标准库 `unittest discover` 现注册为 CTest
+`MRPrototype`；其 54 项 RDM、正规序、commutator、J-coupling、生成元、
+direct flow、Magnus 与 I/O 测试以 `2.37 s` 通过，CTest 总数因此由 22
+增至 23。它补充而不替代耗时更长的真实四核 `MRCorrelatedDriver`。
 
 Vobig Eqs. (4.6.7),(4.6.8) 的 Bernoulli 相对项停止门将 emax4/6
 `s=1e-4` 单线程流的 scalar commutator 数从固定 `k=8` 的 `65` 降至 `23`。

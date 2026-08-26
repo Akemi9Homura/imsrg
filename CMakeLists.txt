@@ -74,4 +74,10 @@ if(IMSRG_BUILD_PYTHON_BINDINGS)
         COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/UnitTestTensor.py  
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     )
+    add_test (
+        NAME MRPrototype
+        COMMAND ${PYTHON_EXECUTABLE} -m unittest discover
+                -s ${CMAKE_CURRENT_SOURCE_DIR}/prototype/mrimsrg/tests -v
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
 endif()
