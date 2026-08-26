@@ -1,5 +1,5 @@
 {
-  "schema": "mrimsrg_jscheme_large_space_acceptance_v13",
+  "schema": "mrimsrg_jscheme_large_space_acceptance_v14",
   "implementation_commit": "460a009dff957cd261da429c0e474ac3767c59f5",
   "baseline_profiler_commit": "1f02961a2c8ab9560ece346284ab4dd2d7a25337",
   "shell_model_obs_commit": "4b10afab0218711b0278ef66ad73e88bc7791c34",
@@ -1078,6 +1078,24 @@
     },
     "white_ncsm_monopole_cache_maximum_vacuum_h_abs_vs_previous_mev": 9.308109838457312e-13,
     "white_ncsm_monopole_cache_maximum_ncsm_spectral_abs_vs_previous_mev": 1.1368683772161603e-13,
+    "sanitizer_regression": {
+      "cmake_environment_commit": "04202213b71a46978f88dee205da4f9af5eb4149",
+      "build_type": "RelWithDebInfo",
+      "cxx_flags": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+      "python_host_instrumented": false,
+      "preload_order": ["libasan.so", "libstdc++.so.6"],
+      "asan_options": "detect_leaks=0:halt_on_error=1:abort_on_error=1",
+      "ubsan_options": "print_stacktrace=1:halt_on_error=1",
+      "leak_detection_scope_note": "disabled only in Python-hosted CTest because non-instrumented CPython retains process-global allocations; address and undefined-behaviour failures remain fatal",
+      "mr_reference_seconds": 15.51,
+      "short_suite_seconds": 46.85,
+      "short_suite": ["MRDriver", "MRSRDriver", "MRDenominators", "MRJobGenerator", "MRTailDiagnostic", "MRDownstreamWindow"],
+      "mr_correlated_driver_seconds": 465.57,
+      "normal_build_seven_test_seconds": 41.40,
+      "writebinary_rejection_caught": true,
+      "address_or_undefined_reports": 0,
+      "passed": true
+    },
     "local_regression_passed": true,
     "passed": true
   }

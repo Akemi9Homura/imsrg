@@ -349,7 +349,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       已有结果只作为已知边界保留，不再据此选择流窗、生成元、ODE 或
       Magnus。当前任务重新收敛到 C++ J-scheme MR-IMSRG 本身的实现、验证
       与性能优化。
-- [~] **MR-P0：干净构建与生产测试矩阵。** 从当前提交新建 Release 和
+- [x] **MR-P0：干净构建与生产测试矩阵。** 从当前提交新建 Release 和
       sanitizer build，运行全部 MRReference、正规序往返、命名
       `lambda2` contraction、随机 J↔m oracle、White-NCSM denominator/
       generator、SR dispatcher 退化、六个真实参考态 RHS/checkpoint 与
@@ -361,10 +361,18 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `comm220ss` 空 channel 上发现 Armadillo 空指针引用，已由 commit
       `5dfa32a4` 加严格零贡献保护；修复后 sanitizer 下 MR driver、SR
       退化和 denominator 三项通过；本轮两个优化后的完整四核相关参考
-      sanitizer oracle 也以 `544.38 s` 通过。sanitized `pyIMSRG` 在测试故意触发
-      `WriteBinary` 拒绝覆盖异常时仍有 libasan/CPython `__cxa_throw`
-      interceptor 冲突；这是当前剩余的测试运行环境问题，不能误记为
-      MRReference 数值失败，也不能据此把 sanitizer 项标成完成。
+      sanitizer oracle 也以 `544.38 s` 通过。剩余的 `WriteBinary` 重复写
+      异常已最小复现为 host 环境问题：纯 C `/usr/bin/python3` 启动时尚未
+      加载 libstdc++，预加载 ASan 因而没有 `__cxa_throw` 的真实入口。
+      commit `04202213` 让 sanitizer CTest 保持 libasan 第一并同时预加载
+      libstdc++，还强制 `PYTHONPATH/LD_LIBRARY_PATH` 指向当前 build，避免
+      误载 Release 模块。只对 Python-hosted 测试关闭非 instrumented
+      CPython 的进程退出 LeakSanitizer；AddressSanitizer/UBSan 仍为
+      `halt_on_error=1`。正式 sanitizer `MRReference`（含重复写拒绝）用时
+      `15.51 s` 通过，六项短门禁 `46.85 s` 全通过，完整四体系
+      `MRCorrelatedDriver` 又以 `465.57 s` 通过；普通 build 七项回归
+      `41.40 s` 全通过。因此 MR-P0 的数值、生产入口和 sanitizer 环境均
+      已闭合。
 - [x] **MR-P1：补齐生产入口验收缺口。** 审计 `imsrg++ -> IMSRGSolver ->
       MRCommutator/Generator` 的真实调用链；对任何只在 helper/pybind 层测试、
       未覆盖生产 dispatcher 的路径增加最小回归。`lambda2=0` 必须逐元素
@@ -490,7 +498,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       driver 和同时覆盖空/full/partial channel 的 emax4 短流通过。最后的
       emax12 容量门只放大已通过这些回归的相同 C++ 路径，没有再引入算法
       改动；输入/可执行文件/输出哈希、wall/RSS 与 profiler 已写入
-      `docs/MR-IMSRG-Jscheme-large-space.json` schema v13，本轮 P3 完成。
+      `docs/MR-IMSRG-Jscheme-large-space.json` schema v14，本轮 P3 完成。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

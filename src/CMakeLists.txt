@@ -823,8 +823,9 @@ add_test(NAME MRDownstreamWindow
 # Python itself is not built with the sanitizers.  When an instrumented C++
 # extension is loaded later, ASan cannot install its __cxa_throw interceptor
 # unless libstdc++ is already present.  Keep libasan first, preload libstdc++ as
-# well, and ignore only the non-instrumented CPython interpreter's process-exit
-# leak report.  Address/undefined-behaviour checks remain fatal.  Explicitly
+# well.  LeakSanitizer is disabled for these Python-hosted tests because the
+# non-instrumented CPython interpreter retains process-global allocations;
+# address/undefined-behaviour checks remain fatal.  Explicitly
 # point every MR Python test at the module from this build tree so a sanitizer
 # build cannot silently import the normal Release module.
 set(MR_PYTHON_TESTS

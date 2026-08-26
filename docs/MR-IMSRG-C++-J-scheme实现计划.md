@@ -740,7 +740,32 @@ dense 临时量。这个实测否定了当前新增 V recoupling plan/cache 的�
 MR 路径已不是 emax12 的容量或 wall 主瓶颈，继续复杂化不会有成比例收益。
 本节只验收生产 C++ J-scheme MR 实现和物化能力，不启动 finite-s NCSM
 研究，也不把一步结果称为收敛 Hamiltonian。完整机器记录见
-`MR-IMSRG-Jscheme-large-space.json` schema v13。
+`MR-IMSRG-Jscheme-large-space.json` schema v14。
+
+### 6.2 sanitizer Python 异常门闭环
+
+此前完整 sanitizer 数值路径已经通过，但 `MRReference.WriteBinary()` 的
+“拒绝覆盖已有文件”测试一抛 C++ 异常就由 ASan 在
+`__interceptor___cxa_throw` 内部终止。最小脚本证明 C++ 语义本身正确：
+第一次写成功，第二次确实进入拒绝分支。根因是 `/usr/bin/python3` 是纯 C
+host，ASan 初始化时 libstdc++ 尚未加载，所以 `real___cxa_throw` 为空；
+这不是 MRReference 越界或 pybind 未转换异常。
+
+commit `04202213` 在 CMake 的 MR Python tests 上自动识别 address-sanitized
+build，保持 libasan 为 `LD_PRELOAD` 第一项并同时预加载编译器对应的
+libstdc++。每个测试还把 `PYTHONPATH/LD_LIBRARY_PATH` 固定到自己的 binary
+tree，防止 sanitizer build 意外导入普通 Release `pyIMSRG.so`。由于 host
+CPython 未 instrument 且退出时保留全局分配，Python-hosted tests 设置
+`detect_leaks=0`；这项限制只针对该 CTest 环境，AddressSanitizer 与 UBSan
+仍以 `halt_on_error=1`、ASan `abort_on_error=1` 运行，任何地址或 UB 命中
+都会立即失败。
+
+修复后 ASan+UBSan `MRReference`（包括第二次 `WriteBinary` 抛出并由 Python
+捕获）以 `15.51 s` 通过；`MRDriver/MRSRDriver/MRDenominators/
+MRJobGenerator/MRTailDiagnostic/MRDownstreamWindow` 六项合计 `46.85 s`
+全通过；最重的四体系 `MRCorrelatedDriver` 以 `465.57 s` 通过。普通 build
+对应七项测试合计 `41.40 s` 通过。至此 sanitizer 环境不再是 MR-P0 的
+未决项。
 
 ## 7. 错误定位原则
 
