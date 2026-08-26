@@ -10,6 +10,7 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY))
 
 from prototype.mrimsrg.summarize_magnus_gate import (  # noqa: E402
+    omega_segments_are_materialized,
     parse_energies,
     parse_flow,
     parse_resource_usage,
@@ -56,6 +57,28 @@ def main():
         )
         require(energies == [-3.5, -2.0, -1.5],
                 "NCSM energies were not sorted by state")
+
+        require(
+            omega_segments_are_materialized(
+                {"omega_files": 20, "empty_omega_files": 0},
+                {"omega_files": 21, "empty_omega_files": 0},
+            ),
+            "nonempty Omega segments were rejected",
+        )
+        require(
+            not omega_segments_are_materialized(
+                {"omega_files": 0, "empty_omega_files": 0},
+                {"omega_files": 1, "empty_omega_files": 0},
+            ),
+            "missing Omega segments were accepted",
+        )
+        require(
+            not omega_segments_are_materialized(
+                {"omega_files": 1, "empty_omega_files": 1},
+                {"omega_files": 1, "empty_omega_files": 0},
+            ),
+            "an empty Omega segment was accepted",
+        )
 
     print("MR Magnus gate parser regression passed")
 

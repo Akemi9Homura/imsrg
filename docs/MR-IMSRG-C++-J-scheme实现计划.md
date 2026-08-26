@@ -1118,7 +1118,8 @@ lossless J64。两核所有级数拒步计数为零。
 新增 `prototype/mrimsrg/summarize_magnus_gate.py` 统一读取 flow、
 metadata、resource usage、拒步日志与 `Omega` 段，比较完整
 J64 0B/1B/2B，并分别对角化 J64/no2bpack 后输出 JSON。
-`MRMagnusGate` 回归固定其 flow/resource/NCSM 解析。He4/O16
+`MRMagnusGate` 回归固定其 flow/resource/NCSM 解析，并把 default/tight
+均存在至少一个非空 `Omega` 段列为硬门禁。He4/O16
 default jobs `100600/100606` 正在运行，完成后执行同一门禁。Be8/C12
 已在 point7 计算节点用远程原始产物生成
 `result/mr-jscheme-magnus/gates/Be8.json` 与 `C12.json`，两份

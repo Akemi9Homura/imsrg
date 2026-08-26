@@ -138,6 +138,7 @@ def profile(root: Path) -> dict[str, object]:
     log_path = unique(root, "log_*.txt")
     log = log_path.read_text(encoding="utf-8")
     metadata_path = unique(root, "metadata.json")
+    omega_paths = sorted(root.glob("*_Omega_*"))
     return {
         "root": str(root.resolve()),
         "metadata": json.loads(metadata_path.read_text(encoding="utf-8")),
@@ -145,13 +146,21 @@ def profile(root: Path) -> dict[str, object]:
         "resource_usage": parse_resource_usage(unique(root, "resource_usage.txt")),
         "jcoupled64": unique(root, "H_*.jcoupled64"),
         "no2bpack": unique(root, "H_*.no2bpack"),
-        "omega_files": len(list(root.glob("*_Omega_*"))),
+        "omega_files": len(omega_paths),
+        "empty_omega_files": sum(path.stat().st_size == 0 for path in omega_paths),
         "magnus_series_rejections": log.count("Magnus series rejected"),
         "magnus_series_recovery_segments": log.count(
             "materialized the accepted segment"
         ),
         "log": str(log_path.resolve()),
     }
+
+
+def omega_segments_are_materialized(*entries: dict[str, object]) -> bool:
+    return all(
+        entry["omega_files"] > 0 and entry["empty_omega_files"] == 0
+        for entry in entries
+    )
 
 
 def summarize(args: argparse.Namespace) -> dict[str, object]:
@@ -208,6 +217,9 @@ def summarize(args: argparse.Namespace) -> dict[str, object]:
         "clean_exit": (
             default["resource_usage"].get("exit_status") == 0
             and tight["resource_usage"].get("exit_status") == 0
+        ),
+        "omega_segments_materialized": omega_segments_are_materialized(
+            default, tight
         ),
     }
     return {
