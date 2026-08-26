@@ -1094,6 +1094,12 @@ point7 唯一生产 checkout 已回到
 direct-flow 结果通过 `result/mr-jscheme-flow-legacy-e604e181` 链接统一
 访问。生产 executable SHA-256 为
 `a70a28582d232d675c41a8db26a327b6d29bde8e5cf0317695d7d26745218de5`。
+该 executable 构建于 `b15ac899`；从该提交到当前验收工具提交，
+`BCH.cc`、`IMSRGSolver.cc`、`MRCommutator.cc`、`MRReference.cc`、
+`Generator.cc`、`imsrg++.cc`、`Operator.cc` 和 `TwoBodyME.cc` 的
+`git diff --quiet` 返回零。`src/` 后续变化只有 CMake 注册和独立
+`imsrg_operator_validate`，没有生产物理代码漂移；因此 default/tight
+继续使用同一已冻结 executable/library，不为版本字符串重链后重跑长流。
 He4 的 bare J64/JREF 分别复现已有严格门禁 SHA-256
 `55a3c161...44e2`/`1c9934aa...0898`；四核均从同一固定 NNLOopt
 minipack 按各自 `A` 生成 bare J64。
