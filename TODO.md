@@ -54,7 +54,10 @@
       不允许核特例或测试专用分支。
 - [x] 六个相关/单参考固定体系的首步 `Omega`、零阈值 MR-BCH Hamiltonian
       和默认阈值生产 driver 已逐项复现 Python/C++ oracle。
-- [ ] Magnus 短流还须与 direct flow 在共同截断/步长极限下收敛一致。
+- [x] Magnus 短流与 direct flow 已在同一非零 `lambda2`、有隙小模型中按
+      `ds=1e-2,5e-3,2.5e-3` 比较，Hamiltonian 差为
+      `1.338e-4/3.368e-5/8.447e-6`，比值 `0.252/0.251`，验证共同连续流
+      极限和预期二阶局部差。
       Magnus(2) 与
       direct-flow IMSRG(2) 长流不要求 bitwise 相同，但差异必须随数值阈值
       稳定并有矩阵元级记录。

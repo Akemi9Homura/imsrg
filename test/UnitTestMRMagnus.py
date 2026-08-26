@@ -223,6 +223,66 @@ def main():
     assert bch_sr_error < 1e-14
     assert product_sr_error < 1e-14
 
+    # Direct RK4 and the production first-order Magnus update represent the
+    # same continuous MR flow.  Their one-step difference must therefore
+    # vanish quadratically as the common interval is reduced.
+    flow_hamiltonian = 0.1 * random_scalar_operator(
+        modelspace, layout, np.random.default_rng(424242), +1
+    )
+    for p in range(modelspace.GetNumberOrbits()):
+        orbit_p = modelspace.GetOrbit(p)
+        for q in range(modelspace.GetNumberOrbits()):
+            flow_hamiltonian.SetOneBody(p, q, 0.0)
+        flow_hamiltonian.SetOneBody(
+            p,
+            p,
+            5.0 * (2 * orbit_p.n + orbit_p.l)
+            + 0.05 * p,
+        )
+
+    convergence_errors = []
+    for step in (1e-2, 5e-3, 2.5e-3):
+        direct_solver = pyIMSRG.IMSRGSolver(flow_hamiltonian)
+        direct_solver.SetMRReference(reference)
+        direct_solver.SetGenerator("white-ncsm")
+        direct_solver.SetMethod("flow_RK4")
+        direct_solver.SetEtaCriterion(0.0)
+        direct_solver.SetDs(step)
+        direct_solver.SetDsmax(step)
+        direct_solver.SetSmax(step)
+        direct_solver.Solve()
+
+        magnus_solver = pyIMSRG.IMSRGSolver(flow_hamiltonian)
+        magnus_solver.SetMRReference(reference)
+        magnus_solver.SetGenerator("white-ncsm")
+        magnus_solver.SetMethod("magnus")
+        magnus_solver.SetMagnusAdaptive(False)
+        magnus_solver.SetEtaCriterion(0.0)
+        magnus_solver.SetDs(step)
+        magnus_solver.SetSmax(step)
+        pyIMSRG.BCH.Set_BCH_Transform_Threshold(0.0)
+        pyIMSRG.BCH.Set_BCH_Product_Threshold(0.0)
+        try:
+            magnus_solver.Solve()
+        finally:
+            pyIMSRG.BCH.Set_BCH_Transform_Threshold(1e-9)
+            pyIMSRG.BCH.Set_BCH_Product_Threshold(1e-4)
+        convergence_errors.append(
+            j_operator_error(direct_solver.GetH_s(), magnus_solver.GetH_s())
+        )
+
+    ratios = [
+        convergence_errors[index + 1] / convergence_errors[index]
+        for index in range(2)
+    ]
+    print(
+        "MR direct/Magnus common limit: errors="
+        + ",".join(f"{error:.3e}" for error in convergence_errors)
+        + " ratios="
+        + ",".join(f"{ratio:.3f}" for ratio in ratios)
+    )
+    assert all(0.15 < ratio < 0.35 for ratio in ratios)
+
 
 if __name__ == "__main__":
     main()

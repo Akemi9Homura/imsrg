@@ -945,3 +945,12 @@ commit `382eb3e2` 已把现有 scalar `BCH_Transform`/`BCH_Product`、分段
 MR/SR executable；八组 J64 的 0B/1B/2B 差全部为零。这里验收的是
 MR-Magnus 代数与生产入口，尚未替代后续步长/BCH 阈值稳定性、direct-flow
 共同极限、完整流和 NCSM 谱门。
+
+随后在同一个非零 `lambda2` 的 emax1 参考态上构造有明确单粒子能隙的
+Hamiltonian，排除 White 分母 cutoff 的非光滑影响。生产 RK4 direct flow
+与零阈值生产 Magnus 在共同区间
+`ds=1e-2,5e-3,2.5e-3` 的 Hamiltonian 差依次为
+`1.338e-4,3.368e-5,8.447e-6`，相邻比值为 `0.252,0.251`。这与首阶
+Magnus 步相对 RK4 的 `O(ds^2)` 局部差一致，验证两条实现趋向同一个连续
+MR 流；此前无隙随机 Hamiltonian 会触发 denominator cutoff，不能用作
+ODE 阶数测试。
