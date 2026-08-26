@@ -637,6 +637,28 @@ SR 退化、分母以及 emax4 稀疏活跃行短流也通过。下一轮只继�
 IV/VI 的精确 channel 遍历和临时量；共享 `comm222_phss` 虽已是 emax8
 最大单项，但任何改动都必须另带完整 SR/VS 逐元素与性能门禁。
 
+随后 commit `21760bbf` 只合并 MR 中成对张量的重复查询。IV 的
+`XLY/YLX` 和 VI trace 的 `LY/LX` 共享一次 channel、ket、交换相位及
+normalized-pair 归一化查询；VI 主和直接复用 `imsrg++` 已有的
+`TwoBodyME::GetTBME_J_twoOps()` 同时读取 `X/Y`，并在调用前按精确角动量
+三角条件排除零项。外部 `one/two` 只遍历现有 scalar one-body channel，
+其顺序仍是原轨道序；没有重排任何有效求和，也没有改变公式或密度截断。
+emax4 的 IV/VI/addon 从 `0.00860/0.01415/0.06659 s` 降至
+`0.00404/0.00562/0.05402 s`，emax6 从
+`0.07247/0.15042/0.46645 s` 降至
+`0.02706/0.04122/0.25384 s`，emax8 从
+`0.25080/0.77368/1.91721 s` 降至
+`0.11566/0.19998/1.12244 s`；相邻 emax8 短流 wall 实测为
+`13.86 -> 11.36 s`，峰值仍约 `1.35 GiB`。
+
+emax4/6/8 的流后 J64 相对 `b0c832a8` 冻结输出全部 bitwise 相同，emax6
+的 1/16 线程文件 SHA-256 相同。Release 的随机全活跃参考、生产 MR/SR
+driver、分母和完整四体系 Python m-scheme oracle（`355.27 s`）通过；
+ASan+UBSan 下生产 MR/SR driver 和 emax4 稀疏嵌入短流通过。下一项集中在
+MR V 的 ordered-cross-block build：先检查 active-active Pandya 子块是否
+在 row/column 两次构造中被重复计算，只有能保持全活跃分支和逐位输出时才
+允许消除重复；不转向有限-s NCSM 行为研究。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和

@@ -410,6 +410,20 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       进程峰值下降。下一步只继续审计 MR IV/VI 的 channel 遍历、缓存和
       输出临时量；共享 SR `comm222_phss` 虽是 emax8 总体主瓶颈，但不在
       没有独立 SR/VS 性能与逐元素回归时贸然改动。
+      commit `21760bbf` 完成上述 MR 查询审计：IV 对 `XLY/YLX`、VI trace
+      对 `LY/LX` 各只做一次 channel/ket/交换相位/normalized-pair 查询；
+      VI 主和复用现有 `GetTBME_J_twoOps()` 同时读取 `X/Y`，并在 accessor
+      前只跳过严格违反角动量三角条件或不属于同一 scalar one-body channel
+      的零贡献。有效项次序与算术表达式不变。emax4 的 IV/VI/addon 从
+      `0.00860/0.01415/0.06659 s` 降到
+      `0.00404/0.00562/0.05402 s`；emax6 从
+      `0.07247/0.15042/0.46645 s` 降到
+      `0.02706/0.04122/0.25384 s`；emax8 从
+      `0.25080/0.77368/1.91721 s` 降到
+      `0.11566/0.19998/1.12244 s`。emax8 单次短流 wall 由本轮相邻实测
+      `13.86 s` 降到 `11.36 s`，峰值 RSS 保持约 `1.35 GiB`。当前 MR
+      最大单项已变为 V/build；下一轮先审计 ordered-cross-block 构造是否
+      仍重复生成精确相同的 active-active Pandya 元素，再决定最小改动。
 - [~] **MR-P3：每个优化提交的强制回归。** 每个边界清楚的优化必须先过
       MR-P0/P1 的小空间代数与生产入口测试，再重跑至少一个 emax4/6 RHS
       性能点；要求数值误差保持既有门禁、Hermiticity/anti-Hermiticity 与
@@ -424,6 +438,12 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       跑过稀疏活跃行短流。sanitizer 输出及 emax4/6/8 Release 输出均与
       冻结 J64 bitwise 相同。本轮只验证 RHS/短流实现，不把有限-s NCSM
       行为列为性能优化门禁。
+      成对查询提交 `21760bbf` 又通过相同的 emax4/6/8 bitwise J64 回归、
+      emax6 1/16 线程同 SHA、Release `MRReference`、`MRDriver`、
+      `MRSRDriver`、`MRDenominators` 和完整四体系 oracle（`355.27 s`）。
+      保留在 `/tmp` 的增量 ASan+UBSan 构建已通过 `MRDriver/MRSRDriver`
+      与 emax4 稀疏
+      嵌入短流，未发现 `GetTBME_J_twoOps` 索引或三角筛选问题。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`
