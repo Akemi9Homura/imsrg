@@ -113,6 +113,16 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       `ode_tolerance=1e-6` 收紧为 `1e-7`，不改 `ds_0/dsmax`。
       tight 必须把 `target_s` 固定为 default 的实际停止点并用
       `eta_criterion<=1e-20` 禁用提前停止，禁止比较两个不同流时刻。
+- [x] `Be8 Nrefmax=0` 与 `C12 Nrefmax=0` 的完整 default/同终点
+      tight Magnus 流和 NCSM 读回已通过。二者 default 分别在
+      `s=330.08347/226.53612` 达到残差比
+      `9.78935e-7/9.71606e-7`；十倍收紧的三态最大变化为
+      `0.64841/0.76990 keV`，J64/no2bpack 最大 packing 差为
+      `1.145/3.305 eV`。作业为 `100602/100604/100618/100616`，
+      拒步计数均为零。
+- [ ] `He4/O16 Nrefmax=2` default 长流 jobs `100600/100606` 已启动并
+      通过输入、参考态和 `Omega` 写出检查；完成后以各自实际
+      停止 `s` 生成同终点 tight 复算。
 - [ ] 四核均必须达到目标掩码内解耦残差相对初值 `<1e-6`，
       十倍收紧后 NCSM 验收能级变化 `<1 keV`，并保持 Hermiticity、
       anti-Hermiticity、J64/no2bpack 读回窗和已验收的 m-scheme/SR 极限。

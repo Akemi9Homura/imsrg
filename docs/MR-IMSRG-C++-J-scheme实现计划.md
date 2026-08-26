@@ -1086,3 +1086,37 @@ CTest `21/21` 以 `499.20 s` 通过，其中相关参考态验收项
 为固定 `target_s`，并设 `eta_criterion<=1e-20` 禁用残差提前停止；
 否则两个容差会在略有不同的 `s` 越过门槛，其 Hamiltonian 差混入
 真实流变化，不再是纯 ODE 误差。生成器对该条件作强制检查。
+
+### 8.6 emax2 四核严格 Magnus 门禁
+
+point7 唯一生产 checkout 已回到
+`/tns/mengziyan/mr-imsrg`；原有被 Git 忽略的结果保留，旧的 J-scheme
+direct-flow 结果通过 `result/mr-jscheme-flow-legacy-e604e181` 链接统一
+访问。生产 executable SHA-256 为
+`a70a28582d232d675c41a8db26a327b6d29bde8e5cf0317695d7d26745218de5`。
+He4 的 bare J64/JREF 分别复现已有严格门禁 SHA-256
+`55a3c161...44e2`/`1c9934aa...0898`；四核均从同一固定 NNLOopt
+minipack 按各自 `A` 生成 bare J64。
+
+`Be8 Nrefmax=0` 和 `C12 Nrefmax=0` 已首先完成。default jobs
+`100602/100604` 在 `s=330.08347/226.53612` 停止，最终
+`||eta||/||eta(0)||=9.78935e-7/9.71606e-7`。同终点 tight jobs
+`100618/100616` 禁用提前停止并将 ODE 容差从 `1e-6` 收紧为
+`1e-7`。NCSM `Nmax=0` 三态最大变化分别为
+`0.648406/0.769901 keV`，通过 `<1 keV` 门禁。完整 J64
+default/tight 矩阵元最大差为：
+
+- Be8：0B `0.58385 keV`、1B `0.55189 keV`、2B `0.28986 keV`；
+- C12：0B `1.68784 keV`、1B `0.83744 keV`、2B `0.27109 keV`。
+
+C12 的零体矩阵元差大于 `1 keV`，但后 NCSM 谱差为
+`0.770 keV`；这两个量已分开记录，不用零体项代替谱验收。
+J64/no2bpack 三态最大差为 `1.145/3.305 eV`，符合
+float32 packed 路径的 `5 eV` 四核读回窗；高精度物理比较始终用
+lossless J64。两核所有级数拒步计数为零。
+
+新增 `prototype/mrimsrg/summarize_magnus_gate.py` 统一读取 flow、
+metadata、resource usage、拒步日志与 `Omega` 段，比较完整
+J64 0B/1B/2B，并分别对角化 J64/no2bpack 后输出 JSON。
+`MRMagnusGate` 回归固定其 flow/resource/NCSM 解析。He4/O16
+default jobs `100600/100606` 正在运行，完成后执行同一门禁。

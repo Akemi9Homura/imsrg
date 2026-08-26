@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+"""Summarize one matched-endpoint MR-Magnus production/tight gate."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+import re
+import subprocess
+
+try:
+    from .compare_jcoupled64 import compare as compare_jcoupled64
+except ImportError:
+    from compare_jcoupled64 import compare as compare_jcoupled64
+
+
+ENERGY_PATTERN = re.compile(r"^state=(\d+) E=([-+0-9.eE]+)", re.MULTILINE)
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def unique(root: Path, pattern: str) -> Path:
+    matches = sorted(root.glob(pattern))
+    if len(matches) != 1:
+        raise ValueError(
+            f"expected one {pattern!r} below {root}, found {len(matches)}"
+        )
+    return matches[0]
+
+
+def parse_flow(path: Path) -> dict[str, object]:
+    rows: list[list[float]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        fields = line.split()
+        if len(fields) < 12:
+            continue
+        try:
+            rows.append([float(value) for value in fields[:12]])
+        except ValueError:
+            continue
+    if not rows:
+        raise ValueError(f"flow file contains no status rows: {path}")
+
+    def status(row: list[float]) -> dict[str, object]:
+        eta_components = row[8:11]
+        omega_components = row[5:8]
+        return {
+            "step": int(row[0]),
+            "s": row[1],
+            "zero_body_mev": row[2],
+            "hamiltonian_norm": row[3],
+            "omega_components": omega_components,
+            "omega_norm": math.sqrt(sum(value * value for value in omega_components)),
+            "eta_components": eta_components,
+            "eta_norm": math.sqrt(sum(value * value for value in eta_components)),
+            "scalar_commutators": int(row[11]),
+        }
+
+    initial = status(rows[0])
+    final = status(rows[-1])
+    final["eta_ratio_to_initial"] = (
+        final["eta_norm"] / initial["eta_norm"]
+    )
+    return {
+        "path": str(path.resolve()),
+        "status_rows": len(rows),
+        "initial": initial,
+        "final": final,
+    }
+
+
+def parse_resource_usage(path: Path) -> dict[str, object]:
+    result: dict[str, object] = {"path": str(path.resolve())}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        try:
+            result[key] = int(value)
+        except ValueError:
+            result[key] = value
+    return result
+
+
+def parse_energies(output: str) -> list[float]:
+    states = sorted(
+        (int(index), float(energy))
+        for index, energy in ENERGY_PATTERN.findall(output)
+    )
+    if not states or [index for index, _ in states] != list(range(len(states))):
+        raise ValueError("NCSM output does not contain a contiguous state list")
+    return [energy for _, energy in states]
+
+
+def diagonalize(
+    validator: Path,
+    hamiltonian: Path,
+    *,
+    interaction: Path,
+    proton_number: int,
+    neutron_number: int,
+    nmax: int,
+    states: int,
+) -> list[float]:
+    if hamiltonian.suffix == ".jcoupled64":
+        command = [
+            str(validator), "--interaction", str(interaction),
+            "--jcoupled64", str(hamiltonian),
+        ]
+    else:
+        command = [str(validator), "--no2bpack", str(hamiltonian)]
+    command.extend([
+        "--Z", str(proton_number), "--N", str(neutron_number),
+        "--nmax", str(nmax), "--states", str(states),
+    ])
+    completed = subprocess.run(
+        command, check=True, text=True, capture_output=True
+    )
+    energies = parse_energies(completed.stdout)
+    if len(energies) != states:
+        raise ValueError(
+            f"NCSM returned {len(energies)} states instead of {states}"
+        )
+    return energies
+
+
+def profile(root: Path) -> dict[str, object]:
+    flow = parse_flow(unique(root, "flow_*.dat"))
+    log_path = unique(root, "log_*.txt")
+    log = log_path.read_text(encoding="utf-8")
+    metadata_path = unique(root, "metadata.json")
+    return {
+        "root": str(root.resolve()),
+        "metadata": json.loads(metadata_path.read_text(encoding="utf-8")),
+        "flow": flow,
+        "resource_usage": parse_resource_usage(unique(root, "resource_usage.txt")),
+        "jcoupled64": unique(root, "H_*.jcoupled64"),
+        "no2bpack": unique(root, "H_*.no2bpack"),
+        "omega_files": len(list(root.glob("*_Omega_*"))),
+        "magnus_series_rejections": log.count("Magnus series rejected"),
+        "magnus_series_recovery_segments": log.count(
+            "materialized the accepted segment"
+        ),
+        "log": str(log_path.resolve()),
+    }
+
+
+def summarize(args: argparse.Namespace) -> dict[str, object]:
+    default = profile(args.default)
+    tight = profile(args.tight)
+    matrix = compare_jcoupled64(default["jcoupled64"], tight["jcoupled64"])
+    for entry in (default, tight):
+        entry["jcoupled64_sha256"] = sha256(entry["jcoupled64"])
+        entry["no2bpack_sha256"] = sha256(entry["no2bpack"])
+        entry["jcoupled64_energies_mev"] = diagonalize(
+            args.validator, entry["jcoupled64"], interaction=args.interaction,
+            proton_number=args.proton_number,
+            neutron_number=args.neutron_number,
+            nmax=args.nmax, states=args.states,
+        )
+        entry["no2bpack_energies_mev"] = diagonalize(
+            args.validator, entry["no2bpack"], interaction=args.interaction,
+            proton_number=args.proton_number,
+            neutron_number=args.neutron_number,
+            nmax=args.nmax, states=args.states,
+        )
+        entry["packing_max_abs_mev"] = max(
+            abs(left - right) for left, right in zip(
+                entry["jcoupled64_energies_mev"],
+                entry["no2bpack_energies_mev"],
+            )
+        )
+        entry["jcoupled64"] = str(entry["jcoupled64"].resolve())
+        entry["no2bpack"] = str(entry["no2bpack"].resolve())
+
+    spectral_differences = [
+        tight_energy - default_energy
+        for default_energy, tight_energy in zip(
+            default["jcoupled64_energies_mev"],
+            tight["jcoupled64_energies_mev"],
+        )
+    ]
+    maximum_spectral_difference = max(abs(value) for value in spectral_differences)
+    endpoint_difference = abs(
+        default["flow"]["final"]["s"] - tight["flow"]["final"]["s"]
+    )
+    gates = {
+        "default_residual_ratio_below_limit": (
+            default["flow"]["final"]["eta_ratio_to_initial"]
+            < args.residual_ratio
+        ),
+        "matched_endpoint": endpoint_difference <= args.endpoint_tolerance,
+        "spectral_stability": (
+            maximum_spectral_difference < args.spectral_tolerance_mev
+        ),
+        "packing_readback": max(
+            default["packing_max_abs_mev"], tight["packing_max_abs_mev"]
+        ) < args.packing_tolerance_mev,
+        "clean_exit": (
+            default["resource_usage"].get("exit_status") == 0
+            and tight["resource_usage"].get("exit_status") == 0
+        ),
+    }
+    return {
+        "schema": "mrimsrg_magnus_gate_v1",
+        "nucleus": args.nucleus,
+        "nrefmax": args.nrefmax,
+        "nmax": args.nmax,
+        "states": args.states,
+        "interaction": str(args.interaction.resolve()),
+        "interaction_sha256": sha256(args.interaction),
+        "default": default,
+        "tight": tight,
+        "matrix_difference": matrix,
+        "endpoint_abs_difference": endpoint_difference,
+        "tight_minus_default_spectrum_mev": spectral_differences,
+        "spectral_max_abs_mev": maximum_spectral_difference,
+        "thresholds": {
+            "residual_ratio": args.residual_ratio,
+            "endpoint_tolerance": args.endpoint_tolerance,
+            "spectral_tolerance_mev": args.spectral_tolerance_mev,
+            "packing_tolerance_mev": args.packing_tolerance_mev,
+        },
+        "gates": gates,
+        "passed": all(gates.values()),
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--nucleus", required=True)
+    parser.add_argument("--nrefmax", required=True, type=int)
+    parser.add_argument("--default", required=True, type=Path)
+    parser.add_argument("--tight", required=True, type=Path)
+    parser.add_argument("--interaction", required=True, type=Path)
+    parser.add_argument("--validator", required=True, type=Path)
+    parser.add_argument("--Z", dest="proton_number", required=True, type=int)
+    parser.add_argument("--N", dest="neutron_number", required=True, type=int)
+    parser.add_argument("--nmax", required=True, type=int)
+    parser.add_argument("--states", type=int, default=3)
+    parser.add_argument("--residual-ratio", type=float, default=1e-6)
+    parser.add_argument("--endpoint-tolerance", type=float, default=1e-4)
+    parser.add_argument("--spectral-tolerance-mev", type=float, default=1e-3)
+    parser.add_argument("--packing-tolerance-mev", type=float, default=5e-6)
+    parser.add_argument("--json", required=True, type=Path)
+    args = parser.parse_args()
+    report = summarize(args)
+    rendered = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    print(rendered, end="")
+    args.json.write_text(rendered, encoding="utf-8")
+    if not report["passed"]:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -829,6 +829,8 @@ add_test(NAME MRTailDiagnostic
          COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRTailDiagnostic.py)
 add_test(NAME MRDownstreamWindow
          COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRDownstreamWindow.py)
+add_test(NAME MRMagnusGate
+         COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRMagnusGate.py)
 
 # Python itself is not built with the sanitizers.  When an instrumented C++
 # extension is loaded later, ASan cannot install its __cxa_throw interceptor
@@ -840,7 +842,7 @@ add_test(NAME MRDownstreamWindow
 # build cannot silently import the normal Release module.
 set(MR_PYTHON_TESTS
     MRReference MRDriver MRSRDriver MRCorrelatedDriver MRDenominators MRMagnus
-    MRJobGenerator MRTailDiagnostic MRDownstreamWindow)
+    MRJobGenerator MRTailDiagnostic MRDownstreamWindow MRMagnusGate)
 set(MR_PYTHON_TEST_ENVIRONMENT
     "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{PYTHONPATH}"
     "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}")
