@@ -17,9 +17,11 @@ from prototype.mrimsrg.summarize_magnus_gate import (  # noqa: E402
     parse_resource_usage,
 )
 from prototype.mrimsrg.aggregate_magnus_gates import (  # noqa: E402
+    EXPECTED_BARE_J64_SHA256,
     EXPECTED_INTERACTION_SHA256,
     EXPECTED_NREFMAX,
     EXPECTED_NMAX,
+    EXPECTED_REFERENCE_SHA256,
     EXPECTED_THRESHOLDS,
     aggregate,
 )
@@ -94,6 +96,8 @@ def main():
                 "metadata": {
                     "executable_sha256": "exe-sha",
                     "shared_library_sha256": "library-sha",
+                    "reference_sha256": EXPECTED_REFERENCE_SHA256[nucleus],
+                    "interaction_sha256": EXPECTED_BARE_J64_SHA256[nucleus],
                 },
                 "log": f"/result/log_{nucleus}_{1000 + index}.txt",
                 "flow": {"final": {"s": 10.0 + index,

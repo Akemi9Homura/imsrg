@@ -134,7 +134,8 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       anti-Hermiticity、J64/no2bpack 读回窗和已验收的 m-scheme/SR 极限；
       最后由 `aggregate_magnus_gates.py` 强制核种/Nrefmax、interaction、
       NCSM Nmax/三态、production executable/library、NCSM/Omega validator
-      与正式阈值一致并生成单一四核 JSON，不手工拼接完成结论。
+      与正式阈值一致，同时逐核锁死 JREF 和 A-dependent bare J64 哈希并
+      生成单一四核 JSON，不手工拼接完成结论。
 
 ## P0：生产版 C++ J-scheme MR-IMSRG(2)
 

@@ -22,6 +22,18 @@ EXPECTED_THRESHOLDS = {
     "residual_ratio": 1e-6,
     "spectral_tolerance_mev": 1e-3,
 }
+EXPECTED_REFERENCE_SHA256 = {
+    "He4": "1c9934aa92b50cc55122f15434b0093a860d99ae50a745d89848f76f1f608898",
+    "Be8": "bbc3eb70c62e6022bb35d42e05582edd429d6031da1662ff19ab6b9c67416e17",
+    "C12": "83b5d9ef6317a9290d37575f0af9819ca5f10babd62c62d95ed7045998192cda",
+    "O16": "9c54eb88f9d57afdc09dde8da316ebaac818008fc67e05d092fe7d162907b21c",
+}
+EXPECTED_BARE_J64_SHA256 = {
+    "He4": "55a3c161f78bde8586c997f332f89f0f1043a467af3c5ae90c1f98ed8fd344e2",
+    "Be8": "75595b6b5e34f2f723f779497d81d1e0304c67e90bce9c8426d96a13e99249c0",
+    "C12": "c669fcde829c3b12a0bcd77edcc60c4c9742e3c28455b5d9af4c306e2205bb46",
+    "O16": "fe2027ffda381820a40f8617493152bfa0a017a6fc2e77a6f252b1758fac356e",
+}
 JOB_PATTERN = re.compile(r"_(\d+)\.txt$")
 
 
@@ -124,6 +136,12 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
             "source_gate_sha256": sha256(path),
             "nrefmax": report["nrefmax"],
             "nmax": report["nmax"],
+            "reference_sha256": report["default"]["metadata"][
+                "reference_sha256"
+            ],
+            "bare_jcoupled64_sha256": report["default"]["metadata"][
+                "interaction_sha256"
+            ],
             "default_job_id": job_id(report["default"]["log"]),
             "tight_job_id": job_id(report["tight"]["log"]),
             "default_stop_s": report["default"]["flow"]["final"]["s"],
@@ -167,6 +185,14 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
         "production_library_identical": bool(production_library_sha256),
         "omega_validator_identical": bool(omega_validator_sha256),
         "thresholds_are_frozen": json.loads(thresholds) == EXPECTED_THRESHOLDS,
+        "input_artifacts_are_frozen": all(
+            report[profile]["metadata"]["reference_sha256"]
+            == EXPECTED_REFERENCE_SHA256[nucleus]
+            and report[profile]["metadata"]["interaction_sha256"]
+            == EXPECTED_BARE_J64_SHA256[nucleus]
+            for nucleus, (_, report) in by_nucleus.items()
+            for profile in ("default", "tight")
+        ),
     }
     return {
         "schema": "mrimsrg_four_nucleus_magnus_gate_v1",

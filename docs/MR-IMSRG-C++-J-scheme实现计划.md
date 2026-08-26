@@ -1142,7 +1142,8 @@ ASan+UBSan Debug 构建中读取 Be8/C12 的真实 production `Omega_0`；
 聚合，不从日志手工摘录。它要求恰有 `He4/Be8/C12/O16`，对应
 `Nrefmax=2/0/0/2`、NCSM `Nmax=8/0/0/2` 和各三态，并强制固定
 NNLOopt SHA-256、生产 executable、`libIMSRG.so`、下游 NCSM/Omega
-validator 与正式阈值逐字一致；任一单核
+validator 与正式阈值逐字一致；四核 JREF 及各自 A-dependent bare J64
+也按已冻结 SHA-256 逐核检查。任一单核
 `passed=false` 或 provenance 不一致即拒绝。输出同时汇总四核最大
 残差比、tight/default 谱差、packing 差、Omega anti-Hermiticity、
 拒步计数、作业号和产物哈希。
