@@ -87,7 +87,8 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       `k=8` 的输出逐位相同，scalar commutator 数从 `65` 降到 `23`。
 - [x] 将独立 Python m-scheme 原型的标准库 `unittest discover` 注册为
       CTest `MRPrototype`；54 项 RDM/正规序/commutator/J-coupling/
-      generator/flow/Magnus/I/O 测试全部通过，不再依赖手工另跑 README 命令。
+      generator/flow/Magnus/I/O 测试全部通过，不再依赖手工另跑 README 命令；
+      注册后的 current-HEAD Release CTest `23/23` 以 `489.09 s` 通过。
 
 ### M4. 生产收尾：级数失败不得静默接受
 

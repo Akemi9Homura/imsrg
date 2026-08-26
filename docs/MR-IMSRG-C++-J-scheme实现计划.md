@@ -1037,6 +1037,8 @@ library 路径的 0B/1B/2B 最坏差为 `3.55e-15 MeV`。
 `MRPrototype`；其 54 项 RDM、正规序、commutator、J-coupling、生成元、
 direct flow、Magnus 与 I/O 测试以 `2.37 s` 通过，CTest 总数因此由 22
 增至 23。它补充而不替代耗时更长的真实四核 `MRCorrelatedDriver`。
+注册后的 current-HEAD 完整 Release CTest `23/23` 以 `489.09 s` 通过，
+其中 `MRCorrelatedDriver` 为 `398.51 s`。
 
 Vobig Eqs. (4.6.7),(4.6.8) 的 Bernoulli 相对项停止门将 emax4/6
 `s=1e-4` 单线程流的 scalar commutator 数从固定 `k=8` 的 `65` 降至 `23`。
