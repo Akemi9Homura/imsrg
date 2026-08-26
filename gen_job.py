@@ -187,6 +187,26 @@ class MRJschemeSettings:
 
 
 @dataclass(frozen=True)
+class MRJschemeInputSettings:
+    nucleus: str
+    nrefmax: int
+    emax: int
+    minipack: Path
+    source_reference: Path
+    partition: str = "c128m512"
+    qos: str = "low"
+    cpus: int = 64
+    nodelist: Optional[str] = None
+    label: Optional[str] = None
+    result_root: Path = REPO_ROOT / "result" / "mr-jscheme-inputs"
+    converter: Path = (
+        REPO_ROOT / "prototype" / "mrimsrg" / "build" /
+        "mrimsrg_minipack_to_j64"
+    )
+    pyimsrg_dir: Path = REPO_ROOT / "build" / "src"
+
+
+@dataclass(frozen=True)
 class MRNCSMReadbackSettings:
     no2bpack: Path
     proton_number: int
@@ -386,6 +406,157 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
         "flow_file": str(flow_file),
         "output_jcoupled64": str(output_j64),
         "output_no2bpack": str(output_no2bpack),
+        "script": str(script_file),
+    }
+    manifest.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8")
+    return script_file
+
+
+def _validate_mr_jscheme_input_settings(settings: MRJschemeInputSettings) -> None:
+    allowed_nrefmax = {"He4": (0, 2), "Be8": (0,), "C12": (0,), "O16": (0, 2)}
+    if settings.nucleus not in allowed_nrefmax:
+        raise ValueError("unsupported MR J-scheme input nucleus")
+    if settings.nrefmax not in allowed_nrefmax[settings.nucleus]:
+        raise ValueError("unsupported nucleus/Nrefmax MR input reference")
+    if settings.emax < 2 or settings.emax % 2:
+        raise ValueError("MR J-scheme input emax must be an even integer >= 2")
+    if settings.partition not in ("c128m1024", "c128m512", "compute_C", "compute_A"):
+        raise ValueError("unsupported point7 partition")
+    if settings.qos != "low":
+        raise ValueError("MR J-scheme input preparation requires qos=low")
+    if settings.cpus < 1:
+        raise ValueError("MR J-scheme input preparation cpus must be positive")
+    for value, field in ((settings.nodelist, "nodelist"), (settings.label, "label")):
+        if value is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+            raise ValueError(f"{field} contains unsupported characters")
+    for path, description in (
+        (settings.minipack, "minipack"),
+        (settings.source_reference, "source MR reference"),
+        (settings.converter, "minipack-to-J64 converter"),
+        (settings.pyimsrg_dir / "pyIMSRG.so", "pyIMSRG module"),
+        (REPO_ROOT / "prototype" / "mrimsrg" / "embed_jref.py", "jref embedder"),
+        (REPO_ROOT / "sourceme.sh", "repository environment"),
+    ):
+        if not path.is_file():
+            raise FileNotFoundError(f"{description} is unavailable: {path}")
+
+
+def generate_mr_jscheme_input_slurm(settings: MRJschemeInputSettings) -> Path:
+    """Generate one hashed J64/reference preparation job for a larger MR space."""
+    _validate_mr_jscheme_input_settings(settings)
+    minipack = settings.minipack.resolve()
+    source_reference = settings.source_reference.resolve()
+    converter = settings.converter.resolve()
+    pyimsrg_module = (settings.pyimsrg_dir / "pyIMSRG.so").resolve()
+    pyimsrg_dir = pyimsrg_module.parent
+    embedder = (REPO_ROOT / "prototype" / "mrimsrg" / "embed_jref.py").resolve()
+    environment_script = (REPO_ROOT / "sourceme.sh").resolve()
+    result_root = settings.result_root.resolve()
+    repository_commit = _repository_commit(REPO_ROOT)
+    tag = (
+        f"{settings.nucleus}_Nrefmax{settings.nrefmax}_emax{settings.emax}"
+        "_input"
+    )
+    if settings.label:
+        tag += f"_{settings.label}"
+    result_dir = result_root / tag
+    if result_dir.exists():
+        raise FileExistsError(f"refusing to overwrite existing MR input: {result_dir}")
+    result_dir.mkdir(parents=True)
+    script_file = result_dir / f"run_{tag}.sh"
+    output_j64 = result_dir / f"{settings.nucleus}_emax{settings.emax}_bare.jcoupled64"
+    output_reference = result_dir / f"{settings.nucleus}_emax{settings.emax}.jref"
+    embed_report = result_dir / "embed_report.json"
+    converter_stdout = result_dir / "converter.stdout"
+    converter_time = result_dir / "converter.time"
+    embed_stdout = result_dir / "embed.stdout"
+    embed_time = result_dir / "embed.time"
+    manifest = result_dir / "metadata.json"
+    nucleus_a = int(re.search(r"\d+", settings.nucleus).group())
+    hashes = {
+        "minipack_sha256": _sha256(minipack),
+        "source_reference_sha256": _sha256(source_reference),
+        "converter_sha256": _sha256(converter),
+        "pyimsrg_sha256": _sha256(pyimsrg_module),
+        "embedder_sha256": _sha256(embedder),
+        "environment_script_sha256": _sha256(environment_script),
+    }
+    nodelist_line = (
+        f"#SBATCH --nodelist={settings.nodelist}\n" if settings.nodelist else ""
+    )
+    converter_command = shlex.join([
+        str(converter), "--interaction", str(minipack),
+        "--output", str(output_j64), "--A", str(nucleus_a),
+    ])
+    embed_command = shlex.join([
+        "python3", str(embedder), "--source", str(source_reference),
+        "--interaction", str(minipack), "--output", str(output_reference),
+        "--pyimsrg-dir", str(pyimsrg_dir), "--json", str(embed_report),
+    ])
+    checks = "\n".join(
+        f"echo '{digest}  {path}' | sha256sum -c -"
+        for digest, path in (
+            (hashes["minipack_sha256"], minipack),
+            (hashes["source_reference_sha256"], source_reference),
+            (hashes["converter_sha256"], converter),
+            (hashes["pyimsrg_sha256"], pyimsrg_module),
+            (hashes["embedder_sha256"], embedder),
+            (hashes["environment_script_sha256"], environment_script),
+        )
+    )
+    contents = f"""#!/bin/bash -l
+#SBATCH --partition={settings.partition}
+#SBATCH --qos={settings.qos}
+#SBATCH -J mr_input_{settings.nucleus.lower()}_e{settings.emax}
+{nodelist_line}#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task={settings.cpus}
+#SBATCH -o {result_dir}/log_{tag}_%j.txt
+
+set -eo pipefail
+cd {REPO_ROOT}
+source ./sourceme.sh
+export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
+export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pyimsrg_dir}:{converter.parent}"
+
+echo repository_commit={repository_commit}
+{checks}
+if ldd {shlex.quote(str(converter))} | grep 'not found'; then
+  exit 1
+fi
+/usr/bin/time -v {converter_command} > {shlex.quote(str(converter_stdout))} 2> {shlex.quote(str(converter_time))}
+/usr/bin/time -v {embed_command} > {shlex.quote(str(embed_stdout))} 2> {shlex.quote(str(embed_time))}
+test -s {shlex.quote(str(output_j64))}
+test -s {shlex.quote(str(output_reference))}
+test -s {shlex.quote(str(embed_report))}
+sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_reference))} {shlex.quote(str(embed_report))}
+"""
+    script_file.write_text(contents, encoding="utf-8")
+    script_file.chmod(0o755)
+    metadata = {
+        "schema": "mrimsrg_jscheme_input_slurm_v1",
+        "repository_commit": repository_commit,
+        "settings": {
+            **asdict(settings),
+            "minipack": str(minipack),
+            "source_reference": str(source_reference),
+            "result_root": str(result_root),
+            "converter": str(converter),
+            "pyimsrg_dir": str(pyimsrg_dir),
+        },
+        **hashes,
+        "pyimsrg_module": str(pyimsrg_module),
+        "embedder": str(embedder),
+        "environment_script": str(environment_script),
+        "output_jcoupled64": str(output_j64),
+        "output_reference": str(output_reference),
+        "embed_report": str(embed_report),
+        "converter_stdout": str(converter_stdout),
+        "converter_time": str(converter_time),
+        "embed_stdout": str(embed_stdout),
+        "embed_time": str(embed_time),
         "script": str(script_file),
     }
     manifest.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n",
@@ -598,6 +769,10 @@ def parse_args():
         help="generate one production C++ J-scheme MR direct-flow job",
     )
     parser.add_argument(
+        "--mr-prepare-jscheme", action="store_true",
+        help="prepare one larger-space J64 interaction and embedded MR reference",
+    )
+    parser.add_argument(
         "--mr-ncsm-readback", action="store_true",
         help="generate one downstream NCSM/no2bpack readback job",
     )
@@ -606,6 +781,10 @@ def parse_args():
     parser.add_argument("--mr-emax", type=int)
     parser.add_argument("--mr-interaction", type=Path)
     parser.add_argument("--mr-reference-file", type=Path)
+    parser.add_argument("--mr-minipack", type=Path)
+    parser.add_argument("--mr-source-reference", type=Path)
+    parser.add_argument("--mr-converter", type=Path)
+    parser.add_argument("--mr-pyimsrg-dir", type=Path)
     parser.add_argument("--mr-start-s", type=float, default=0.0)
     parser.add_argument("--mr-target-s", type=float)
     parser.add_argument(
@@ -644,8 +823,10 @@ if __name__ == "__main__":
     args = parse_args()
     if args.generate_only and args.submit:
         raise SystemExit("--generate-only and --submit are mutually exclusive")
-    if args.mr_jscheme and args.mr_ncsm_readback:
-        raise SystemExit("--mr-jscheme and --mr-ncsm-readback are mutually exclusive")
+    mr_modes = sum((args.mr_jscheme, args.mr_prepare_jscheme,
+                    args.mr_ncsm_readback))
+    if mr_modes > 1:
+        raise SystemExit("MR J-scheme modes are mutually exclusive")
     check_and_make_dir(REPO_ROOT / "result")
 
     if args.smoke_test:
@@ -694,6 +875,63 @@ if __name__ == "__main__":
                     args.mr_executable
                     if args.mr_executable is not None
                     else default_executable
+                ),
+            )
+        )
+        print(script_file)
+        if args.generate_only:
+            exit(0)
+        if args.submit:
+            result = subprocess.run(
+                ["sbatch", str(script_file)], capture_output=True, text=True, check=True
+            )
+            if result.stdout.strip():
+                print(result.stdout.strip())
+            exit(0)
+        run_mode = input("submit job: y/n\n")
+        if run_mode.lower()[0] == "y":
+            subprocess.run(["sbatch", str(script_file)], check=True)
+        else:
+            subprocess.run(["bash", str(script_file)], check=True)
+        exit(0)
+
+    if args.mr_prepare_jscheme:
+        required = {
+            "--mr-nucleus": args.mr_nucleus,
+            "--mr-nrefmax": args.mr_nrefmax,
+            "--mr-emax": args.mr_emax,
+            "--mr-minipack": args.mr_minipack,
+            "--mr-source-reference": args.mr_source_reference,
+        }
+        missing = [name for name, value in required.items() if value is None]
+        if missing:
+            raise SystemExit("--mr-prepare-jscheme requires " + ", ".join(missing))
+        script_file = generate_mr_jscheme_input_slurm(
+            MRJschemeInputSettings(
+                nucleus=args.mr_nucleus,
+                nrefmax=args.mr_nrefmax,
+                emax=args.mr_emax,
+                minipack=args.mr_minipack,
+                source_reference=args.mr_source_reference,
+                partition=args.mr_partition,
+                cpus=args.mr_cpus,
+                nodelist=args.mr_nodelist,
+                label=args.mr_label,
+                result_root=(
+                    args.mr_result_root
+                    if args.mr_result_root is not None
+                    else REPO_ROOT / "result" / "mr-jscheme-inputs"
+                ),
+                converter=(
+                    args.mr_converter
+                    if args.mr_converter is not None
+                    else REPO_ROOT / "prototype" / "mrimsrg" / "build" /
+                    "mrimsrg_minipack_to_j64"
+                ),
+                pyimsrg_dir=(
+                    args.mr_pyimsrg_dir
+                    if args.mr_pyimsrg_dir is not None
+                    else REPO_ROOT / "build" / "src"
                 ),
             )
         )

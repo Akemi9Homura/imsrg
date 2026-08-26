@@ -12,8 +12,10 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY))
 
 from gen_job import (  # noqa: E402
+    MRJschemeInputSettings,
     MRJschemeSettings,
     MRNCSMReadbackSettings,
+    generate_mr_jscheme_input_slurm,
     generate_mr_jscheme_slurm,
     generate_mr_ncsm_readback_slurm,
 )
@@ -114,6 +116,59 @@ def main():
             pass
         else:
             raise AssertionError("unsupported Be8 Nrefmax=2 was accepted")
+
+        pyimsrg_dir = root / "pyimsrg"
+        pyimsrg_dir.mkdir()
+        (pyimsrg_dir / "pyIMSRG.so").write_bytes(b"test pyimsrg module\n")
+        input_settings = MRJschemeInputSettings(
+            nucleus="He4",
+            nrefmax=2,
+            emax=12,
+            minipack=interaction,
+            source_reference=reference,
+            partition="c128m1024",
+            cpus=128,
+            label="capacity",
+            result_root=root / "input-result",
+            converter=executable,
+            pyimsrg_dir=pyimsrg_dir,
+        )
+        input_script = generate_mr_jscheme_input_slurm(input_settings)
+        input_contents = input_script.read_text(encoding="utf-8")
+        input_metadata = json.loads(
+            (input_script.parent / "metadata.json").read_text(encoding="utf-8")
+        )
+        require(input_metadata["schema"] == "mrimsrg_jscheme_input_slurm_v1",
+                "unexpected MR input manifest schema")
+        for token in (
+            "#SBATCH --partition=c128m1024",
+            "#SBATCH --cpus-per-task=128",
+            "/usr/bin/time -v",
+            "--interaction",
+            "--output",
+            "--A 4",
+            "embed_jref.py",
+            "--source",
+            "--pyimsrg-dir",
+            "converter.time",
+            "embed.time",
+            "sha256sum -c -",
+            "ldd ",
+        ):
+            require(token in input_contents,
+                    "generated MR input script is missing: " + token)
+        for key in (
+            "minipack_sha256", "source_reference_sha256", "converter_sha256",
+            "pyimsrg_sha256", "embedder_sha256", "environment_script_sha256",
+        ):
+            require(len(input_metadata[key]) == 64,
+                    "MR input metadata lost SHA-256: " + key)
+        try:
+            generate_mr_jscheme_input_slurm(input_settings)
+        except FileExistsError:
+            pass
+        else:
+            raise AssertionError("MR input generator silently overwrote a result")
 
         packed = root / "flow.no2bpack"
         packed.write_bytes(b"packed Hamiltonian\n")
