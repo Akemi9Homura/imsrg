@@ -173,20 +173,17 @@ namespace
     return result;
   }
 
-  void MatrixElements(const arma::mat &first, const arma::mat &second,
-                      const TwoBodyChannel &channel,
-                      index_t a, index_t b, index_t c, index_t d,
-                      double &first_value, double &second_value)
+  bool MatrixElementCoordinates(const TwoBodyChannel &channel,
+                                index_t a, index_t b, index_t c, index_t d,
+                                size_t &ibra, size_t &iket, double &phase)
   {
-    first_value = 0.0;
-    second_value = 0.0;
     Orbit &oa = channel.modelspace->GetOrbit(a);
     Orbit &ob = channel.modelspace->GetOrbit(b);
     Orbit &oc = channel.modelspace->GetOrbit(c);
     Orbit &od = channel.modelspace->GetOrbit(d);
     if (!channel.CheckChannel_ket(&oa, &ob) || !channel.CheckChannel_ket(&oc, &od))
-      return;
-    double phase = 1.0;
+      return false;
+    phase = 1.0;
     if (a > b)
     {
       phase *= channel.modelspace->GetKet(b, a).Phase(channel.J);
@@ -197,12 +194,28 @@ namespace
       phase *= channel.modelspace->GetKet(d, c).Phase(channel.J);
       std::swap(c, d);
     }
-    const size_t ibra = channel.GetLocalIndex(a, b);
-    const size_t iket = channel.GetLocalIndex(c, d);
+    ibra = channel.GetLocalIndex(a, b);
+    iket = channel.GetLocalIndex(c, d);
     if (a == b)
       phase *= std::sqrt(2.0);
     if (c == d)
       phase *= std::sqrt(2.0);
+    return true;
+  }
+
+  void MatrixElements(const arma::mat &first, const arma::mat &second,
+                      const TwoBodyChannel &channel,
+                      index_t a, index_t b, index_t c, index_t d,
+                      double &first_value, double &second_value)
+  {
+    first_value = 0.0;
+    second_value = 0.0;
+    size_t ibra = 0;
+    size_t iket = 0;
+    double phase = 1.0;
+    if (!MatrixElementCoordinates(channel, a, b, c, d,
+                                  ibra, iket, phase))
+      return;
     first_value = phase * first(ibra, iket);
     second_value = phase * second(ibra, iket);
   }
@@ -213,8 +226,12 @@ namespace
     std::vector<arma::mat> YLX;
     std::vector<arma::mat> LY_active_rows;
     std::vector<arma::mat> LX_active_rows;
+    std::vector<arma::mat> X_active_columns;
+    std::vector<arma::mat> Y_active_columns;
     std::vector<std::vector<int>> pair_to_active_row;
+    std::vector<bool> full_active;
     size_t dense_ly_lx_bytes = 0;
+    size_t dense_xly_ylx_bytes = 0;
 
     size_t DataSize() const
     {
@@ -224,6 +241,8 @@ namespace
         bytes += sizeof(double) *
                  (XLY[ch].n_elem + YLX[ch].n_elem +
                   LY_active_rows[ch].n_elem + LX_active_rows[ch].n_elem);
+        bytes += sizeof(double) *
+                 (X_active_columns[ch].n_elem + Y_active_columns[ch].n_elem);
         bytes += sizeof(int) * pair_to_active_row[ch].size();
       }
       return bytes;
@@ -237,6 +256,14 @@ namespace
                  (LY_active_rows[ch].n_elem + LX_active_rows[ch].n_elem);
       return bytes;
     }
+
+    size_t StoredIVOutputDataSize() const
+    {
+      size_t bytes = 0;
+      for (size_t ch = 0; ch < XLY.size(); ++ch)
+        bytes += sizeof(double) * (XLY[ch].n_elem + YLX[ch].n_elem);
+      return bytes;
+    }
   };
 
   void ActiveRowMatrixElements(const arma::mat &first_active_rows,
@@ -248,35 +275,38 @@ namespace
   {
     first_value = 0.0;
     second_value = 0.0;
-    Orbit &oa = channel.modelspace->GetOrbit(a);
-    Orbit &ob = channel.modelspace->GetOrbit(b);
-    Orbit &oc = channel.modelspace->GetOrbit(c);
-    Orbit &od = channel.modelspace->GetOrbit(d);
-    if (!channel.CheckChannel_ket(&oa, &ob) ||
-        !channel.CheckChannel_ket(&oc, &od))
-      return;
+    size_t ibra = 0;
+    size_t iket = 0;
     double phase = 1.0;
-    if (a > b)
-    {
-      phase *= channel.modelspace->GetKet(b, a).Phase(channel.J);
-      std::swap(a, b);
-    }
-    if (c > d)
-    {
-      phase *= channel.modelspace->GetKet(d, c).Phase(channel.J);
-      std::swap(c, d);
-    }
-    const size_t ibra = channel.GetLocalIndex(a, b);
+    if (!MatrixElementCoordinates(channel, a, b, c, d,
+                                  ibra, iket, phase))
+      return;
     const int active_row = pair_to_active_row[ibra];
     if (active_row < 0)
       return;
-    const size_t iket = channel.GetLocalIndex(c, d);
-    if (a == b)
-      phase *= std::sqrt(2.0);
-    if (c == d)
-      phase *= std::sqrt(2.0);
     first_value = phase * first_active_rows(active_row, iket);
     second_value = phase * second_active_rows(active_row, iket);
+  }
+
+  void SkinnyProductMatrixElements(
+      const arma::mat &first_left, const arma::mat &first_right,
+      const arma::mat &second_left, const arma::mat &second_right,
+      const TwoBodyChannel &channel,
+      index_t a, index_t b, index_t c, index_t d,
+      double &first_value, double &second_value)
+  {
+    first_value = 0.0;
+    second_value = 0.0;
+    size_t ibra = 0;
+    size_t iket = 0;
+    double phase = 1.0;
+    if (!MatrixElementCoordinates(channel, a, b, c, d,
+                                  ibra, iket, phase))
+      return;
+    first_value = phase *
+                  arma::dot(first_left.row(ibra), first_right.col(iket));
+    second_value = phase *
+                   arma::dot(second_left.row(ibra), second_right.col(iket));
   }
 
   StandardProducts BuildStandardProducts(const Operator &X, const Operator &Y,
@@ -288,7 +318,10 @@ namespace
     products.YLX.resize(nch);
     products.LY_active_rows.resize(nch);
     products.LX_active_rows.resize(nch);
+    products.X_active_columns.resize(nch);
+    products.Y_active_columns.resize(nch);
     products.pair_to_active_row.resize(nch);
+    products.full_active.assign(nch, false);
     for (size_t ch = 0; ch < nch; ++ch)
     {
       const arma::mat &x = X.TwoBody.GetMatrix(ch);
@@ -296,6 +329,9 @@ namespace
       const arma::mat &lambda = reference.Lambda2.GetMatrix(ch);
       products.dense_ly_lx_bytes +=
           2 * sizeof(double) * lambda.n_rows * lambda.n_cols;
+      products.dense_xly_ylx_bytes +=
+          sizeof(double) *
+          (x.n_rows * y.n_cols + y.n_rows * x.n_cols);
       std::vector<bool> pair_is_active(lambda.n_rows, false);
       size_t active_count = 0;
       for (arma::uword i = 0; i < lambda.n_rows; ++i)
@@ -320,8 +356,6 @@ namespace
         products.LY_active_rows[ch].zeros(0, y.n_cols);
         products.LX_active_rows[ch].zeros(0, x.n_cols);
         products.pair_to_active_row[ch].assign(lambda.n_rows, -1);
-        products.XLY[ch].zeros(x.n_rows, y.n_cols);
-        products.YLX[ch].zeros(y.n_rows, x.n_cols);
         continue;
       }
 
@@ -339,6 +373,7 @@ namespace
 
       if (active_count == lambda.n_rows)
       {
+        products.full_active[ch] = true;
         products.LY_active_rows[ch] = lambda * y;
         products.LX_active_rows[ch] = lambda * x;
         products.XLY[ch] = x * products.LY_active_rows[ch];
@@ -351,11 +386,12 @@ namespace
       products.LX_active_rows[ch] = lambda_active * x.rows(active);
 
       // Lambda is exactly zero outside the active principal submatrix.  Keep
-      // the exact active rows needed by term VI, and use the same rows for the
-      // IV products.  No numerical cutoff or MR-IMSRG term is introduced or
-      // removed here.  The full-active case is included automatically.
-      products.XLY[ch] = x.cols(active) * products.LY_active_rows[ch];
-      products.YLX[ch] = y.cols(active) * products.LX_active_rows[ch];
+      // the exact active rows needed by term VI and the matching active columns
+      // needed by the IV partial trace.  No numerical cutoff or MR-IMSRG term
+      // is introduced or removed here; the full-active branch above preserves
+      // the original complete matrix products.
+      products.X_active_columns[ch] = x.cols(active);
+      products.Y_active_columns[ch] = y.cols(active);
     }
     return products;
   }
@@ -607,12 +643,17 @@ namespace MRCommutator
     const size_t standard_product_bytes = products.DataSize();
     const size_t avoided_dense_ly_lx_bytes =
         products.dense_ly_lx_bytes - products.ActiveLYLXDataSize();
+    const size_t avoided_dense_iv_output_bytes =
+        products.dense_xly_ylx_bytes - products.StoredIVOutputDataSize();
     X.profiler.counter["MR standard products peak KiB"] = std::max(
         X.profiler.counter["MR standard products peak KiB"],
         static_cast<int>((standard_product_bytes + 1023) / 1024));
     X.profiler.counter["MR dense LY LX avoided KiB"] = std::max(
         X.profiler.counter["MR dense LY LX avoided KiB"],
         static_cast<int>((avoided_dense_ly_lx_bytes + 1023) / 1024));
+    X.profiler.counter["MR IV dense output avoided KiB"] = std::max(
+        X.profiler.counter["MR IV dense output avoided KiB"],
+        static_cast<int>((avoided_dense_iv_output_bytes + 1023) / 1024));
     X.profiler.timer["MR comm221 lambda2 setup"] += omp_get_wtime() - section_start;
 
     // IV: ordinary pair-coupled X lambda Y products.
@@ -620,6 +661,9 @@ namespace MRCommutator
     const size_t nch = modelspace.GetNumberTwoBodyChannels();
     for (size_t ch = 0; ch < nch; ++ch)
     {
+      if (!products.full_active[ch] &&
+          products.X_active_columns[ch].n_cols == 0)
+        continue;
       const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
       const double angular_weight = 2 * channel.J + 1.0;
       for (index_t one : modelspace.all_orbits)
@@ -631,8 +675,14 @@ namespace MRCommutator
           {
             double xly = 0.0;
             double ylx = 0.0;
-            MatrixElements(products.XLY[ch], products.YLX[ch], channel,
-                           one, t, two, t, xly, ylx);
+            if (products.full_active[ch])
+              MatrixElements(products.XLY[ch], products.YLX[ch], channel,
+                             one, t, two, t, xly, ylx);
+            else
+              SkinnyProductMatrixElements(
+                  products.X_active_columns[ch], products.LY_active_rows[ch],
+                  products.Y_active_columns[ch], products.LX_active_rows[ch],
+                  channel, one, t, two, t, xly, ylx);
             raw(one, two, 0) += 0.5 * angular_weight / (o1.j2 + 1.0) *
                                 (xly - ylx);
           }
