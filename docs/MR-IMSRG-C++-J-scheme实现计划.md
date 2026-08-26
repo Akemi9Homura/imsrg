@@ -1119,4 +1119,9 @@ lossless J64。两核所有级数拒步计数为零。
 metadata、resource usage、拒步日志与 `Omega` 段，比较完整
 J64 0B/1B/2B，并分别对角化 J64/no2bpack 后输出 JSON。
 `MRMagnusGate` 回归固定其 flow/resource/NCSM 解析。He4/O16
-default jobs `100600/100606` 正在运行，完成后执行同一门禁。
+default jobs `100600/100606` 正在运行，完成后执行同一门禁。Be8/C12
+已在 point7 计算节点用远程原始产物生成
+`result/mr-jscheme-magnus/gates/Be8.json` 与 `C12.json`，两份
+`passed=true`；验证器由独立的 `prototype/mrimsrg/build-current`
+构建，不重链生产 executable。加入 `MRMagnusGate` 后的本机 Release
+完整 CTest 为 `22/22`，总用时 `518.68 s`。
