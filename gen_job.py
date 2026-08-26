@@ -30,7 +30,19 @@ cpus = 64
 # share RAM with no protection). Set to None / "" to let Slurm choose.
 nodelist = "node3"
 
-exe = str(REPO_ROOT / "build" / "imsrg++")
+def default_executable() -> Path:
+    """Resolve the configured CMake output layout without hiding a missing build."""
+    candidates = (
+        REPO_ROOT / "build" / "imsrg++",
+        REPO_ROOT / "build" / "src" / "imsrg++",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[0]
+
+
+exe = str(default_executable())
 params = {}
 
 flag = "EM1.8_2.0"
@@ -139,7 +151,8 @@ def path_token(value):
 
 
 def add_header(output, partition=partition, qos=qos, cpus=cpus, nodelist=nodelist):
-    lib_dir = REPO_ROOT / "build"
+    executable_dir = Path(exe).resolve().parent
+    library_paths = f"{executable_dir}:{executable_dir.parent}"
     header_list = [
         "#!/bin/bash -l",
         f"#SBATCH --partition={partition}",
@@ -157,7 +170,7 @@ def add_header(output, partition=partition, qos=qos, cpus=cpus, nodelist=nodelis
         f'cd "{REPO_ROOT}"',
         "source ./sourceme.sh",
         f"export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{cpus}}}",
-        f'export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{lib_dir}"',
+        f'export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{library_paths}"',
     ]
     header = '\n'.join(header_list)
     return header

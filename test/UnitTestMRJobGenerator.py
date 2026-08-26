@@ -16,6 +16,8 @@ from gen_job import (  # noqa: E402
     MRJschemeInputSettings,
     MRJschemeSettings,
     MRNCSMReadbackSettings,
+    add_header,
+    default_executable,
     generate_mr_jscheme_input_slurm,
     generate_mr_jscheme_slurm,
     generate_mr_ncsm_readback_slurm,
@@ -31,6 +33,12 @@ def main():
     if len(sys.argv) != 2:
         raise SystemExit("usage: UnitTestMRJobGenerator.py <imsrg++ executable>")
     executable = Path(sys.argv[1]).resolve()
+
+    require(default_executable().is_file(),
+            "default executable does not resolve an existing CMake output")
+    header = add_header(Path("smoke.log"), nodelist=None)
+    require(str(default_executable().parent.resolve()) in header,
+            "Slurm header does not export the executable library directory")
 
     with tempfile.TemporaryDirectory(prefix="mr-job-generator-") as temporary:
         root = Path(temporary)
