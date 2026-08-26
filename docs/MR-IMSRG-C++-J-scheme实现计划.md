@@ -1133,4 +1133,7 @@ default jobs `100600/100606` 正在运行，完成后执行同一门禁。Be8/C1
 `22/22`，总用时 `491.61 s`。point7 原始产物中 Be8 default/tight
 分别有 `20/21` 段、C12 有 `12/13` 段；所有段的 1B/2B 数值
 anti-Hermiticity 违例均为零，0B 最大绝对值仅
-`5.063e-22`，完整 gate 保持 `passed=true`。
+`5.063e-22`，完整 gate 保持 `passed=true`。checker 另在独立
+ASan+UBSan Debug 构建中读取 Be8/C12 的真实 production `Omega_0`；
+两次均无 sanitizer 诊断，1B/2B 违例为零，0B 分别为
+`1.212e-23/4.019e-23`。
