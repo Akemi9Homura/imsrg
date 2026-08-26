@@ -11,9 +11,9 @@ from pathlib import Path
 import numpy as np
 
 try:
-    from .sr_imsrgpp_check import read_jcoupled64
+    from .jcoupled64_io import read_jcoupled64
 except ImportError:
-    from sr_imsrgpp_check import read_jcoupled64
+    from jcoupled64_io import read_jcoupled64
 
 
 def sha256(path: Path) -> str:
