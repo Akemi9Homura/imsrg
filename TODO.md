@@ -120,8 +120,8 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       `0.64841/0.76990 keV`，J64/no2bpack 最大 packing 差为
       `1.145/3.305 eV`。作业为 `100602/100604/100618/100616`，
       拒步计数均为零；point7 原生 gate JSON 已写入被忽略的结果目录
-      `result/mr-jscheme-magnus/gates/`。当前 Release 完整回归含新增 gate
-      测试，`22/22` 以 `518.68 s` 通过；gate 同时要求 default/tight
+      `result/mr-jscheme-magnus/gates/`。加入落盘 Omega 数值检查后的
+      Release 完整回归 `22/22` 以 `491.61 s` 通过；gate 同时要求 default/tight
       均实际写出至少一个非空 `Omega` 段，并由链接生产 `Operator` 的
       C++ checker 读回检查标量量子数、有限性及 0B/1B/2B
       anti-Hermiticity；测试同时确认人为破坏的对角 1B 元素会被拒绝。

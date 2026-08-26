@@ -1129,4 +1129,8 @@ default jobs `100600/100606` 正在运行，完成后执行同一门禁。Be8/C1
 `result/mr-jscheme-magnus/gates/Be8.json` 与 `C12.json`，两份
 `passed=true`；验证器由独立的 `prototype/mrimsrg/build-current`
 构建，不重链生产 executable。加入 `MRMagnusGate` 后的本机 Release
-完整 CTest 为 `22/22`，总用时 `518.68 s`。
+完整 CTest 为 `22/22`。再加入落盘 Omega 数值 checker 后重跑仍为
+`22/22`，总用时 `491.61 s`。point7 原始产物中 Be8 default/tight
+分别有 `20/21` 段、C12 有 `12/13` 段；所有段的 1B/2B 数值
+anti-Hermiticity 违例均为零，0B 最大绝对值仅
+`5.063e-22`，完整 gate 保持 `passed=true`。
