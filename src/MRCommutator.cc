@@ -665,14 +665,29 @@ namespace MRCommutator
           // the intermediate index to that principal submatrix therefore
           // preserves X*Lambda*Y exactly while bounding the correlated-reference
           // work by its active space instead of the full single-particle space.
-          const arma::mat xly = block.full_active
-                                    ? (block.X * block.Lambda) * block.Y
-                                    : (block.X_active_columns * block.Lambda) *
-                                          block.Y_active_rows;
-          const arma::mat ylx = block.full_active
-                                    ? (block.Y * block.Lambda) * block.X
-                                    : (block.Y_active_columns * block.Lambda) *
-                                          block.X_active_rows;
+          arma::mat xly;
+          arma::mat ylx;
+          arma::mat xlambda;
+          arma::mat ylambda;
+          if (block.full_active)
+          {
+            xly = (block.X * block.Lambda) * block.Y;
+            ylx = (block.Y * block.Lambda) * block.X;
+          }
+          else
+          {
+            // The one-body partial trace below reads only entries whose two
+            // ordered pairs share the spectator orbit t.  Retain the skinny
+            // left factors and evaluate exactly those dots instead of forming
+            // two mostly unused dimension-by-dimension output matrices.
+            xlambda = block.X_active_columns * block.Lambda;
+            ylambda = block.Y_active_columns * block.Lambda;
+            const size_t avoided_bytes =
+                2 * sizeof(double) * block.pairs.size() * block.pairs.size();
+            X.profiler.counter["MR V dense output avoided KiB"] = std::max(
+                X.profiler.counter["MR V dense output avoided KiB"],
+                static_cast<int>((avoided_bytes + 1023) / 1024));
+          }
           v_blas_seconds += omp_get_wtime() - v_part_start;
           const double angular_weight = 2 * block.J + 1.0;
           v_part_start = omp_get_wtime();
@@ -687,8 +702,18 @@ namespace MRCommutator
                 const int iket = block.Find(two, t);
                 if (ibra < 0 || iket < 0)
                   continue;
+                const double xly_value = block.full_active
+                                             ? xly(ibra, iket)
+                                             : arma::dot(
+                                                   xlambda.row(ibra),
+                                                   block.Y_active_rows.col(iket));
+                const double ylx_value = block.full_active
+                                             ? ylx(ibra, iket)
+                                             : arma::dot(
+                                                   ylambda.row(ibra),
+                                                   block.X_active_rows.col(iket));
                 raw(one, two, 1) += 0.5 * angular_weight / (o1.j2 + 1.0) *
-                                    (xly(ibra, iket) - ylx(ibra, iket));
+                                    (xly_value - ylx_value);
               }
             }
           }
