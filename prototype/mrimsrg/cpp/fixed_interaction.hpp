@@ -15,6 +15,8 @@ inline constexpr const char *validated_emax4_interaction_sha256 =
     "d3dff5faa2a58d8c234914170caffa3649d0cd3805a1344818f4f4d3c37fd19e";
 inline constexpr const char *validated_emax6_interaction_sha256 =
     "199d5a7a3e060427582d112bd2ab36688db199629ddebb6e097a4676980b913b";
+inline constexpr const char *validated_emax8_interaction_sha256 =
+    "3fd1a0038e8c6f00cd93ec26113f02fcb19dd51268a95238da67b17e12fd4bda";
 
 inline std::string shell_quote(const std::string &value)
 {
@@ -65,16 +67,17 @@ inline std::string require_fixed_interaction(const std::filesystem::path &path)
 // orbit/channel tables before replacing every 0B/1B/2B matrix element with
 // the lossless jcoupled64 payload.  Keep the production reference/export
 // paths on require_fixed_interaction(), while permitting this independently
-// frozen emax=4 and canonical emax=6 basis sources in read-only spectral and
-// vacuum-format checks.  The latter was extracted from the frozen emax=14
-// parent and independently compared channel-by-channel at A=4 and A=16.
+// frozen emax=4 and canonical emax=6/emax=8 basis sources in read-only spectral
+// and vacuum-format checks.  The latter two were extracted from the frozen
+// emax=14 parent and independently compared channel-by-channel at A=4 and A=16.
 inline std::string require_validated_interaction_basis(
     const std::filesystem::path &path)
 {
     const std::string digest = sha256_file(path);
     if (digest != fixed_interaction_sha256 &&
         digest != validated_emax4_interaction_sha256 &&
-        digest != validated_emax6_interaction_sha256)
+        digest != validated_emax6_interaction_sha256 &&
+        digest != validated_emax8_interaction_sha256)
         throw std::runtime_error("unexpected interaction SHA-256: " + digest);
     return digest;
 }
