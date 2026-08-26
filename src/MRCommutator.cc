@@ -206,9 +206,68 @@ namespace
   {
     std::vector<arma::mat> XLY;
     std::vector<arma::mat> YLX;
-    std::vector<arma::mat> LY;
-    std::vector<arma::mat> LX;
+    std::vector<arma::mat> LY_active_rows;
+    std::vector<arma::mat> LX_active_rows;
+    std::vector<std::vector<int>> pair_to_active_row;
+    size_t dense_ly_lx_bytes = 0;
+
+    size_t DataSize() const
+    {
+      size_t bytes = 0;
+      for (size_t ch = 0; ch < XLY.size(); ++ch)
+      {
+        bytes += sizeof(double) *
+                 (XLY[ch].n_elem + YLX[ch].n_elem +
+                  LY_active_rows[ch].n_elem + LX_active_rows[ch].n_elem);
+        bytes += sizeof(int) * pair_to_active_row[ch].size();
+      }
+      return bytes;
+    }
+
+    size_t ActiveLYLXDataSize() const
+    {
+      size_t bytes = 0;
+      for (size_t ch = 0; ch < LY_active_rows.size(); ++ch)
+        bytes += sizeof(double) *
+                 (LY_active_rows[ch].n_elem + LX_active_rows[ch].n_elem);
+      return bytes;
+    }
   };
+
+  double ActiveRowMatrixElement(const arma::mat &active_rows,
+                                const std::vector<int> &pair_to_active_row,
+                                const TwoBodyChannel &channel,
+                                index_t a, index_t b, index_t c, index_t d)
+  {
+    Orbit &oa = channel.modelspace->GetOrbit(a);
+    Orbit &ob = channel.modelspace->GetOrbit(b);
+    Orbit &oc = channel.modelspace->GetOrbit(c);
+    Orbit &od = channel.modelspace->GetOrbit(d);
+    if (!channel.CheckChannel_ket(&oa, &ob) ||
+        !channel.CheckChannel_ket(&oc, &od))
+      return 0.0;
+    double phase = 1.0;
+    if (a > b)
+    {
+      phase *= channel.modelspace->GetKet(b, a).Phase(channel.J);
+      std::swap(a, b);
+    }
+    if (c > d)
+    {
+      phase *= channel.modelspace->GetKet(d, c).Phase(channel.J);
+      std::swap(c, d);
+    }
+    const size_t ibra = channel.GetLocalIndex(a, b);
+    const int active_row = pair_to_active_row[ibra];
+    if (active_row < 0)
+      return 0.0;
+    const size_t iket = channel.GetLocalIndex(c, d);
+    if (a == b)
+      phase *= std::sqrt(2.0);
+    if (c == d)
+      phase *= std::sqrt(2.0);
+    return phase * active_rows(active_row, iket);
+  }
 
   StandardProducts BuildStandardProducts(const Operator &X, const Operator &Y,
                                          const MRReference &reference)
@@ -217,13 +276,16 @@ namespace
     StandardProducts products;
     products.XLY.resize(nch);
     products.YLX.resize(nch);
-    products.LY.resize(nch);
-    products.LX.resize(nch);
+    products.LY_active_rows.resize(nch);
+    products.LX_active_rows.resize(nch);
+    products.pair_to_active_row.resize(nch);
     for (size_t ch = 0; ch < nch; ++ch)
     {
       const arma::mat &x = X.TwoBody.GetMatrix(ch);
       const arma::mat &y = Y.TwoBody.GetMatrix(ch);
       const arma::mat &lambda = reference.Lambda2.GetMatrix(ch);
+      products.dense_ly_lx_bytes +=
+          2 * sizeof(double) * lambda.n_rows * lambda.n_cols;
       std::vector<bool> pair_is_active(lambda.n_rows, false);
       size_t active_count = 0;
       for (arma::uword i = 0; i < lambda.n_rows; ++i)
@@ -245,18 +307,11 @@ namespace
 
       if (active_count == 0)
       {
-        products.LY[ch].zeros(lambda.n_rows, y.n_cols);
-        products.LX[ch].zeros(lambda.n_rows, x.n_cols);
+        products.LY_active_rows[ch].zeros(0, y.n_cols);
+        products.LX_active_rows[ch].zeros(0, x.n_cols);
+        products.pair_to_active_row[ch].assign(lambda.n_rows, -1);
         products.XLY[ch].zeros(x.n_rows, y.n_cols);
         products.YLX[ch].zeros(y.n_rows, x.n_cols);
-        continue;
-      }
-      if (active_count == lambda.n_rows)
-      {
-        products.LY[ch] = lambda * y;
-        products.LX[ch] = lambda * x;
-        products.XLY[ch] = x * products.LY[ch];
-        products.YLX[ch] = y * products.LX[ch];
         continue;
       }
 
@@ -267,20 +322,30 @@ namespace
           active_storage.push_back(i);
       const arma::uvec active =
           arma::conv_to<arma::uvec>::from(active_storage);
+      products.pair_to_active_row[ch].assign(lambda.n_rows, -1);
+      for (size_t i = 0; i < active_storage.size(); ++i)
+        products.pair_to_active_row[ch][active_storage[i]] =
+            static_cast<int>(i);
+
+      if (active_count == lambda.n_rows)
+      {
+        products.LY_active_rows[ch] = lambda * y;
+        products.LX_active_rows[ch] = lambda * x;
+        products.XLY[ch] = x * products.LY_active_rows[ch];
+        products.YLX[ch] = y * products.LX_active_rows[ch];
+        continue;
+      }
+
       const arma::mat lambda_active = lambda.submat(active, active);
-      const arma::mat ly_active = lambda_active * y.rows(active);
-      const arma::mat lx_active = lambda_active * x.rows(active);
+      products.LY_active_rows[ch] = lambda_active * y.rows(active);
+      products.LX_active_rows[ch] = lambda_active * x.rows(active);
 
       // Lambda is exactly zero outside the active principal submatrix.  Keep
-      // the full LY/LX layouts required by term VI, but restrict both BLAS
-      // contractions to the exact nonzero pair support.  No numerical cutoff
-      // or MR-IMSRG term is introduced or removed here.
-      products.LY[ch].zeros(lambda.n_rows, y.n_cols);
-      products.LX[ch].zeros(lambda.n_rows, x.n_cols);
-      products.LY[ch].rows(active) = ly_active;
-      products.LX[ch].rows(active) = lx_active;
-      products.XLY[ch] = x.cols(active) * ly_active;
-      products.YLX[ch] = y.cols(active) * lx_active;
+      // the exact active rows needed by term VI, and use the same rows for the
+      // IV products.  No numerical cutoff or MR-IMSRG term is introduced or
+      // removed here.  The full-active case is included automatically.
+      products.XLY[ch] = x.cols(active) * products.LY_active_rows[ch];
+      products.YLX[ch] = y.cols(active) * products.LX_active_rows[ch];
     }
     return products;
   }
@@ -529,6 +594,15 @@ namespace MRCommutator
     double section_start = omp_get_wtime();
     const StandardProducts products = BuildStandardProducts(X, Y, reference);
     arma::cube raw(norbits, norbits, 3, arma::fill::zeros);
+    const size_t standard_product_bytes = products.DataSize();
+    const size_t avoided_dense_ly_lx_bytes =
+        products.dense_ly_lx_bytes - products.ActiveLYLXDataSize();
+    X.profiler.counter["MR standard products peak KiB"] = std::max(
+        X.profiler.counter["MR standard products peak KiB"],
+        static_cast<int>((standard_product_bytes + 1023) / 1024));
+    X.profiler.counter["MR dense LY LX avoided KiB"] = std::max(
+        X.profiler.counter["MR dense LY LX avoided KiB"],
+        static_cast<int>((avoided_dense_ly_lx_bytes + 1023) / 1024));
     X.profiler.timer["MR comm221 lambda2 setup"] += omp_get_wtime() - section_start;
 
     // IV: ordinary pair-coupled X lambda Y products.
@@ -635,14 +709,20 @@ namespace MRCommutator
               continue;
             const int ch = modelspace.GetTwoBodyChannelIndex(
                 J2, (os.l + ow.l) % 2, (os.tz2 + ow.tz2) / 2);
-            if (ch < 0 || static_cast<size_t>(ch) >= products.LY.size())
+            if (ch < 0 || static_cast<size_t>(ch) >= products.XLY.size())
               continue;
             const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
             const double weight = (2 * J2 + 1.0) / (ot.j2 + 1.0);
             ly_trace(s, t) += weight *
-                              MatrixElement(products.LY[ch], channel, s, w, t, w);
+                              ActiveRowMatrixElement(
+                                  products.LY_active_rows[ch],
+                                  products.pair_to_active_row[ch],
+                                  channel, s, w, t, w);
             lx_trace(s, t) += weight *
-                              MatrixElement(products.LX[ch], channel, s, w, t, w);
+                              ActiveRowMatrixElement(
+                                  products.LX_active_rows[ch],
+                                  products.pair_to_active_row[ch],
+                                  channel, s, w, t, w);
           }
       }
     X.profiler.timer["MR comm221 lambda2 VI trace"] +=
