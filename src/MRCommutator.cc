@@ -224,10 +224,63 @@ namespace
       const arma::mat &x = X.TwoBody.GetMatrix(ch);
       const arma::mat &y = Y.TwoBody.GetMatrix(ch);
       const arma::mat &lambda = reference.Lambda2.GetMatrix(ch);
-      products.LY[ch] = lambda * y;
-      products.LX[ch] = lambda * x;
-      products.XLY[ch] = x * products.LY[ch];
-      products.YLX[ch] = y * products.LX[ch];
+      std::vector<bool> pair_is_active(lambda.n_rows, false);
+      size_t active_count = 0;
+      for (arma::uword i = 0; i < lambda.n_rows; ++i)
+        for (arma::uword j = 0; j < lambda.n_cols; ++j)
+        {
+          if (lambda(i, j) == 0.0)
+            continue;
+          if (!pair_is_active[i])
+          {
+            pair_is_active[i] = true;
+            ++active_count;
+          }
+          if (!pair_is_active[j])
+          {
+            pair_is_active[j] = true;
+            ++active_count;
+          }
+        }
+
+      if (active_count == 0)
+      {
+        products.LY[ch].zeros(lambda.n_rows, y.n_cols);
+        products.LX[ch].zeros(lambda.n_rows, x.n_cols);
+        products.XLY[ch].zeros(x.n_rows, y.n_cols);
+        products.YLX[ch].zeros(y.n_rows, x.n_cols);
+        continue;
+      }
+      if (active_count == lambda.n_rows)
+      {
+        products.LY[ch] = lambda * y;
+        products.LX[ch] = lambda * x;
+        products.XLY[ch] = x * products.LY[ch];
+        products.YLX[ch] = y * products.LX[ch];
+        continue;
+      }
+
+      std::vector<arma::uword> active_storage;
+      active_storage.reserve(active_count);
+      for (arma::uword i = 0; i < pair_is_active.size(); ++i)
+        if (pair_is_active[i])
+          active_storage.push_back(i);
+      const arma::uvec active =
+          arma::conv_to<arma::uvec>::from(active_storage);
+      const arma::mat lambda_active = lambda.submat(active, active);
+      const arma::mat ly_active = lambda_active * y.rows(active);
+      const arma::mat lx_active = lambda_active * x.rows(active);
+
+      // Lambda is exactly zero outside the active principal submatrix.  Keep
+      // the full LY/LX layouts required by term VI, but restrict both BLAS
+      // contractions to the exact nonzero pair support.  No numerical cutoff
+      // or MR-IMSRG term is introduced or removed here.
+      products.LY[ch].zeros(lambda.n_rows, y.n_cols);
+      products.LX[ch].zeros(lambda.n_rows, x.n_cols);
+      products.LY[ch].rows(active) = ly_active;
+      products.LX[ch].rows(active) = lx_active;
+      products.XLY[ch] = x.cols(active) * ly_active;
+      products.YLX[ch] = y.cols(active) * lx_active;
     }
     return products;
   }
