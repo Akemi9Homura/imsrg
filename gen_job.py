@@ -313,6 +313,7 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
     prefix = result_dir / tag
     output_j64 = result_dir / f"H_{tag}.jcoupled64"
     output_no2bpack = result_dir / f"H_{tag}.no2bpack"
+    resource_usage = result_dir / "resource_usage.txt"
     manifest = result_dir / "metadata.json"
     nucleus_a = int(re.search(r"\d+", settings.nucleus).group())
     parameters = [
@@ -376,7 +377,29 @@ echo '{environment_script_sha256}  {environment_script}' | sha256sum -c -
 if ldd {shlex.quote(str(executable_path))} | grep 'not found'; then
   exit 1
 fi
-{command}
+start_seconds=$SECONDS
+maximum_rss_kib=0
+{command} &
+flow_pid=$!
+while kill -0 "$flow_pid" 2>/dev/null; do
+  current_rss_kib=$(awk '/^VmHWM:/ {{print $2}}' "/proc/$flow_pid/status" 2>/dev/null || true)
+  if [[ "$current_rss_kib" =~ ^[0-9]+$ ]] && (( current_rss_kib > maximum_rss_kib )); then
+    maximum_rss_kib=$current_rss_kib
+  fi
+  sleep 1
+done
+set +e
+wait "$flow_pid"
+flow_status=$?
+set -e
+{{
+  echo wall_seconds=$((SECONDS - start_seconds))
+  echo maximum_rss_kib="$maximum_rss_kib"
+  echo exit_status="$flow_status"
+}} | tee {shlex.quote(str(resource_usage))}
+if (( flow_status != 0 )); then
+  exit "$flow_status"
+fi
 test -s {shlex.quote(str(output_j64))}
 test -s {shlex.quote(str(output_no2bpack))}
 sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
@@ -406,6 +429,7 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
         "flow_file": str(flow_file),
         "output_jcoupled64": str(output_j64),
         "output_no2bpack": str(output_no2bpack),
+        "resource_usage": str(resource_usage),
         "script": str(script_file),
     }
     manifest.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n",

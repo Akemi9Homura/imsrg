@@ -55,6 +55,7 @@ def main():
             executable=executable,
         )
         script = generate_mr_jscheme_slurm(settings)
+        subprocess.run(["bash", "-n", str(script)], check=True)
         contents = script.read_text(encoding="utf-8")
         metadata = json.loads((script.parent / "metadata.json").read_text(encoding="utf-8"))
 
@@ -86,6 +87,10 @@ def main():
             "ode_tolerance=1.0000000000000001e-09",
             "write_H_jcoupled64=",
             "write_H_no2bpack=",
+            "/proc/$flow_pid/status",
+            "echo wall_seconds=",
+            "echo maximum_rss_kib=",
+            "resource_usage.txt",
             "sha256sum -c -",
             "ldd ",
         )
@@ -101,6 +106,8 @@ def main():
                 "generated script does not verify libIMSRG")
         require(metadata["environment_script"] in contents,
                 "generated script does not verify sourceme.sh")
+        require(metadata["resource_usage"] in contents,
+                "generated script does not preserve sampled flow resources")
 
         try:
             generate_mr_jscheme_slurm(settings)
