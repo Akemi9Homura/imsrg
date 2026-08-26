@@ -215,6 +215,7 @@ def main():
                 "nmax": EXPECTED_NMAX[nucleus],
                 "states": 3,
                 "interaction_sha256": EXPECTED_INTERACTION_SHA256,
+                "gate_implementation": {"sha256": "gate-reader-sha"},
                 "downstream_validator": {"sha256": "validator-sha"},
                 "thresholds": EXPECTED_THRESHOLDS,
                 "spectral_max_abs_mev": (index + 1) * 1e-4,
@@ -272,6 +273,21 @@ def main():
             pass
         else:
             raise AssertionError("a stale single-nucleus gate schema was accepted")
+
+        mixed_reader_entries = list(entries)
+        mixed_reader_report = dict(mixed_reader_entries[0][1])
+        mixed_reader_report["gate_implementation"] = {
+            "sha256": "different-gate-reader"
+        }
+        mixed_reader_entries[0] = (
+            mixed_reader_entries[0][0], mixed_reader_report
+        )
+        try:
+            aggregate(mixed_reader_entries)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("mixed gate reader implementations were accepted")
 
         unfrozen_entries = []
         for path, report in entries:

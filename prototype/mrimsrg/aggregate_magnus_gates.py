@@ -124,6 +124,10 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
         (report["downstream_validator"]["sha256"] for report in reports),
         "downstream validator SHA-256",
     )
+    gate_implementation_sha256 = unique(
+        (report["gate_implementation"]["sha256"] for report in reports),
+        "single-nucleus gate implementation SHA-256",
+    )
     production_executable_sha256 = unique(
         (
             report[profile]["metadata"]["executable_sha256"]
@@ -211,6 +215,7 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
             interaction_sha256 == EXPECTED_INTERACTION_SHA256
         ),
         "downstream_validator_identical": bool(downstream_validator_sha256),
+        "gate_implementation_identical": bool(gate_implementation_sha256),
         "production_executable_is_frozen": (
             production_executable_sha256
             == EXPECTED_PRODUCTION_EXECUTABLE_SHA256
@@ -233,6 +238,7 @@ def aggregate(entries: list[tuple[Path, dict]]) -> dict[str, object]:
         "schema": "mrimsrg_four_nucleus_magnus_gate_v1",
         "interaction_sha256": interaction_sha256,
         "downstream_validator_sha256": downstream_validator_sha256,
+        "gate_implementation_sha256": gate_implementation_sha256,
         "production_executable_sha256": production_executable_sha256,
         "production_library_sha256": production_library_sha256,
         "omega_validator_sha256": omega_validator_sha256,

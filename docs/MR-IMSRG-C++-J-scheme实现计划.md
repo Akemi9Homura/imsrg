@@ -1158,6 +1158,8 @@ He4/O16 长流的 scalar commutator 计数超过六位后，原生
 因此纯 `split()` 会把 `0.0000000001184939` 误当成一个浮点数并把计数读成
 零。gate reader 现按源码的 `5,12,9x16,7` 固定列宽解析前缀，并以真实
 He4 七位计数行回归，既不改动流也不丢失计数。
+单核 JSON 同时记录该 reader 文件本身的 SHA-256；最终聚合要求四核一致，
+避免同一 v2 schema 下混入修复前后的两种解析实现。
 
 最终四核完成判据由 `prototype/mrimsrg/aggregate_magnus_gates.py`
 聚合，不从日志手工摘录。它要求恰有 `He4/Be8/C12/O16`，对应

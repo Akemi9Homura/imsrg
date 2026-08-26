@@ -119,6 +119,7 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       旧 schema 或仅手填顶层 `passed=true` 的报告。
       flow reader 按 `IMSRGSolver::WriteFlowStatus` 的固定列宽读取到 `Ncomm`；
       不能用空白切分，因为七位 commutator 计数会紧接满宽 `Eta_3` 字段。
+      每份 v2 JSON 保存 gate reader 自身 SHA-256，四核聚合要求一致。
 - [x] `Be8 Nrefmax=0` 与 `C12 Nrefmax=0` 的完整 default/同终点
       tight Magnus 流和 NCSM 读回已通过。二者 default 分别在
       `s=330.08347/226.53612` 达到残差比

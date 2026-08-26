@@ -376,6 +376,10 @@ def summarize(args: argparse.Namespace) -> dict[str, object]:
     })
     return {
         "schema": GATE_SCHEMA,
+        "gate_implementation": {
+            "path": str(Path(__file__).resolve()),
+            "sha256": sha256(Path(__file__).resolve()),
+        },
         "nucleus": args.nucleus,
         "nrefmax": args.nrefmax,
         "nmax": args.nmax,
