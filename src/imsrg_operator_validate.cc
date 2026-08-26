@@ -98,8 +98,9 @@ int main(int argc, char **argv)
 
       metadata_passed = metadata_passed && omega.GetJRank() == 0 &&
                         omega.GetTRank() == 0 && omega.GetParity() == 0 &&
-                        omega.GetParticleRank() <= 2 &&
-                        omega.IsAntiHermitian() &&
+                        omega.GetParticleRank() == 2 &&
+                        omega.GetNumberLegs() == 4 &&
+                        !omega.IsHermitian() && omega.IsAntiHermitian() &&
                         omega.TwoBody.IsAntiHermitian();
       finite_passed = finite_passed && std::isfinite(omega.ZeroBody) &&
                       omega.OneBody.is_finite();
