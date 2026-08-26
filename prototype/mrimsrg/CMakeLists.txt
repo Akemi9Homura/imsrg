@@ -6,26 +6,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(SHELL_MODEL_OBS_ROOT "/home/mengziyan/shell-model-obs" CACHE PATH
-    "Path to the validated shell-model-obs checkout")
+set(SIMPLE_NCSM_ROOT "/home/mengziyan/simple-ncsm" CACHE PATH
+    "Path to the isolated simple-ncsm validation checkout")
 
-if(NOT EXISTS "${SHELL_MODEL_OBS_ROOT}/CMakeLists.txt")
-    message(FATAL_ERROR "shell-model-obs checkout not found: ${SHELL_MODEL_OBS_ROOT}")
+if(NOT EXISTS "${SIMPLE_NCSM_ROOT}/CMakeLists.txt")
+    message(FATAL_ERROR "simple-ncsm checkout not found: ${SIMPLE_NCSM_ROOT}")
 endif()
 
 # The bridge needs only the validated NN reader and simpleFCI path.  Disabling
 # optional 3B readers keeps this small build independent of unused libraries.
-set(TBME "NONE" CACHE STRING "shell-model-obs optional 3B reader" FORCE)
+set(TBME "NONE" CACHE STRING "simple-ncsm optional 3B reader" FORCE)
 set(SIMPLE_FCI_EMAX "2" CACHE STRING "simpleFCI determinant emax")
-add_subdirectory("${SHELL_MODEL_OBS_ROOT}" "${CMAKE_BINARY_DIR}/shell-model-obs" EXCLUDE_FROM_ALL)
+add_subdirectory("${SIMPLE_NCSM_ROOT}" "${CMAKE_BINARY_DIR}/simple-ncsm" EXCLUDE_FROM_ALL)
 
 execute_process(
-    COMMAND git -C "${SHELL_MODEL_OBS_ROOT}" rev-parse HEAD
-    OUTPUT_VARIABLE SHELL_MODEL_OBS_REVISION
+    COMMAND git -C "${SIMPLE_NCSM_ROOT}" rev-parse HEAD
+    OUTPUT_VARIABLE SIMPLE_NCSM_REVISION
     OUTPUT_STRIP_TRAILING_WHITESPACE
-    RESULT_VARIABLE SHELL_MODEL_OBS_GIT_RESULT)
-if(NOT SHELL_MODEL_OBS_GIT_RESULT EQUAL 0)
-    set(SHELL_MODEL_OBS_REVISION "unknown")
+    RESULT_VARIABLE SIMPLE_NCSM_GIT_RESULT)
+if(NOT SIMPLE_NCSM_GIT_RESULT EQUAL 0)
+    set(SIMPLE_NCSM_REVISION "unknown")
 endif()
 
 add_executable(mrimsrg_prepare cpp/prepare_reference.cpp)
@@ -40,8 +40,10 @@ foreach(target mrimsrg_prepare mrimsrg_validate mrimsrg_export_no2bpack
     target_link_libraries(${target} PRIVATE fci nucleus util)
     target_compile_definitions(${target} PRIVATE
         SIMPLE_FCI_EMAX=${SIMPLE_FCI_EMAX}
-        SHELL_MODEL_OBS_ROOT="${SHELL_MODEL_OBS_ROOT}"
-        SHELL_MODEL_OBS_REVISION="${SHELL_MODEL_OBS_REVISION}")
+        # Preserve historical metadata keys while pointing them at the
+        # isolated validation checkout.
+        SHELL_MODEL_OBS_ROOT="${SIMPLE_NCSM_ROOT}"
+        SHELL_MODEL_OBS_REVISION="${SIMPLE_NCSM_REVISION}")
     target_compile_options(${target} PRIVATE
         -Wall -Wextra -Wpedantic
         $<$<CONFIG:Release>:-march=native>)

@@ -3,13 +3,15 @@
 This directory contains the deliberately small m-scheme prototype described in
 `docs/MR-IMSRG-快速结果计划.md`.  The C++ bridge does not implement another
 interaction reader or NCSM solver: it builds against the validated
-`/home/mengziyan/shell-model-obs` `Hamiltonian` and `simpleFCI` libraries.
+`/home/mengziyan/simple-ncsm` `Hamiltonian` and `simpleFCI` libraries.  This
+lightweight path is only for deterministic bridge smoke tests; formal NCSM
+spectrum acceptance uses BIGSTICK.
 
 Build the input bridge:
 
 ```bash
 cmake -S prototype/mrimsrg -B prototype/mrimsrg/build \
-  -DSHELL_MODEL_OBS_ROOT=/home/mengziyan/shell-model-obs \
+  -DSIMPLE_NCSM_ROOT=/home/mengziyan/simple-ncsm \
   -DCMAKE_BUILD_TYPE=Release
 cmake --build prototype/mrimsrg/build \
   --target mrimsrg_prepare mrimsrg_validate mrimsrg_export_no2bpack -j2
