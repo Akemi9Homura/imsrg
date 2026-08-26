@@ -360,7 +360,8 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `374.41 s` 通过。ASan+UBSan 首轮在 MR 必经的既有 SR
       `comm220ss` 空 channel 上发现 Armadillo 空指针引用，已由 commit
       `5dfa32a4` 加严格零贡献保护；修复后 sanitizer 下 MR driver、SR
-      退化和 denominator 三项通过。sanitized `pyIMSRG` 在测试故意触发
+      退化和 denominator 三项通过；本轮两个优化后的完整四核相关参考
+      sanitizer oracle 也以 `544.38 s` 通过。sanitized `pyIMSRG` 在测试故意触发
       `WriteBinary` 拒绝覆盖异常时仍有 libasan/CPython `__cxa_throw`
       interceptor 冲突；这是当前剩余的测试运行环境问题，不能误记为
       MRReference 数值失败，也不能据此把 sanitizer 项标成完成。
