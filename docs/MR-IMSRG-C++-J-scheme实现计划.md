@@ -1076,3 +1076,10 @@ SR driver 与作业生成回归还在独立 Debug
 `-fsanitize=address,undefined` 构建下全部通过；完整 Release
 CTest `21/21` 以 `499.20 s` 通过，其中相关参考态验收项
 `MRCorrelatedDriver` 为 `405.61 s`。
+
+生产作业仍不要求 MR 专用 ODE 输入：默认 profile 完全继承
+`IMSRGSolver` 的 `ds_0/dsmax/ode_tolerance`。为执行独立的十倍收紧
+验收，单点生成器另提供 `--mr-tight-validation`布尔 profile；它只在
+复算脚本中写入既有 `ode_tolerance=1e-7`，不改步长参数，并将
+唯一 override 和 profile 写入 metadata。这不把 ODE 参数重新变成
+默认生产必填项。

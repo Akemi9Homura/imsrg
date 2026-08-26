@@ -191,6 +191,7 @@ class MRJschemeSettings:
     cpus: int = 64
     nodelist: Optional[str] = None
     label: Optional[str] = None
+    tight_validation: bool = False
     result_root: Path = REPO_ROOT / "result" / "mr-jscheme-magnus"
     executable: Path = REPO_ROOT / "build" / "src" / "imsrg++"
 
@@ -363,6 +364,8 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
         f"{settings.nucleus}_Nrefmax{settings.nrefmax}_emax{settings.emax}"
         f"_s{path_token(settings.start_s)}to{path_token(settings.target_s)}"
     )
+    if settings.tight_validation:
+        tag += "_tight"
     if settings.label:
         tag += f"_{settings.label}"
     result_dir = result_root / tag
@@ -408,6 +411,11 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
         f"write_H_jcoupled64={output_j64}",
         f"write_H_no2bpack={output_no2bpack}",
     ]
+    if settings.tight_validation:
+        # This is an explicit numerical validation rerun, not a required MR
+        # production input. The unmodified production profile continues to
+        # inherit IMSRGSolver's ode_tolerance=1e-6 default.
+        parameters.append("ode_tolerance=1e-7")
     command = shlex.join([str(executable_path), *parameters])
     nodelist_line = (
         f"#SBATCH --nodelist={settings.nodelist}\n" if settings.nodelist else ""
@@ -490,8 +498,17 @@ sha256sum {shlex.quote(omega_prefix)}*
         "cumulative_target_s": settings.target_s,
         "segment_smax": segment_smax,
         "solver_method": "magnus_adaptive",
-        "ode_parameter_source": "imsrg++ adaptive Magnus runtime defaults",
-        "ode_parameter_overrides": [],
+        "ode_parameter_source": (
+            "explicit tenfold validation override of the imsrg++ default"
+            if settings.tight_validation
+            else "imsrg++ adaptive Magnus runtime defaults"
+        ),
+        "ode_parameter_overrides": (
+            ["ode_tolerance=1e-7"] if settings.tight_validation else []
+        ),
+        "validation_profile": (
+            "tight_ode" if settings.tight_validation else "production_default"
+        ),
         "omega_represents": "segment",
         "omega_segment_start_s": settings.start_s,
         "omega_segment_target_s": settings.target_s,
@@ -952,6 +969,14 @@ def parse_args():
     parser.add_argument("--mr-nodelist")
     parser.add_argument("--mr-cpus", type=int, default=64)
     parser.add_argument("--mr-label")
+    parser.add_argument(
+        "--mr-tight-validation",
+        action="store_true",
+        help=(
+            "rerun the MR point with the existing ode_tolerance parameter "
+            "tightened from its 1e-6 runtime default to 1e-7"
+        ),
+    )
     parser.add_argument("--mr-result-root", type=Path)
     parser.add_argument("--mr-executable", type=Path)
     parser.add_argument("--mr-ncsm-no2bpack", type=Path)
@@ -1011,6 +1036,7 @@ if __name__ == "__main__":
                 cpus=args.mr_cpus,
                 nodelist=args.mr_nodelist,
                 label=args.mr_label,
+                tight_validation=args.mr_tight_validation,
                 result_root=(
                     args.mr_result_root
                     if args.mr_result_root is not None

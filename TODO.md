@@ -108,7 +108,9 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
 - [ ] 按 `He4 -> Be8 -> C12 -> O16` 跑完整生产流；每个体系保存
       默认/十倍收紧的最终 0B/1B/2B 矩阵元差、解耦残差、
       Magnus 收敛/拒步计数、分段 `Omega` 及 NCSM 低能谱；不以零体项
-      代替读回对角化。
+      代替读回对角化。默认 profile 不写 ODE 参数；
+      `--mr-tight-validation` 只用于独立验收复算，显式将既有
+      `ode_tolerance=1e-6` 收紧为 `1e-7`，不改 `ds_0/dsmax`。
 - [ ] 四核均必须达到目标掩码内解耦残差相对初值 `<1e-6`，
       十倍收紧后 NCSM 验收能级变化 `<1 keV`，并保持 Hermiticity、
       anti-Hermiticity、J64/no2bpack 读回窗和已验收的 m-scheme/SR 极限。

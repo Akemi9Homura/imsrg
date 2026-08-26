@@ -76,6 +76,8 @@ def main():
                 "MR Magnus does not record the source of its ODE parameters")
         require(metadata["ode_parameter_overrides"] == [],
                 "MR flow still records wrapper-level ODE overrides")
+        require(metadata["validation_profile"] == "production_default",
+                "default MR flow has the wrong validation profile")
         required_tokens = (
             "#SBATCH --partition=compute_C",
             "#SBATCH --cpus-per-task=64",
@@ -150,6 +152,29 @@ def main():
             pass
         else:
             raise AssertionError("generator silently overwrote an existing result")
+
+        tight_settings = replace(
+            settings,
+            tight_validation=True,
+            label="validation",
+            result_root=root / "tight-result",
+        )
+        tight_script = generate_mr_jscheme_slurm(tight_settings)
+        tight_contents = tight_script.read_text(encoding="utf-8")
+        tight_metadata = json.loads(
+            (tight_script.parent / "metadata.json").read_text(encoding="utf-8")
+        )
+        require("_tight_validation" in tight_script.parent.name,
+                "tight validation is not distinguished in the result path")
+        require("ode_tolerance=1e-7" in tight_contents,
+                "tight validation did not tighten the existing ODE parameter")
+        require("ds_0=" not in tight_contents and "dsmax=" not in tight_contents,
+                "tight validation changed unrelated flow defaults")
+        require(tight_metadata["validation_profile"] == "tight_ode",
+                "tight validation profile is not recorded")
+        require(tight_metadata["ode_parameter_overrides"] ==
+                ["ode_tolerance=1e-7"],
+                "tight validation override is not explicit in metadata")
 
         invalid = replace(settings, nucleus="Be8", nrefmax=2,
                           result_root=root / "invalid")
