@@ -819,3 +819,39 @@ add_test(NAME MRTailDiagnostic
          COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRTailDiagnostic.py)
 add_test(NAME MRDownstreamWindow
          COMMAND python3 ${CMAKE_SOURCE_DIR}/test/UnitTestMRDownstreamWindow.py)
+
+# Python itself is not built with the sanitizers.  When an instrumented C++
+# extension is loaded later, ASan cannot install its __cxa_throw interceptor
+# unless libstdc++ is already present.  Keep libasan first, preload libstdc++ as
+# well, and ignore only the non-instrumented CPython interpreter's process-exit
+# leak report.  Address/undefined-behaviour checks remain fatal.  Explicitly
+# point every MR Python test at the module from this build tree so a sanitizer
+# build cannot silently import the normal Release module.
+set(MR_PYTHON_TESTS
+    MRReference MRDriver MRSRDriver MRCorrelatedDriver MRDenominators
+    MRJobGenerator MRTailDiagnostic MRDownstreamWindow)
+set(MR_PYTHON_TEST_ENVIRONMENT
+    "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{PYTHONPATH}"
+    "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}")
+string(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_UPPER)
+set(MR_EFFECTIVE_CXX_FLAGS
+    "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE_UPPER}}")
+if(MR_EFFECTIVE_CXX_FLAGS MATCHES "-fsanitize=[^ ]*address")
+  execute_process(
+      COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libasan.so
+      OUTPUT_VARIABLE MR_ASAN_RUNTIME
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+      COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libstdc++.so.6
+      OUTPUT_VARIABLE MR_LIBSTDCXX_RUNTIME
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT EXISTS "${MR_ASAN_RUNTIME}" OR NOT EXISTS "${MR_LIBSTDCXX_RUNTIME}")
+    message(FATAL_ERROR "Cannot locate ASan/libstdc++ runtimes for MR Python tests")
+  endif()
+  list(APPEND MR_PYTHON_TEST_ENVIRONMENT
+       "LD_PRELOAD=${MR_ASAN_RUNTIME}:${MR_LIBSTDCXX_RUNTIME}"
+       "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:abort_on_error=1"
+       "UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1")
+endif()
+set_tests_properties(${MR_PYTHON_TESTS}
+                     PROPERTIES ENVIRONMENT "${MR_PYTHON_TEST_ENVIRONMENT}")
