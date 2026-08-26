@@ -93,7 +93,9 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       `MRPrototype/MRSRDriver/MRMagnus/MRJobGenerator/MRMagnusGate`；
       `5/5` 以 `16.58 s` 通过。随后同一构建的 `MRReference/
       MRCorrelatedDriver/MRDenominators` `3/3` 以 `620.95 s` 通过；全部
-      ASan/UBSan 均无诊断。
+      ASan/UBSan 均无诊断。最后补齐 `MRDriver/MRTailDiagnostic/
+      MRDownstreamWindow` `3/3`（`13.51 s`）；当前 11 项 MR/原型 CTest
+      已在同一干净 sanitizer 构建中全部通过。
 
 ### M4. 生产收尾：级数失败不得静默接受
 
