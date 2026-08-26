@@ -179,6 +179,21 @@ def main():
         ):
             require(len(input_metadata[key]) == 64,
                     "MR input metadata lost SHA-256: " + key)
+        blocked_sympy_import = r'''\
+import builtins
+original_import = builtins.__import__
+def blocked_import(name, *args, **kwargs):
+    if name == "sympy" or name.startswith("sympy."):
+        raise ModuleNotFoundError("blocked by dependency-isolation regression")
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = blocked_import
+import prototype.mrimsrg.embed_jref
+'''
+        subprocess.run(
+            [sys.executable, "-c", blocked_sympy_import],
+            cwd=REPOSITORY,
+            check=True,
+        )
         try:
             generate_mr_jscheme_input_slurm(input_settings)
         except FileExistsError:

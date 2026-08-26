@@ -18,18 +18,15 @@ import numpy as np
 try:
     from .basis import prepare_natural_basis
     from .densities import compute_densities, validate_densities
+    from .jref_format import ENDIAN_MARKER, MAGIC, SCHEMA_VERSION
     from .jcoupling import couple_scalar_two_body, extract_j_orbits
     from .reference_io import load_reference
 except ImportError:
     from basis import prepare_natural_basis
     from densities import compute_densities, validate_densities
+    from jref_format import ENDIAN_MARKER, MAGIC, SCHEMA_VERSION
     from jcoupling import couple_scalar_two_body, extract_j_orbits
     from reference_io import load_reference
-
-
-MAGIC = b"mrimsrg_jref1\0\0\0"
-ENDIAN_MARKER = 0x01020304
-SCHEMA_VERSION = 1
 
 
 def _digest_files(paths: tuple[Path, ...]) -> str:

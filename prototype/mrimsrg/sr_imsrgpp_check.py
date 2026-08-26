@@ -15,10 +15,8 @@ from __future__ import annotations
 import argparse
 from functools import lru_cache
 import hashlib
-import importlib
 import json
 from pathlib import Path
-import sys
 from typing import Any
 
 import numpy as np
@@ -40,6 +38,7 @@ try:
         white_generator,
     )
     from .normal_order import MRHamiltonian, VacuumHamiltonian, normal_order, to_vacuum
+    from .pyimsrg_utils import import_pyimsrg
     from .reference_io import load_reference
 except ImportError:
     from jcoupled64_io import JCoupled64, read_jcoupled64, write_jcoupled64
@@ -56,6 +55,7 @@ except ImportError:
         white_generator,
     )
     from normal_order import MRHamiltonian, VacuumHamiltonian, normal_order, to_vacuum
+    from pyimsrg_utils import import_pyimsrg
     from reference_io import load_reference
 
 
@@ -87,14 +87,6 @@ def verify_oracle_sources(repository: Path, oracle_source: Path) -> dict[str, st
             )
         result[name] = local_hash
     return result
-
-
-def import_pyimsrg(module_dir: Path) -> Any:
-    sys.path.insert(0, str(module_dir.resolve()))
-    try:
-        return importlib.import_module("pyIMSRG")
-    finally:
-        sys.path.pop(0)
 
 
 def _modelspace_orbits(modelspace: Any) -> np.ndarray:

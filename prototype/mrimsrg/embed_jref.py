@@ -11,11 +11,11 @@ from pathlib import Path
 import struct
 
 try:
-    from .export_jref import ENDIAN_MARKER, MAGIC, SCHEMA_VERSION
-    from .sr_imsrgpp_check import import_pyimsrg
+    from .jref_format import ENDIAN_MARKER, MAGIC, SCHEMA_VERSION
+    from .pyimsrg_utils import import_pyimsrg
 except ImportError:
-    from export_jref import ENDIAN_MARKER, MAGIC, SCHEMA_VERSION
-    from sr_imsrgpp_check import import_pyimsrg
+    from jref_format import ENDIAN_MARKER, MAGIC, SCHEMA_VERSION
+    from pyimsrg_utils import import_pyimsrg
 
 
 _JREF_HEADER = struct.Struct("<16sII7idQQ")
