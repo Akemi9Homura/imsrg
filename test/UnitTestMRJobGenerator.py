@@ -87,7 +87,7 @@ def main():
             "ode_tolerance=1.0000000000000001e-09",
             "write_H_jcoupled64=",
             "write_H_no2bpack=",
-            "test \"$(git rev-parse HEAD)\" =",
+            "echo repository_commit=",
             "/proc/$flow_pid/status",
             "echo wall_seconds=",
             "echo maximum_rss_kib=",
@@ -103,6 +103,15 @@ def main():
                 "libIMSRG SHA-256 was not recorded")
         require(len(metadata["environment_script_sha256"]) == 64,
                 "sourceme.sh SHA-256 was not recorded")
+        require(metadata["repository_state_files"],
+                "repository state files were not recorded")
+        require("git rev-parse" not in contents,
+                "flow job still requires Git on the compute node")
+        for state_file in metadata["repository_state_files"]:
+            require(len(state_file["sha256"]) == 64,
+                    "repository-state SHA-256 was not recorded")
+            require(state_file["path"] in contents,
+                    "flow job does not verify a repository-state file")
         require(metadata["shared_library"] in contents,
                 "generated script does not verify libIMSRG")
         require(metadata["environment_script"] in contents,
@@ -153,7 +162,7 @@ def main():
         for token in (
             "#SBATCH --partition=c128m1024",
             "#SBATCH --cpus-per-task=128",
-            "test \"$(git rev-parse HEAD)\" =",
+            "echo repository_commit=",
             "run_with_rss()",
             "/proc/$sampled_pid/status",
             "echo wall_seconds=",
@@ -177,6 +186,10 @@ def main():
                     "generated MR input script is missing: " + token)
         require("/usr/bin/time" not in input_contents,
                 "point7 MR input script still requires unavailable /usr/bin/time")
+        require("git rev-parse" not in input_contents,
+                "input job still requires Git on the compute node")
+        require(input_metadata["repository_state_files"],
+                "input job lost repository-state hashes")
         for key in (
             "minipack_sha256", "source_reference_sha256", "converter_sha256",
             "pyimsrg_sha256", "embedder_sha256", "format_module_sha256",
@@ -234,7 +247,7 @@ import prototype.mrimsrg.embed_jref
         for token in (
             "#SBATCH --partition=compute_C",
             "#SBATCH --cpus-per-task=64",
-            "test \"$(git rev-parse HEAD)\" =",
+            "echo repository_commit=",
             "start_seconds=$SECONDS",
             "maximum_rss_kib=0",
             "/proc/$ncsm_pid/status",
@@ -255,6 +268,10 @@ import prototype.mrimsrg.embed_jref
                 "NCSM input SHA-256 was not recorded")
         require(len(ncsm_metadata["executable_sha256"]) == 64,
                 "NCSM executable SHA-256 was not recorded")
+        require("git rev-parse" not in ncsm_contents,
+                "NCSM job still requires Git on the compute node")
+        require(ncsm_metadata["repository_state_files"],
+                "NCSM job lost repository-state hashes")
 
         foreground_settings = replace(
             ncsm_settings,

@@ -245,6 +245,60 @@ def _repository_commit(repository: Path) -> str:
     return commit
 
 
+def _repository_state_files(repository: Path) -> tuple[tuple[Path, str], ...]:
+    """Freeze files resolving HEAD without requiring Git on a compute node.
+
+    point7 login nodes provide ``git``, while some compute-node images do not.
+    Hashing the worktree HEAD file and, for an attached checkout, its loose ref
+    (or packed-refs fallback) preserves the runtime checkout guard without
+    depending on a compute-node Git installation.
+    """
+
+    def git_path(name: str) -> Path:
+        result = subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "--git-path", name],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        path = Path(result.stdout.strip())
+        if not path.is_absolute():
+            path = repository / path
+        return path.resolve()
+
+    head = git_path("HEAD")
+    if not head.is_file():
+        raise FileNotFoundError(f"repository HEAD file is unavailable: {head}")
+    paths = [head]
+    head_text = head.read_text(encoding="ascii").strip()
+    if head_text.startswith("ref: "):
+        ref_name = head_text.removeprefix("ref: ")
+        if not re.fullmatch(r"refs/[A-Za-z0-9._/-]+", ref_name):
+            raise RuntimeError(
+                f"repository HEAD contains an invalid ref: {ref_name}"
+            )
+        ref_file = git_path(ref_name)
+        if ref_file.is_file():
+            paths.append(ref_file)
+        else:
+            packed_refs = git_path("packed-refs")
+            if not packed_refs.is_file():
+                raise FileNotFoundError(
+                    f"repository ref is neither loose nor packed: {ref_name}"
+                )
+            paths.append(packed_refs)
+    return tuple((path, _sha256(path)) for path in paths)
+
+
+def _repository_state_checks(
+    state_files: tuple[tuple[Path, str], ...],
+) -> str:
+    return "\n".join(
+        f"echo {shlex.quote(digest + '  ' + str(path))} | sha256sum -c -"
+        for path, digest in state_files
+    )
+
+
 def _validate_mr_jscheme_settings(settings: MRJschemeSettings) -> None:
     if not re.fullmatch(r"(?:He4|Be8|C12|O16)", settings.nucleus):
         raise ValueError("MR J-scheme nucleus must be He4, Be8, C12, or O16")
@@ -296,6 +350,8 @@ def generate_mr_jscheme_slurm(settings: MRJschemeSettings) -> Path:
     shared_library_sha256 = _sha256(shared_library)
     environment_script_sha256 = _sha256(environment_script)
     repository_commit = _repository_commit(REPO_ROOT)
+    repository_state_files = _repository_state_files(REPO_ROOT)
+    repository_state_checks = _repository_state_checks(repository_state_files)
     segment_smax = settings.target_s - settings.start_s
     tag = (
         f"{settings.nucleus}_Nrefmax{settings.nrefmax}_emax{settings.emax}"
@@ -367,7 +423,7 @@ export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{library_paths}"
 
 echo repository_commit={repository_commit}
-test "$(git rev-parse HEAD)" = "{repository_commit}"
+{repository_state_checks}
 echo cumulative_start_s={settings.start_s:.17g}
 echo cumulative_target_s={settings.target_s:.17g}
 echo '{interaction_sha256}  {interaction}' | sha256sum -c -
@@ -410,6 +466,10 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_no2bpack))}
     metadata = {
         "schema": "mrimsrg_cpp_jscheme_slurm_v1",
         "repository_commit": repository_commit,
+        "repository_state_files": [
+            {"path": str(path), "sha256": digest}
+            for path, digest in repository_state_files
+        ],
         "settings": {
             **asdict(settings),
             "interaction": str(interaction),
@@ -483,6 +543,8 @@ def generate_mr_jscheme_input_slurm(settings: MRJschemeInputSettings) -> Path:
     environment_script = (REPO_ROOT / "sourceme.sh").resolve()
     result_root = settings.result_root.resolve()
     repository_commit = _repository_commit(REPO_ROOT)
+    repository_state_files = _repository_state_files(REPO_ROOT)
+    repository_state_checks = _repository_state_checks(repository_state_files)
     tag = (
         f"{settings.nucleus}_Nrefmax{settings.nrefmax}_emax{settings.emax}"
         "_input"
@@ -555,7 +617,7 @@ export OPENBLAS_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:{pyimsrg_dir}:{converter.parent}"
 
 echo repository_commit={repository_commit}
-test "$(git rev-parse HEAD)" = "{repository_commit}"
+{repository_state_checks}
 {checks}
 if ldd {shlex.quote(str(converter))} | grep 'not found'; then
   exit 1
@@ -602,6 +664,10 @@ sha256sum {shlex.quote(str(output_j64))} {shlex.quote(str(output_reference))} {s
     metadata = {
         "schema": "mrimsrg_jscheme_input_slurm_v1",
         "repository_commit": repository_commit,
+        "repository_state_files": [
+            {"path": str(path), "sha256": digest}
+            for path, digest in repository_state_files
+        ],
         "settings": {
             **asdict(settings),
             "minipack": str(minipack),
@@ -659,6 +725,8 @@ def generate_mr_ncsm_readback_slurm(settings: MRNCSMReadbackSettings) -> Path:
     executable = settings.executable.resolve()
     result_root = settings.result_root.resolve()
     repository_commit = _repository_commit(REPO_ROOT)
+    repository_state_files = _repository_state_files(REPO_ROOT)
+    repository_state_checks = _repository_state_checks(repository_state_files)
     no2bpack_sha256 = _sha256(no2bpack)
     executable_sha256 = _sha256(executable)
     environment_script_sha256 = _sha256(environment_script)
@@ -729,7 +797,7 @@ export OMP_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-{settings.cpus}}}
 export OPENBLAS_NUM_THREADS=1
 
 echo repository_commit={repository_commit}
-test "$(git rev-parse HEAD)" = "{repository_commit}"
+{repository_state_checks}
 echo '{no2bpack_sha256}  {no2bpack}' | sha256sum -c -
 echo '{executable_sha256}  {executable}' | sha256sum -c -
 echo '{environment_script_sha256}  {environment_script}' | sha256sum -c -
@@ -744,6 +812,10 @@ start_seconds=$SECONDS
     metadata = {
         "schema": "mrimsrg_ncsm_readback_slurm_v1",
         "repository_commit": repository_commit,
+        "repository_state_files": [
+            {"path": str(path), "sha256": digest}
+            for path, digest in repository_state_files
+        ],
         "settings": {
             **asdict(settings),
             "no2bpack": str(no2bpack),
