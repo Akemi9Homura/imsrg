@@ -1166,6 +1166,13 @@ ASan+UBSan Debug 构建中读取 Be8/C12 的真实 production `Omega_0`；
 两次均无 sanitizer 诊断，1B/2B 违例为零，0B 分别为
 `1.212e-23/4.019e-23`。
 
+O16 Nrefmax=2 default job `100606` 随后在 `s=19653.65375` 完成，最终
+`||eta||/||eta(0)||=9.84554e-7`，wall `8686 s`、峰值 RSS
+`12428 KiB`、exit 0，Magnus 级数拒步为零；J64/no2bpack 与 18 个非空
+`Omega` 段均已物化。按该精确终点由生成器产生的 tight job `100658`
+通过完整脚本审查、`bash -n` 和 `sbatch --test-only` 后在 compute_A 启动；
+它禁用提前停止并只写入 `ode_tolerance=1e-7`，不覆写任何步长参数。
+
 He4/O16 长流的 scalar commutator 计数超过六位后，原生
 `WriteFlowStatus` 的七字符 `Ncomm` 紧接前一个 16 字符 `Eta_3` 字段；
 因此纯 `split()` 会把 `0.0000000001184939` 误当成一个浮点数并把计数读成

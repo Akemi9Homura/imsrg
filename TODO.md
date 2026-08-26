@@ -146,8 +146,12 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       anti-Hermiticity；测试同时确认人为破坏的对角 1B 元素会被拒绝，
       Be8/C12 真实生产段的独立 ASan+UBSan 读回也已通过。
 - [ ] `He4/O16 Nrefmax=2` default 长流 jobs `100600/100606` 已启动并
-      通过输入、参考态和 `Omega` 写出检查；完成后以各自实际
-      停止 `s` 生成同终点 tight 复算。
+      通过输入、参考态和 `Omega` 写出检查。O16 default 已在
+      `s=19653.65375` 以残差比 `9.84554e-7`、exit 0、零拒步完成；18 个
+      非空 `Omega` 段及 J64/no2bpack 已物化。同终点 tight job `100658`
+      已经完整脚本审查、`bash -n`、`sbatch --test-only` 后启动，只覆写
+      `ode_tolerance=1e-7` 并设 `eta_criterion=1e-30`。He4 default 继续运行，
+      完成后按同一流程生成其 tight 复算。
 - [ ] 四核均必须达到目标掩码内解耦残差相对初值 `<1e-6`，
       十倍收紧后 NCSM 验收能级变化 `<1 keV`，并保持 Hermiticity、
       anti-Hermiticity、J64/no2bpack 读回窗和已验收的 m-scheme/SR 极限；
