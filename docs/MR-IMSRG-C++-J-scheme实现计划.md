@@ -680,6 +680,28 @@ emax8 1/16 线程 SHA-256 相同；Release 完整四体系 oracle 用时
 短流通过。下一项把同一“只形成实际读取的迹元素”原则用于标准耦合 IV 的
 `XLY/YLX`，它们仍是当前 standard products 中最大的 MR dense 输出。
 
+commit `460a009d` 已把该原则落实到 IV。`StandardProducts` 对空 cumulant
+channel 不再分配两个全零 `d*d` 矩阵；partial-active channel 只保存
+`X/Y(:,A)` 与 `lambda*Y/X(A,:)`，并对实际进入 IV partial trace 的坐标
+点积；全活跃 channel 继续执行原完整 BLAS。完整矩阵、skinny IV 和 VI
+活跃行现在共用同一个 pair 坐标函数，统一 channel 检查、交换相位和相同
+轨道的 `sqrt(2)` normalized-pair 因子。
+
+emax4/6/8 分别避免 `1050/14495/109900 KiB` IV dense 输出；全部 channel
+同时驻留的 standard products 数值存储从 `1198/14949/110935 KiB` 降至
+`291/883/1993 KiB`。emax8 setup/IV/addon 从
+`0.13488/0.12549/0.86220 s` 降至
+`0.04524/0.04068/0.67228 s`，单/16 线程 wall 分别为
+`10.95 -> 10.80 s` 与 `6.95 -> 6.85 s`。总进程峰值仍约 `1.35 GiB`，
+因为它出现在完整 Hamiltonian/SR scratch 占用阶段；这里报告的是已明确
+消除的 MR 中间量，不能混写为 RSS 降幅。emax4/6/8 J64 继续 bitwise
+相同，emax8 1/16 线程 SHA-256 相同；Release 完整四体系 oracle
+（`361.73 s`）及 ASan+UBSan MR/SR driver、emax4 空/full/partial channel
+短流均通过。当前 emax8 MR addon 只占单线程 profiler real 的 `6.3%`。
+下一门禁是在 point7 把同一 emax2 参考无损嵌入 canonical emax10，实跑一
+个 RHS/短流并记录 channel 尺寸、wall、RSS 和各 MR contraction；只有该
+实测显示 V build 再次成为限制时，才新增 recoupling plan/cache。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和

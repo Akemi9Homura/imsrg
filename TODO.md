@@ -437,6 +437,19 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `11.36 -> 10.95 s`，16 线程 wall `7.27 -> 6.95 s`；进程 RSS 仍由
       完整算符/SR scratch 主导。下一步对 IV 的标准耦合 `XLY/YLX` 做同类
       迹专用审计；它们当前仍是 standard products 中最大的 dense 输出。
+      commit `460a009d` 已完成该审计：空 cumulant channel 不再分配零
+      `d*d` 矩阵，partial-active channel 保存 `X/Y(:,A)` 与
+      `lambda*Y/X(A,:)` 并只点积实际 IV 迹元素；全活跃 channel 保留原
+      完整 BLAS。统一 pair 坐标 helper 固定 channel、交换相位及相同轨道
+      `sqrt(2)` 归一化。emax4/6/8 分别避免
+      `1050/14495/109900 KiB` IV dense 输出，standard products 实存从
+      `1198/14949/110935 KiB` 降至 `291/883/1993 KiB`。emax8
+      setup/IV/addon 从 `0.13488/0.12549/0.86220 s` 降至
+      `0.04524/0.04068/0.67228 s`；单/16 线程 wall 为
+      `10.95 -> 10.80 s`、`6.95 -> 6.85 s`。至此 emax8 MR addon 只占
+      单线程 profiler real 的 `6.3%`，下一步先在 point7 用同一固定
+      emax2 参考嵌入 canonical emax10 空间做一 RHS/短流容量与 profiler
+      门禁，再决定是否值得为 V build 新增 recoupling plan/cache。
 - [~] **MR-P3：每个优化提交的强制回归。** 每个边界清楚的优化必须先过
       MR-P0/P1 的小空间代数与生产入口测试，再重跑至少一个 emax4/6 RHS
       性能点；要求数值误差保持既有门禁、Hermiticity/anti-Hermiticity 与
@@ -461,6 +474,10 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       emax8 1/16 线程同 SHA、Release 四项 MR 门禁和完整四体系 oracle
       （`352.75 s`）；增量 ASan+UBSan 的生产 MR/SR driver 及 emax4
       partial-active 短流通过。
+      IV 迹专用提交 `460a009d` 又通过相同三档 bitwise J64、emax8 1/16
+      线程同 SHA、Release `MRReference/MRDriver/MRSRDriver/MRDenominators`
+      及完整四体系 oracle（`361.73 s`）；增量 ASan+UBSan 的生产 MR/SR
+      driver 和同时覆盖空/full/partial channel 的 emax4 短流通过。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`
