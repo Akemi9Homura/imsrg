@@ -424,6 +424,19 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `13.86 s` 降到 `11.36 s`，峰值 RSS 保持约 `1.35 GiB`。当前 MR
       最大单项已变为 V/build；下一轮先审计 ordered-cross-block 构造是否
       仍重复生成精确相同的 active-active Pandya 元素，再决定最小改动。
+      审计中试验的 active-active 复制和块内 OpenMP 在 emax8 均无可测
+      收益，且后者增加约 30 MiB 峰值，已全部撤回。真正的浪费是 partial-
+      active V 先形成两个完整 `d*d` 输出、最终却只读取共同 spectator
+      `t` 的少量元素。commit `287adea4` 保留全活跃分支原 BLAS，只保存
+      `X*lambda/Y*lambda` 的 `d*a` skinny 左因子并按实际迹元素点积。
+      emax4/6/8 每个最大块分别避免 `441/4390/26244 KiB` dense 输出；
+      emax6 的 V/BLAS/addon 从 `0.16431/0.04214/0.25384 s` 降至
+      `0.13445/0.00283/0.22717 s`，emax8 从
+      `0.62761/0.25488/1.12244 s` 降至
+      `0.34349/0.00590/0.86220 s`。emax8 单线程 wall
+      `11.36 -> 10.95 s`，16 线程 wall `7.27 -> 6.95 s`；进程 RSS 仍由
+      完整算符/SR scratch 主导。下一步对 IV 的标准耦合 `XLY/YLX` 做同类
+      迹专用审计；它们当前仍是 standard products 中最大的 dense 输出。
 - [~] **MR-P3：每个优化提交的强制回归。** 每个边界清楚的优化必须先过
       MR-P0/P1 的小空间代数与生产入口测试，再重跑至少一个 emax4/6 RHS
       性能点；要求数值误差保持既有门禁、Hermiticity/anti-Hermiticity 与
@@ -442,8 +455,12 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       emax6 1/16 线程同 SHA、Release `MRReference`、`MRDriver`、
       `MRSRDriver`、`MRDenominators` 和完整四体系 oracle（`355.27 s`）。
       保留在 `/tmp` 的增量 ASan+UBSan 构建已通过 `MRDriver/MRSRDriver`
-      与 emax4 稀疏
-      嵌入短流，未发现 `GetTBME_J_twoOps` 索引或三角筛选问题。
+      与 emax4 稀疏嵌入短流，未发现 `GetTBME_J_twoOps` 索引或三角筛选
+      问题。
+      V 迹专用提交 `287adea4` 又通过 emax4/6/8 与冻结 J64 bitwise 回归、
+      emax8 1/16 线程同 SHA、Release 四项 MR 门禁和完整四体系 oracle
+      （`352.75 s`）；增量 ASan+UBSan 的生产 MR/SR driver 及 emax4
+      partial-active 短流通过。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

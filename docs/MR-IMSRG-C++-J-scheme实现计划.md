@@ -659,6 +659,27 @@ MR V 的 ordered-cross-block build：先检查 active-active Pandya 子块是否
 在 row/column 两次构造中被重复计算，只有能保持全活跃分支和逐位输出时才
 允许消除重复；不转向有限-s NCSM 行为研究。
 
+实测否定了两个表面上合理但不值得保留的方案：复制 row/column 交叠的
+active-active Pandya 方块对 emax8 V build 没有可测收益；块内 OpenMP 也未
+缩短 16 线程 wall，反而增加约 30 MiB 峰值。两段试验代码均已撤回。随后
+定位到真正的结构浪费：partial-active V 原先形成两个完整 `d*d` 的
+`X*lambda*Y/Y*lambda*X`，而一体 partial trace 只读取 ordered pairs 共享
+spectator `t` 的元素。commit `287adea4` 保留全活跃参考的原 BLAS 分支；
+嵌入大空间分支只保留 `X*lambda` 与 `Y*lambda` 的 `d*a` 左因子，并对
+实际读取的元素按相同活跃指标顺序做点积，不形成未使用的 dense 输出。
+
+emax4/6/8 的单个最大 block 分别避免 `441/4390/26244 KiB` dense scratch。
+emax6 的 V/BLAS/addon 从 `0.16431/0.04214/0.25384 s` 降至
+`0.13445/0.00283/0.22717 s`；emax8 从
+`0.62761/0.25488/1.12244 s` 降至
+`0.34349/0.00590/0.86220 s`。emax8 单线程 wall 为
+`11.36 -> 10.95 s`，16 线程为 `7.27 -> 6.95 s`；总 RSS 仍由完整算符和
+共享 SR scratch 的另一时刻主导。emax4/6/8 J64 与优化前 bitwise 相同，
+emax8 1/16 线程 SHA-256 相同；Release 完整四体系 oracle 用时
+`352.75 s` 并通过，ASan+UBSan 的 MR/SR driver 与 emax4 partial-active
+短流通过。下一项把同一“只形成实际读取的迹元素”原则用于标准耦合 IV 的
+`XLY/YLX`，它们仍是当前 standard products 中最大的 MR dense 输出。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和
