@@ -18,6 +18,10 @@ except ImportError:
 
 
 ENERGY_PATTERN = re.compile(r"^state=(\d+) E=([-+0-9.eE]+)", re.MULTILINE)
+DEFAULT_ODE_PARAMETER_SOURCE = "imsrg++ adaptive Magnus runtime defaults"
+TIGHT_ODE_PARAMETER_SOURCE = (
+    "explicit tenfold validation override of the imsrg++ default"
+)
 
 
 def sha256(path: Path) -> str:
@@ -206,6 +210,69 @@ def omega_segments_are_materialized(*entries: dict[str, object]) -> bool:
     )
 
 
+def profile_metadata_gates(
+    default: dict[str, object],
+    tight: dict[str, object],
+    *,
+    nucleus: str,
+    nrefmax: int,
+    endpoint_tolerance: float,
+) -> dict[str, bool]:
+    """Check that the numerical comparison really uses the frozen profiles."""
+    default_metadata = default["metadata"]
+    tight_metadata = tight["metadata"]
+    default_settings = default_metadata["settings"]
+    tight_settings = tight_metadata["settings"]
+
+    def system_matches(metadata: dict[str, object]) -> bool:
+        settings = metadata["settings"]
+        return (
+            settings.get("nucleus") == nucleus
+            and settings.get("nrefmax") == nrefmax
+            and settings.get("emax") == 2
+            and settings.get("start_s") == 0.0
+        )
+
+    default_stop_s = default["flow"]["final"]["s"]
+    tight_target_s = tight_settings.get("target_s")
+    configured_endpoint_matches = (
+        isinstance(tight_target_s, (int, float))
+        and abs(tight_target_s - default_stop_s) <= endpoint_tolerance
+        and tight_metadata.get("cumulative_target_s") == tight_target_s
+        and tight_metadata.get("omega_segment_target_s") == tight_target_s
+    )
+    return {
+        "metadata_matches_requested_system": (
+            system_matches(default_metadata) and system_matches(tight_metadata)
+        ),
+        "solver_is_adaptive_magnus": (
+            default_metadata.get("solver_method") == "magnus_adaptive"
+            and tight_metadata.get("solver_method") == "magnus_adaptive"
+        ),
+        "default_uses_solver_ode_defaults": (
+            default_metadata.get("ode_parameter_source")
+            == DEFAULT_ODE_PARAMETER_SOURCE
+            and default_metadata.get("ode_parameter_overrides") == []
+            and default_settings.get("tight_validation") in (None, False)
+            and default_metadata.get("validation_profile")
+            in (None, "production_default")
+        ),
+        "tight_uses_only_tenfold_ode_tolerance": (
+            tight_metadata.get("ode_parameter_source")
+            == TIGHT_ODE_PARAMETER_SOURCE
+            and tight_metadata.get("ode_parameter_overrides")
+            == ["ode_tolerance=1e-7"]
+            and tight_settings.get("tight_validation") is True
+            and tight_metadata.get("validation_profile") == "tight_ode"
+        ),
+        "tight_configured_for_default_endpoint": configured_endpoint_matches,
+        "tight_early_stop_disabled": (
+            isinstance(tight_settings.get("eta_criterion"), (int, float))
+            and tight_settings["eta_criterion"] <= 1e-20
+        ),
+    }
+
+
 def summarize(args: argparse.Namespace) -> dict[str, object]:
     default = profile(args.default)
     tight = profile(args.tight)
@@ -253,7 +320,14 @@ def summarize(args: argparse.Namespace) -> dict[str, object]:
     endpoint_difference = abs(
         default["flow"]["final"]["s"] - tight["flow"]["final"]["s"]
     )
-    gates = {
+    gates = profile_metadata_gates(
+        default,
+        tight,
+        nucleus=args.nucleus,
+        nrefmax=args.nrefmax,
+        endpoint_tolerance=args.endpoint_tolerance,
+    )
+    gates.update({
         "default_residual_ratio_below_limit": (
             default["flow"]["final"]["eta_ratio_to_initial"]
             < args.residual_ratio
@@ -278,7 +352,7 @@ def summarize(args: argparse.Namespace) -> dict[str, object]:
             and default["omega_validation"]["returncode"] == 0
             and tight["omega_validation"]["returncode"] == 0
         ),
-    }
+    })
     return {
         "schema": "mrimsrg_magnus_gate_v1",
         "nucleus": args.nucleus,

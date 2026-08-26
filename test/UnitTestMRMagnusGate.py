@@ -15,6 +15,7 @@ from prototype.mrimsrg.summarize_magnus_gate import (  # noqa: E402
     omega_segments_are_materialized,
     parse_energies,
     parse_flow,
+    profile_metadata_gates,
     parse_resource_usage,
 )
 from prototype.mrimsrg.aggregate_magnus_gates import (  # noqa: E402
@@ -91,6 +92,81 @@ def main():
                 {"omega_files": 1, "empty_omega_files": 0},
             ),
             "an empty Omega segment was accepted",
+        )
+
+        default_profile = {
+            "metadata": {
+                "settings": {
+                    "nucleus": "He4", "nrefmax": 2, "emax": 2,
+                    "start_s": 0.0, "target_s": 1e7,
+                    "eta_criterion": 7e-7, "tight_validation": False,
+                },
+                "solver_method": "magnus_adaptive",
+                "ode_parameter_source": "imsrg++ adaptive Magnus runtime defaults",
+                "ode_parameter_overrides": [],
+                "validation_profile": "production_default",
+            },
+            "flow": {"final": {"s": 12.5}},
+        }
+        tight_profile = {
+            "metadata": {
+                "settings": {
+                    "nucleus": "He4", "nrefmax": 2, "emax": 2,
+                    "start_s": 0.0, "target_s": 12.5,
+                    "eta_criterion": 1e-30, "tight_validation": True,
+                },
+                "solver_method": "magnus_adaptive",
+                "ode_parameter_source": (
+                    "explicit tenfold validation override of the imsrg++ default"
+                ),
+                "ode_parameter_overrides": ["ode_tolerance=1e-7"],
+                "validation_profile": "tight_ode",
+                "cumulative_target_s": 12.5,
+                "omega_segment_target_s": 12.5,
+            },
+            "flow": {"final": {"s": 12.5}},
+        }
+        metadata_gates = profile_metadata_gates(
+            default_profile, tight_profile,
+            nucleus="He4", nrefmax=2, endpoint_tolerance=1e-4,
+        )
+        require(all(metadata_gates.values()), "valid flow profiles were rejected")
+        broken_tight_profile = {
+            **tight_profile,
+            "metadata": {
+                **tight_profile["metadata"],
+                "ode_parameter_overrides": [
+                    "ode_tolerance=1e-7", "dsmax=0.05"
+                ],
+            },
+        }
+        broken_gates = profile_metadata_gates(
+            default_profile, broken_tight_profile,
+            nucleus="He4", nrefmax=2, endpoint_tolerance=1e-4,
+        )
+        require(
+            not broken_gates["tight_uses_only_tenfold_ode_tolerance"],
+            "a tight profile with an extra step-size override was accepted",
+        )
+        broken_tight_profile = {
+            **tight_profile,
+            "metadata": {
+                **tight_profile["metadata"],
+                "settings": {
+                    **tight_profile["metadata"]["settings"],
+                    "target_s": 12.6,
+                },
+                "cumulative_target_s": 12.6,
+                "omega_segment_target_s": 12.6,
+            },
+        }
+        broken_gates = profile_metadata_gates(
+            default_profile, broken_tight_profile,
+            nucleus="He4", nrefmax=2, endpoint_tolerance=1e-4,
+        )
+        require(
+            not broken_gates["tight_configured_for_default_endpoint"],
+            "a tight profile configured for a different endpoint was accepted",
         )
 
         entries = []

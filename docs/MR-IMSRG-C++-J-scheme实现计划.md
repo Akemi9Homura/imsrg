@@ -1129,6 +1129,10 @@ metadata、resource usage、拒步日志与 `Omega` 段，比较完整
 J64 0B/1B/2B，并分别对角化 J64/no2bpack 后输出 JSON。
 `MRMagnusGate` 回归固定其 flow/resource/NCSM 解析，并把 default/tight
 均存在至少一个非空 `Omega` 段列为硬门禁。新增
+metadata 门同时要求两条流均为 `magnus_adaptive`、default 无 ODE override、
+tight 只含 `ode_tolerance=1e-7`、`eta_criterion<=1e-20`，且 tight 的配置
+终点逐字对应 default 的实际停止点；因此不能用两个偶然在同一时刻输出、
+但实际 profile 不同的目录冒充十倍收紧验收。新增
 `imsrg_operator_validate` 通过同一生产 `Operator::ReadBinary` 读回每段，
 要求 scalar rank/parity、anti-Hermitian metadata、有限矩阵元、零 0B，
 以及完整 1B/各 J-channel 2B 的数值 anti-Hermiticity 均在 `1e-10`
