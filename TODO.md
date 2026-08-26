@@ -376,7 +376,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       和连续 RK4 checkpoint 门禁；没有发现只在 helper 层成立的核心路径。
       sanitizer 暴露并修复的 `comm220ss` 空 channel UB 是本轮唯一实际生产
       调用链缺陷。
-- [~] **MR-P2：只剖析和优化 MR-IMSRG RHS。** 在 emax2/4/6/8 固定输入上
+- [x] **MR-P2：只剖析和优化 MR-IMSRG RHS。** 在 emax2/4/6/8 固定输入上
       测量单次完整 `MRCommutator + White-NCSM generator` 的 profiler、峰值
       RSS、临时张量尺寸和 1/多线程复现误差，定位当前真实瓶颈后复用
       `imsrg++` 的 channel/block/cache 基础设施做等价优化。禁止以改变物理
@@ -447,10 +447,20 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       setup/IV/addon 从 `0.13488/0.12549/0.86220 s` 降至
       `0.04524/0.04068/0.67228 s`；单/16 线程 wall 为
       `10.95 -> 10.80 s`、`6.95 -> 6.85 s`。至此 emax8 MR addon 只占
-      单线程 profiler real 的 `6.3%`，下一步先在 point7 用同一固定
-      emax2 参考嵌入 canonical emax10 空间做一 RHS/短流容量与 profiler
-      门禁，再决定是否值得为 V build 新增 recoupling plan/cache。
-- [~] **MR-P3：每个优化提交的强制回归。** 每个边界清楚的优化必须先过
+      单线程 profiler real 的 `6.3%`。point7 没有可追溯的 canonical
+      emax10 输入，因此没有虚构或临时裁剪一个；改用现存 canonical
+      NNLOopt `emax=12,e2max=24` 做更强容量门。输入 job `100531` 对
+      182 个 J-orbit、156 个 channel、73842036 条 TBME 完成 J64 零误差
+      round-trip 和 jref 嵌入，参考收缩/Hermiticity 误差为
+      `1.85e-15/0`。固定 `ds=smax=1e-4` 的 64-thread RK4 job `100535`
+      在 node8 以 `COMPLETED 0:0` 结束：进程 wall `185 s`、峰值
+      `26264640 KiB`，J64/no2bpack 均成功物化且反正规序零体差为 0。
+      MR addon 为 `8.69811 s`，只占 profiler real 的 `4.73%`；V build
+      为 `1.13381 s`（`0.6%`），standard products 实存峰值只有
+      `6494 KiB`，同时避免约 `2.30 GiB` IV dense 输出。因此当前实测
+      不支持新增 recoupling plan/cache，MR-P2 以“容量通过、无剩余 MR
+      热点值得复杂化”完成。
+- [x] **MR-P3：每个优化提交的强制回归。** 每个边界清楚的优化必须先过
       MR-P0/P1 的小空间代数与生产入口测试，再重跑至少一个 emax4/6 RHS
       性能点；要求数值误差保持既有门禁、Hermiticity/anti-Hermiticity 与
       线程复现不退化，并记录优化前后 wall/RSS。当前阶段不以 NCSM Nmax
@@ -477,7 +487,10 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       IV 迹专用提交 `460a009d` 又通过相同三档 bitwise J64、emax8 1/16
       线程同 SHA、Release `MRReference/MRDriver/MRSRDriver/MRDenominators`
       及完整四体系 oracle（`361.73 s`）；增量 ASan+UBSan 的生产 MR/SR
-      driver 和同时覆盖空/full/partial channel 的 emax4 短流通过。
+      driver 和同时覆盖空/full/partial channel 的 emax4 短流通过。最后的
+      emax12 容量门只放大已通过这些回归的相同 C++ 路径，没有再引入算法
+      改动；输入/可执行文件/输出哈希、wall/RSS 与 profiler 已写入
+      `docs/MR-IMSRG-Jscheme-large-space.json` schema v13，本轮 P3 完成。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

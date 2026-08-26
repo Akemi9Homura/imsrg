@@ -698,9 +698,49 @@ emax4/6/8 分别避免 `1050/14495/109900 KiB` IV dense 输出；全部 channel
 相同，emax8 1/16 线程 SHA-256 相同；Release 完整四体系 oracle
 （`361.73 s`）及 ASan+UBSan MR/SR driver、emax4 空/full/partial channel
 短流均通过。当前 emax8 MR addon 只占单线程 profiler real 的 `6.3%`。
-下一门禁是在 point7 把同一 emax2 参考无损嵌入 canonical emax10，实跑一
-个 RHS/短流并记录 channel 尺寸、wall、RSS 和各 MR contraction；只有该
-实测显示 V build 再次成为限制时，才新增 recoupling plan/cache。
+point7 没有可追溯的 canonical emax10 输入，因此没有临时裁剪或虚构一个；
+容量门直接提升到现存 canonical NNLOopt `emax=12,e2max=24`，比原计划更强。
+
+### 6.1 emax12 实测容量门
+
+根目录生成器先增加独立、单参数 `--mr-prepare-jscheme` 模式，冻结 minipack、
+源参考、转换器、`pyIMSRG.so`、嵌入器、环境和 git commit 的 SHA-256。
+第一次计算节点试跑发现 point7 没有 `/usr/bin/time`，commit `6b786e4f`
+改为与既有 NCSM runner 相同的 `/proc/<pid>/status` VmHWM 采样；第二次试跑
+发现 embedder 只为三个格式常量意外加载 `export_jref -> sympy`，commit
+`6975c2e6` 把 jref 格式常量和 `pyIMSRG` loader 抽成无符号代数依赖的小模块。
+这两个失败均发生在输入准备阶段，没有产生可用物理结果，也没有靠手写脚本
+绕过生成器。
+
+修复后的 point7 job `100531` 为 `COMPLETED 0:0`。canonical minipack
+SHA-256 为 `b735e7d7...e1c3b1`；A=4 转换得到 182 个 J-orbit、156 个
+J-channel、73842036 条 TBME，J64 round-trip 最坏误差严格为 0。裸 J64
+大小 `2067713204 bytes`、SHA-256 `0f11452d...c35553`；嵌入 jref 大小
+`1181746556 bytes`、SHA-256 `f273a851...67b07`，Hermiticity/收缩误差为
+`0/1.8492e-15`。转换和嵌入分别用 `42/13 s`，采样峰值
+`8087548/4298452 KiB`。
+
+第一次 flow 调度测试 job `100533` 被 Slurm 放到只有约 31 GiB 实际空闲
+内存的 `master`；它在相互作用读取前被主动取消，不能算容量结果。重新由
+生成器指定当时约 617 GiB 空闲的 node8，job `100535` 用 64 threads、
+`flow_RK4`、`ds=smax=1e-4` 完成 4 次完整 RHS，并同时写出 J64 和
+no2bpack。进程 wall 为 `185 s`，`/proc` 与内部 profiler 一致给出峰值
+`26264640 KiB = 25649.0625 MiB`；Slurm 连同输入/输出哈希用时 `227 s`。
+初末 MR 零体项为 `-17.0134907986/-17.017145544706 MeV`，组合
+`||eta||` 比为 `0.9997883895`。该比值只确认一步流实际执行，不是脱耦
+判据。反正规序后参考对角元与 MR 零体项差为 0；流后 J64/no2bpack 的
+SHA-256 分别为 `3f8a9e84...13cfc` 和 `79b43f95...dd585`。
+
+四次 RHS 合计的 MR `lambda2` addon 为 `8.69811 s`，占 profiler real
+`183.76964 s` 的 `4.73%`。其中 IV/V/VI/setup 为
+`0.30983/2.54807/4.13056/0.92176 s`，V build 只有 `1.13381 s`
+（`0.6%`）。活跃支撑实现让 standard products 实存峰值保持
+`6494 KiB`，并分别避免 `2305898/381307/2302859 KiB` 的 IV/V/LY-LX
+dense 临时量。这个实测否定了当前新增 V recoupling plan/cache 的必要性：
+MR 路径已不是 emax12 的容量或 wall 主瓶颈，继续复杂化不会有成比例收益。
+本节只验收生产 C++ J-scheme MR 实现和物化能力，不启动 finite-s NCSM
+研究，也不把一步结果称为收敛 Hamiltonian。完整机器记录见
+`MR-IMSRG-Jscheme-large-space.json` schema v13。
 
 ## 7. 错误定位原则
 
