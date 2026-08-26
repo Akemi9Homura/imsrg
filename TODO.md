@@ -344,11 +344,32 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       smoke test；正式谱门禁改由 BIGSTICK 重做。
       初次松容差读回 job `100454` 因未知非零子进程返回码失败，虽打印相同
       谱也不计入成功；正式结果来自 `max_iter=500` 的成功重跑 `100458`。
-- [ ] 对 emax8 按相同 bare/`s=0.02` Nmax 序列逐点增加到资源允许的最大值，
-      正式谱统一改由 BIGSTICK 计算，才评估 finite-s pilot。不得从
-      emax6 或 `s=1e-4` 资源点外推物理通过。Magnus 只能改善积分/重启成本，
-      不能被当作修复 IMSRG(2) 长流谱漂移的办法；若确需接入，仍须从同一
-      RHS、短流、真空物化和后 NCSM 谱重新验收。
+- [~] **按用户决定终止，不执行：** 不再对 emax8 bare/`s=0.02` 做
+      BIGSTICK Nmax 序列，不再研究 finite-s IM-NCSM 收敛改善或长流谱漂移。
+      已有结果只作为已知边界保留，不再据此选择流窗、生成元、ODE 或
+      Magnus。当前任务重新收敛到 C++ J-scheme MR-IMSRG 本身的实现、验证
+      与性能优化。
+- [ ] **MR-P0：干净构建与生产测试矩阵。** 从当前提交新建 Release 和
+      sanitizer build，运行全部 MRReference、正规序往返、命名
+      `lambda2` contraction、随机 J↔m oracle、White-NCSM denominator/
+      generator、SR dispatcher 退化、六个真实参考态 RHS/checkpoint 与
+      driver 测试。必须区分已有覆盖与实际缺口；不得用后 NCSM 能量替代
+      `E/f/Gamma -> eta -> named RHS` 的逐层断言。
+- [ ] **MR-P1：补齐生产入口验收缺口。** 审计 `imsrg++ -> IMSRGSolver ->
+      MRCommutator/Generator` 的真实调用链；对任何只在 helper/pybind 层测试、
+      未覆盖生产 dispatcher 的路径增加最小回归。`lambda2=0` 必须逐元素
+      退化到现有 SR，相关参考态必须逐命名 contraction 退化到 Python/QCombo
+      oracle；优化前先冻结基准输出与容差。
+- [ ] **MR-P2：只剖析和优化 MR-IMSRG RHS。** 在 emax2/4/6/8 固定输入上
+      测量单次完整 `MRCommutator + White-NCSM generator` 的 profiler、峰值
+      RSS、临时张量尺寸和 1/多线程复现误差，定位当前真实瓶颈后复用
+      `imsrg++` 的 channel/block/cache 基础设施做等价优化。禁止以改变物理
+      掩码、舍弃小 `lambda2`、降低空间或缩短流来换性能。
+- [ ] **MR-P3：每个优化提交的强制回归。** 每个边界清楚的优化必须先过
+      MR-P0/P1 的小空间代数与生产入口测试，再重跑至少一个 emax4/6 RHS
+      性能点；要求数值误差保持既有门禁、Hermiticity/anti-Hermiticity 与
+      线程复现不退化，并记录优化前后 wall/RSS。当前阶段不以 NCSM Nmax
+      收敛或长流谱行为作为优化验收指标。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`
