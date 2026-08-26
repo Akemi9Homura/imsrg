@@ -663,12 +663,16 @@ namespace MRCommutator
             {
               if (ot.j2 != modelspace.GetOrbit(s).j2)
                 continue;
+              const double ly = ly_trace(s, t);
+              const double lx = lx_trace(s, t);
+              if (ly == 0.0 && lx == 0.0)
+                continue;
               const double x = X.TwoBody.GetTBME_J(J1, J1, one, t, two, s);
               const double y = Y.TwoBody.GetTBME_J(J1, J1, one, t, two, s);
               if (x == 0.0 && y == 0.0)
                 continue;
               raw(one, two, 2) -= (2 * J1 + 1.0) / (o1.j2 + 1.0) *
-                                  (x * ly_trace(s, t) - y * lx_trace(s, t));
+                                  (x * ly - y * lx);
             }
           }
       }
