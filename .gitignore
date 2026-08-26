@@ -2,6 +2,7 @@
 build/
 build-src/
 build-py*/
+/build-*/
 #CMake output files
 CMakeFiles/
 CMakeCache.txt
