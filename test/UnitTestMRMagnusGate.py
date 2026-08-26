@@ -15,6 +15,7 @@ from prototype.mrimsrg.summarize_magnus_gate import (  # noqa: E402
     omega_segments_are_materialized,
     parse_energies,
     parse_flow,
+    parse_flow_prefix,
     profile_metadata_gates,
     parse_resource_usage,
 )
@@ -56,6 +57,20 @@ def main():
                 "eta ratio was parsed incorrectly")
         require(parsed["final"]["scalar_commutators"] == 42,
                 "commutator count was parsed incorrectly")
+
+        glued_line = (
+            "26982 13488.38132   -18.931995573   438.349398549"
+            "     0.000000000     0.000012482     0.189820323"
+            "     0.000000000     0.000000010     0.000139684"
+            "     0.0000000001184939    -0.000476594     16"
+            "    5430.410      12.121 / 12.121"
+        )
+        glued = parse_flow_prefix(glued_line)
+        require(glued is not None, "fixed-width production row was rejected")
+        require(glued[8:11] == [1e-8, 0.000139684, 0.0],
+                "eta components in a fixed-width row were parsed incorrectly")
+        require(glued[11] == 1184939,
+                "a seven-digit commutator count was not split from eta3")
 
         resources = root / "resource_usage.txt"
         resources.write_text(

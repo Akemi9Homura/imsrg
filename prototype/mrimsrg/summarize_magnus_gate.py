@@ -23,6 +23,7 @@ DEFAULT_ODE_PARAMETER_SOURCE = "imsrg++ adaptive Magnus runtime defaults"
 TIGHT_ODE_PARAMETER_SOURCE = (
     "explicit tenfold validation override of the imsrg++ default"
 )
+FLOW_PREFIX_WIDTHS = (5, 12, *(16 for _ in range(9)), 7)
 
 
 def sha256(path: Path) -> str:
@@ -42,16 +43,35 @@ def unique(root: Path, pattern: str) -> Path:
     return matches[0]
 
 
+def parse_flow_prefix(line: str) -> list[float] | None:
+    """Parse through Ncomm using the fixed widths emitted by IMSRGSolver."""
+    fixed_width = sum(FLOW_PREFIX_WIDTHS)
+    if len(line) >= fixed_width:
+        fields: list[float] = []
+        start = 0
+        try:
+            for width in FLOW_PREFIX_WIDTHS:
+                fields.append(float(line[start:start + width]))
+                start += width
+            return fields
+        except ValueError:
+            pass
+
+    tokens = line.split()
+    if len(tokens) < len(FLOW_PREFIX_WIDTHS):
+        return None
+    try:
+        return [float(value) for value in tokens[:len(FLOW_PREFIX_WIDTHS)]]
+    except ValueError:
+        return None
+
+
 def parse_flow(path: Path) -> dict[str, object]:
     rows: list[list[float]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
-        fields = line.split()
-        if len(fields) < 12:
-            continue
-        try:
-            rows.append([float(value) for value in fields[:12]])
-        except ValueError:
-            continue
+        fields = parse_flow_prefix(line)
+        if fields is not None:
+            rows.append(fields)
     if not rows:
         raise ValueError(f"flow file contains no status rows: {path}")
 
