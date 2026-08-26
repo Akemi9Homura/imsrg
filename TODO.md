@@ -117,8 +117,9 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       不把生成器单元测试当成生产结果确实使用这些设置的替代证据。
       四核聚合只接受包含完整 13 项门的 `mrimsrg_magnus_gate_v2`，拒绝
       旧 schema 或仅手填顶层 `passed=true` 的报告。
-      flow reader 按 `IMSRGSolver::WriteFlowStatus` 的固定列宽读取到 `Ncomm`；
-      不能用空白切分，因为七位 commutator 计数会紧接满宽 `Eta_3` 字段。
+      flow reader 按 `IMSRGSolver::WriteFlowStatus` 的固定列宽读取到 `Eta_3`，
+      再读取完整十进制 `Ncomm`；不能用空白切分，也不能把 `setw(7)` 当成
+      最大宽度，因为七位计数会紧接 `Eta_3`，八位计数还会继续扩展。
       每份 v2 JSON 保存 gate reader 自身 SHA-256，四核聚合要求一致。
 - [x] `Be8 Nrefmax=0` 与 `C12 Nrefmax=0` 的完整 default/同终点
       tight Magnus 流和 NCSM 读回已通过。二者 default 分别在

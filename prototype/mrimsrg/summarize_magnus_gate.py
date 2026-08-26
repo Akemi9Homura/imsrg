@@ -23,7 +23,7 @@ DEFAULT_ODE_PARAMETER_SOURCE = "imsrg++ adaptive Magnus runtime defaults"
 TIGHT_ODE_PARAMETER_SOURCE = (
     "explicit tenfold validation override of the imsrg++ default"
 )
-FLOW_PREFIX_WIDTHS = (5, 12, *(16 for _ in range(9)), 7)
+FLOW_VALUE_WIDTHS = (5, 12, *(16 for _ in range(9)))
 
 
 def sha256(path: Path) -> str:
@@ -45,23 +45,27 @@ def unique(root: Path, pattern: str) -> Path:
 
 def parse_flow_prefix(line: str) -> list[float] | None:
     """Parse through Ncomm using the fixed widths emitted by IMSRGSolver."""
-    fixed_width = sum(FLOW_PREFIX_WIDTHS)
-    if len(line) >= fixed_width:
+    fixed_width = sum(FLOW_VALUE_WIDTHS)
+    if len(line) > fixed_width:
         fields: list[float] = []
         start = 0
         try:
-            for width in FLOW_PREFIX_WIDTHS:
+            for width in FLOW_VALUE_WIDTHS:
                 fields.append(float(line[start:start + width]))
                 start += width
-            return fields
+            counter = re.match(r"\s*(\d+)", line[start:])
+            if counter is not None:
+                fields.append(float(counter.group(1)))
+                return fields
         except ValueError:
             pass
 
     tokens = line.split()
-    if len(tokens) < len(FLOW_PREFIX_WIDTHS):
+    expected_fields = len(FLOW_VALUE_WIDTHS) + 1
+    if len(tokens) < expected_fields:
         return None
     try:
-        return [float(value) for value in tokens[:len(FLOW_PREFIX_WIDTHS)]]
+        return [float(value) for value in tokens[:expected_fields]]
     except ValueError:
         return None
 

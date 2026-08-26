@@ -71,6 +71,14 @@ def main():
                 "eta components in a fixed-width row were parsed incorrectly")
         require(glued[11] == 1184939,
                 "a seven-digit commutator count was not split from eta3")
+        eight_digit_line = glued_line.replace(
+            "0.0000000001184939", "0.00000000011849390"
+        )
+        eight_digit = parse_flow_prefix(eight_digit_line)
+        require(eight_digit is not None,
+                "a row with an overflowing Ncomm field was rejected")
+        require(eight_digit[11] == 11849390,
+                "an eight-digit commutator count was truncated")
 
         resources = root / "resource_usage.txt"
         resources.write_text(
