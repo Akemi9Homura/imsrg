@@ -29,6 +29,29 @@ import sys
 
 import numpy as np
 
+try:
+    from .basis import prepare_natural_basis, transform_hamiltonian
+    from .densities import compute_densities, validate_densities
+    from .generator import (
+        masked_decoupling_residual,
+        masked_residual_norm,
+        oscillator_quanta_from_orbits,
+    )
+    from .normal_order import VacuumHamiltonian, normal_order
+    from .reference_io import load_reference
+    from .sr_imsrgpp_check import operator_to_mscheme
+except ImportError:
+    from basis import prepare_natural_basis, transform_hamiltonian
+    from densities import compute_densities, validate_densities
+    from generator import (
+        masked_decoupling_residual,
+        masked_residual_norm,
+        oscillator_quanta_from_orbits,
+    )
+    from normal_order import VacuumHamiltonian, normal_order
+    from reference_io import load_reference
+    from sr_imsrgpp_check import operator_to_mscheme
+
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 WHITE_DENOMINATOR_CUTOFF_MEV = 1.0e-6
@@ -143,7 +166,39 @@ def add_entry(
     )
 
 
-def diagnose_stage(pyimsrg, modelspace, reference, label: str, path: Path, top: int):
+def strict_residual_norm(vacuum, source_reference, natural_basis) -> float:
+    """Evaluate the lambda2-dependent masked D-D^dagger norm in m-scheme."""
+
+    vacuum_m = operator_to_mscheme(vacuum, source_reference.orbits)
+    vacuum_nat_m = transform_hamiltonian(
+        vacuum_m, natural_basis.vectors, to_natural=True
+    )
+    hamiltonian_nat_m = normal_order(
+        VacuumHamiltonian(
+            vacuum_nat_m.zero_body,
+            vacuum_nat_m.one_body,
+            vacuum_nat_m.two_body,
+        ),
+        natural_basis.densities,
+    )
+    residual = masked_decoupling_residual(
+        hamiltonian_nat_m,
+        natural_basis.densities,
+        oscillator_quanta_from_orbits(source_reference.orbits),
+    )
+    return masked_residual_norm(residual)
+
+
+def diagnose_stage(
+    pyimsrg,
+    modelspace,
+    reference,
+    label: str,
+    path: Path,
+    top: int,
+    *,
+    strict_context=None,
+):
     vacuum = pyimsrg.Operator(modelspace)
     pyimsrg.ReadWrite().Read_jcoupled64(str(path), vacuum)
     hamiltonian = reference.NormalOrder(
@@ -280,7 +335,7 @@ def diagnose_stage(pyimsrg, modelspace, reference, label: str, path: Path, top: 
         if eta_norm > 0.0
         else 0.0
     )
-    return {
+    result = {
         "label": label,
         "path": str(path),
         "sha256": sha256(path),
@@ -323,11 +378,25 @@ def diagnose_stage(pyimsrg, modelspace, reference, label: str, path: Path, top: 
         "top_channel_eta_norm_squared_fraction": top_fraction,
         "top_channels": top_entries,
     }
+    if strict_context is not None:
+        source_reference, natural_basis = strict_context
+        result["strict_decoupling_residual_norm_mev"] = strict_residual_norm(
+            vacuum, source_reference, natural_basis
+        )
+    return result
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference", type=Path, required=True)
+    parser.add_argument(
+        "--source-reference",
+        type=Path,
+        help=(
+            "original m-scheme NCSM reference bundle; when supplied, also "
+            "evaluate the lambda2-dependent strict D-D^dagger diagnostic"
+        ),
+    )
     parser.add_argument("--nucleus", required=True)
     parser.add_argument("--emax", type=int, required=True)
     parser.add_argument("--hw", type=float, default=20.0)
@@ -358,8 +427,33 @@ def main() -> None:
         pyimsrg.MRReference.ReadOccupationMap(modelspace, str(reference_path))
     )
     reference = pyimsrg.MRReference.ReadBinary(modelspace, str(reference_path))
+    strict_context = None
+    source_reference_path = None
+    if args.source_reference is not None:
+        source_reference_path = args.source_reference.expanduser().resolve()
+        source_reference = load_reference(source_reference_path)
+        if int(source_reference.metadata["emax"]) != args.emax:
+            raise SystemExit("source reference and diagnostic emax differ")
+        if float(source_reference.metadata["hw"]) != args.hw:
+            raise SystemExit("source reference and diagnostic hw differ")
+        densities = compute_densities(
+            source_reference.determinants, source_reference.coefficients
+        )
+        validate_densities(densities, int(source_reference.metadata["A"]))
+        strict_context = (
+            source_reference,
+            prepare_natural_basis(densities),
+        )
     stages = [
-        diagnose_stage(pyimsrg, modelspace, reference, label, path, args.top)
+        diagnose_stage(
+            pyimsrg,
+            modelspace,
+            reference,
+            label,
+            path,
+            args.top,
+            strict_context=strict_context,
+        )
         for label, path in args.hamiltonian
     ]
     initial = stages[0]
@@ -369,6 +463,12 @@ def main() -> None:
             "white_ncsm_numerator_norm_mev",
             "eta_norm",
         ):
+            denominator = float(initial[field])
+            stage[f"{field}_ratio_to_first"] = (
+                float(stage[field]) / denominator if denominator > 0.0 else 0.0
+            )
+        if strict_context is not None:
+            field = "strict_decoupling_residual_norm_mev"
             denominator = float(initial[field])
             stage[f"{field}_ratio_to_first"] = (
                 float(stage[field]) / denominator if denominator > 0.0 else 0.0
@@ -384,6 +484,11 @@ def main() -> None:
             "mask": "Delta e != 0 in the connected natural-orbit blocks",
             "denominator": "leading Epstein-Nesbet",
             "denominator_cutoff_mev": WHITE_DENOMINATOR_CUTOFF_MEV,
+            "strict_diagnostic": (
+                "masked lambda2-dependent D-D^dagger with lambda3=0"
+                if strict_context is not None
+                else "not requested; pass --source-reference"
+            ),
         },
         "reference": {
             "path": str(reference_path),
@@ -395,6 +500,11 @@ def main() -> None:
                 orbit_record(modelspace, index)
                 for index in range(modelspace.GetNumberOrbits())
             ],
+            "source_reference": (
+                str(source_reference_path)
+                if source_reference_path is not None
+                else None
+            ),
         },
         "stages": stages,
     }

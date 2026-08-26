@@ -15,6 +15,8 @@ sys.path.insert(0, str(REPOSITORY / "test"))
 
 from UnitTestMRDriver import vacuum_operator  # noqa: E402
 from prototype.mrimsrg.diagnose_white_ncsm_tail import diagnose_stage  # noqa: E402
+from prototype.mrimsrg.basis import prepare_natural_basis  # noqa: E402
+from prototype.mrimsrg.densities import compute_densities  # noqa: E402
 from prototype.mrimsrg.export_jref import export_reference  # noqa: E402
 from prototype.mrimsrg.reference_io import load_reference  # noqa: E402
 
@@ -51,6 +53,12 @@ def main() -> None:
             "fixture",
             hamiltonian_path,
             top=8,
+            strict_context=(
+                data,
+                prepare_natural_basis(
+                    compute_densities(data.determinants, data.coefficients)
+                ),
+            ),
         )
 
         assert stage["selected_channel_count"] > 0
@@ -59,6 +67,9 @@ def main() -> None:
         assert abs(stage["eta_norm"] - stage["eta_norm_reconstructed"]) < 1e-12
         assert stage["white_ncsm_numerator_norm_mev"] > 0.0
         assert stage["selected_unweighted_hamiltonian_norm_mev"] > 0.0
+        assert abs(
+            stage["strict_decoupling_residual_norm_mev"] - 19.128471188215606
+        ) < 1e-10
         assert 0.0 < stage["top_channel_eta_norm_squared_fraction"] <= 1.0
         assert len(stage["top_channels"]) == 8
         contributions = [
