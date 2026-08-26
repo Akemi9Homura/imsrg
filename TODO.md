@@ -394,9 +394,22 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `12.33056 s`、峰值 `1377824 KiB`；MR addon `1.98985 s`，而既有 SR
       commutator `5.67302 s`（`comm222_phss=4.13714 s`）已是主瓶颈。
       emax2 对应 real/MR addon/峰值为
-      `0.01889 s/0.00997 s/12484 KiB`。下一步补齐各空间临时张量尺寸的
-      统一记录，再评估是否能安全复用既有 SR Pandya 缓存；不能为加速
-      破坏严格 SR 退化。
+      `0.01889 s/0.00997 s/12484 KiB`。
+      commit `b0c832a8` 进一步把标准耦合 IV/VI 共用的
+      `lambda2*Y/lambda2*X` 从完整 channel 矩阵改为 cumulant 精确 pair
+      支撑上的活跃行存储；VI 用保持原交换相位和 normalized-pair
+      `sqrt(2)` 因子的 accessor 读回，不使用数值阈值，也不改变全活跃
+      参考态的原矩阵乘法分支。新增 profiler 统一记录显式 standard-product
+      存储和避免的 dense `LY/LX` 字节：emax4/6/8 分别避免
+      `907/14067/108943 KiB`，对应新 product 存储为
+      `1198/14949/110935 KiB`。三个空间的流后 J64 相对冻结基线均
+      bitwise 相同，emax6 的 1/16 线程 SHA-256 也完全相同；emax8 当前
+      MR addon 为 `1.91721 s`，其中 IV/V/VI/setup 为
+      `0.25080/0.69959/0.77368/0.14675 s`。总 RSS 仍由完整算符和既有
+      SR Pandya 路径主导，不能把消除 106 MiB MR 临时量误写成同等幅度的
+      进程峰值下降。下一步只继续审计 MR IV/VI 的 channel 遍历、缓存和
+      输出临时量；共享 SR `comm222_phss` 虽是 emax8 总体主瓶颈，但不在
+      没有独立 SR/VS 性能与逐元素回归时贸然改动。
 - [~] **MR-P3：每个优化提交的强制回归。** 每个边界清楚的优化必须先过
       MR-P0/P1 的小空间代数与生产入口测试，再重跑至少一个 emax4/6 RHS
       性能点；要求数值误差保持既有门禁、Hermiticity/anti-Hermiticity 与
@@ -405,6 +418,12 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       本轮两个优化均通过 `MRReference` 随机 J↔m/参考实现、真实相关
       `MRDriver`、`MRSRDriver`，第一项另通过四核完整 oracle 和 sanitizer
       driver；第二项的 emax4/6 输出相对第一轮冻结基线均逐字节相同。
+      活跃行存储提交 `b0c832a8` 又通过 Release `MRReference`、`MRDriver`、
+      `MRSRDriver`、`MRDenominators` 和完整四体系 `MRCorrelatedDriver`
+      （`354.88 s`）；ASan+UBSan 下后三项通过，并用 emax4 嵌入参考直接
+      跑过稀疏活跃行短流。sanitizer 输出及 emax4/6/8 Release 输出均与
+      冻结 J64 bitwise 相同。本轮只验证 RHS/短流实现，不把有限-s NCSM
+      行为列为性能优化门禁。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`

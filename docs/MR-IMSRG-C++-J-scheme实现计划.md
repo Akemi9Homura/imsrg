@@ -615,6 +615,28 @@ OpenMP 在 emax4 未产生实测加速且增加线程驻留，试验改动已撤
 全局最坏变化 `2.13e-13 MeV`。因此 Gate 7 的 profiler 优化子项通过；
 emax6 仍必须等可验证 interaction，不能由本结果外推冒充实跑。
 
+当前 MR-P2 已继续推进到标准耦合 IV/VI 中间量的显式内存审计。原实现即使
+`lambda2` 只支撑固定 emax2 参考空间，也会为每个 channel 保存完整
+`LY=lambda2*Y` 和 `LX=lambda2*X`；commit `b0c832a8` 改为只保存 cumulant
+精确 pair 支撑对应的活跃行，并通过一个保持原有交换相位、channel 选择和
+normalized-pair `sqrt(2)` 因子的 accessor 为 VI 提供矩阵元。IV 所需的
+`XLY/YLX` 仍完整形成；全空间活跃参考仍走原 `lambda*Y/X` 的 BLAS 分支，
+因此没有加入阈值、低秩近似或新的 MR 截断。profiler 现在直接报告本组
+standard products 的显式存储，以及相对完整 `LY/LX` 避免的字节。
+
+对同一个 He4 Nrefmax=2 嵌入参考，emax4/6/8 分别避免
+`907/14067/108943 KiB` 的 dense `LY/LX`，新 standard-product 存储分别为
+`1198/14949/110935 KiB`。三个空间一个 `ds=1e-4` RK4 步的完整流后 J64
+都与提交前冻结文件逐字节相同；emax6 的 1/16 线程输出 SHA-256 也相同。
+emax8 当前 MR addon 为 `1.91721 s`，但进程峰值 RSS 仍约 `1.35 GiB`，
+说明完整 0/1/2B 算符和现有 SR Pandya scratch 主导总峰值，不能把消除的
+约 106 MiB MR 临时分配直接等同于 RSS 降幅。Release 下
+`MRReference/MRDriver/MRSRDriver/MRDenominators` 与完整四体系
+`MRCorrelatedDriver`（`354.88 s`）全部通过；ASan+UBSan 下生产 MR driver、
+SR 退化、分母以及 emax4 稀疏活跃行短流也通过。下一轮只继续优化 MR
+IV/VI 的精确 channel 遍历和临时量；共享 `comm222_phss` 虽已是 emax8
+最大单项，但任何改动都必须另带完整 SR/VS 逐元素与性能门禁。
+
 ## 7. 错误定位原则
 
 - SR 极限失配：先检查是否真正复用了现有 contraction、occupation 和
