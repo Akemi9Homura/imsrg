@@ -922,3 +922,26 @@ BCH 另造近似收缩。当前不处理 rank-J 非零张量算符。
 5. 收紧步长/BCH 阈值十倍，最终 Hamiltonian 和下游 NCSM 低能谱变化
    `<1 keV`；J64/no2bpack 物化读回继续通过。最后运行完整 CTest、
    sanitizer 和 emax4/6 性能门。
+
+### 8.4 首轮实现证据
+
+commit `382eb3e2` 已把现有 scalar `BCH_Transform`/`BCH_Product`、分段
+`Omega` 和最终 `Transform` 接到显式 MR dispatcher；SR 两参数 API 和默认
+参数不变。独立 emax1、非零 `lambda2` 的随机 J-scheme 输入展开到 m-scheme
+后，40 阶 MR-BCH 的 0B/1B/2B 最坏差为 `6.66e-16`，生产 BCH-product
+最坏差为 `3.04e-18`。同一测试的 `lambda2=0` MR/SR transform 差为
+`6.94e-18`，product 为逐位零差。
+
+真实参考门在 `He4/Be8/C12/O16` 的
+`Nrefmax=2/0/0/2` 上用 `ds=1e-4` 比较首步 `Omega` 与零阈值完整 MR-BCH：
+四核 `Omega` 最坏差依次为
+`1.694e-21/2.118e-21/1.271e-21/1.694e-21`，Hamiltonian 最坏差依次为
+`1.776e-15/1.776e-15/1.776e-15/3.553e-15 MeV`。恢复原
+`bch_transform_threshold=1e-9` 和 `bch_product_threshold=1e-4` 后，同一
+生产 driver 的 J64 物化 0B/1B/2B 均逐位复现默认 C++ 路径。完整
+`MRCorrelatedDriver` 用时 `409.10 s`。
+
+`He4/O16 Nrefmax=0` 还在 `s=0,1e-4` 对 `flow_RK4` 和 `magnus` 分别运行
+MR/SR executable；八组 J64 的 0B/1B/2B 差全部为零。这里验收的是
+MR-Magnus 代数与生产入口，尚未替代后续步长/BCH 阈值稳定性、direct-flow
+共同极限、完整流和 NCSM 谱门。

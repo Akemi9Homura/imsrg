@@ -30,7 +30,7 @@
 - [x] 实现与生产 `BCH_Product(dOmega,Omega)` 相同乘法顺序和截断的 oracle；
       固定随机小模型逐阶验收 Bernoulli 项，且在 `Omega=0` 时严格满足
       `dOmega/ds=eta`。
-- [ ] 冻结 `He4/O16 Nrefmax=0` 以及 `Be8/C12 Nrefmax=0`、
+- [x] 冻结 `He4/O16 Nrefmax=0` 以及 `Be8/C12 Nrefmax=0`、
       `He4/O16 Nrefmax=2` 的首步、短流 `Omega`、逐阶 BCH 和最终 MR 正规序
       Hamiltonian fixture；不只保存零体能量。
 
@@ -49,11 +49,13 @@
 
 - [x] 随机 scalar J-scheme 输入展开到 m-scheme，逐阶比较 MR-BCH 与
       BCH product 的 0B/1B/2B，max-abs `<=1e-10 MeV`。
-- [ ] `lambda2=0` 的 MR 生产入口对 `He4/O16 Nrefmax=0` 逐元素退化到现有
+- [x] `lambda2=0` 的 MR 生产入口对 `He4/O16 Nrefmax=0` 逐元素退化到现有
       SR Magnus：每段 `Omega`、每阶 BCH、`eta` 和最终 Hamiltonian 均比较，
       不允许核特例或测试专用分支。
-- [ ] 六个相关/单参考固定体系逐项复现 Python m-scheme oracle；短流还须
-      与 direct flow 在共同截断/步长极限下收敛一致。Magnus(2) 与
+- [x] 六个相关/单参考固定体系的首步 `Omega`、零阈值 MR-BCH Hamiltonian
+      和默认阈值生产 driver 已逐项复现 Python/C++ oracle。
+- [ ] Magnus 短流还须与 direct flow 在共同截断/步长极限下收敛一致。
+      Magnus(2) 与
       direct-flow IMSRG(2) 长流不要求 bitwise 相同，但差异必须随数值阈值
       稳定并有矩阵元级记录。
 - [ ] 收紧 `ds/domega` 与 BCH 阈值十倍后，变换后 Hamiltonian 和 NCSM

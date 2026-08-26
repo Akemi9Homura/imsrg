@@ -38,6 +38,7 @@ from prototype.mrimsrg.normal_order import (  # noqa: E402
 )
 from prototype.mrimsrg.reference_io import load_reference  # noqa: E402
 from prototype.mrimsrg.jcoupling import couple_scalar_two_body  # noqa: E402
+from prototype.mrimsrg.magnus import bch_transform, scale  # noqa: E402
 from prototype.mrimsrg.sr_imsrgpp_check import (  # noqa: E402
     _mr_rk4_step,
     operator_to_mscheme,
@@ -410,6 +411,100 @@ def main():
             )
             print(f"{nucleus} Euler ds=1e-4 H={max(euler_errors):.3e}")
             assert max(euler_errors) < 2e-10
+
+            # One fixed production Magnus step.  At Omega(0)=0 the BCH product
+            # must give Omega=ds*eta exactly; the transformed Hamiltonian is
+            # then checked against the independent explicit m-scheme MR-BCH.
+            magnus_solver = pyIMSRG.IMSRGSolver(initial)
+            magnus_solver.SetMRReference(reference)
+            magnus_solver.SetGenerator("white-ncsm")
+            magnus_solver.SetMethod("magnus")
+            magnus_solver.SetMagnusAdaptive(False)
+            magnus_solver.SetEtaCriterion(0.0)
+            magnus_solver.SetDs(euler_step)
+            magnus_solver.SetSmax(euler_step)
+            pyIMSRG.BCH.Set_BCH_Transform_Threshold(0.0)
+            pyIMSRG.BCH.Set_BCH_Product_Threshold(0.0)
+            try:
+                magnus_solver.Solve()
+            finally:
+                pyIMSRG.BCH.Set_BCH_Transform_Threshold(1e-9)
+                pyIMSRG.BCH.Set_BCH_Product_Threshold(1e-4)
+            actual_omega = operator_to_mscheme(
+                magnus_solver.GetOmega(0), data.orbits
+            )
+            expected_omega = scale(expected_eta, euler_step)
+            omega_errors = (
+                abs(actual_omega.zero_body - expected_omega.zero_body),
+                float(
+                    np.max(
+                        np.abs(actual_omega.one_body - expected_omega.one_body)
+                    )
+                ),
+                float(
+                    np.max(
+                        np.abs(actual_omega.two_body - expected_omega.two_body)
+                    )
+                ),
+            )
+            expected_magnus = bch_transform(
+                oracle_initial,
+                expected_omega,
+                oracle_densities,
+                max_order=3,
+            ).operator
+            magnus_errors = mr_operator_errors(
+                magnus_solver.GetH_s(), expected_magnus, data.orbits
+            )
+            print(
+                f"{nucleus} Magnus ds=1e-4: "
+                f"Omega={max(omega_errors):.3e} H={max(magnus_errors):.3e}"
+            )
+            assert max(omega_errors) < 2e-10
+            assert max(magnus_errors) < 2e-10
+
+            # The executable deliberately retains the existing imsrg++ BCH
+            # thresholds.  Reproduce that default path separately from the
+            # zero-threshold algebra gate above before testing driver I/O.
+            default_magnus_solver = pyIMSRG.IMSRGSolver(initial)
+            default_magnus_solver.SetMRReference(reference)
+            default_magnus_solver.SetGenerator("white-ncsm")
+            default_magnus_solver.SetMethod("magnus")
+            default_magnus_solver.SetMagnusAdaptive(False)
+            default_magnus_solver.SetEtaCriterion(0.0)
+            default_magnus_solver.SetDs(euler_step)
+            default_magnus_solver.SetSmax(euler_step)
+            default_magnus_solver.Solve()
+            expected_magnus_vacuum = reference.UndoNormalOrder(
+                default_magnus_solver.GetH_s()
+            ).TransformOneAndTwoBody(
+                reference.NaturalOrbitTransformation.t()
+            )
+            expected_magnus_path = root / f"{nucleus}_expected_magnus.jcoupled64"
+            pyIMSRG.ReadWrite().Write_jcoupled64(
+                str(expected_magnus_path), expected_magnus_vacuum
+            )
+            actual_magnus_path = run_driver(
+                executable,
+                root,
+                nucleus,
+                A,
+                input_file,
+                reference_file,
+                euler_step,
+                True,
+                step=euler_step,
+                method="magnus",
+            )
+            magnus_driver_errors = payload_error(
+                expected_magnus_path, actual_magnus_path
+            )
+            print(
+                f"{nucleus} Magnus driver: zero={magnus_driver_errors[0]:.3e} "
+                f"one={magnus_driver_errors[1]:.3e} "
+                f"two={magnus_driver_errors[2]:.3e}"
+            )
+            assert max(magnus_driver_errors) < 2e-10
 
             for label, smax in (("s0", 0.0), ("rk4", 1e-4)):
                 if smax == 0.0:

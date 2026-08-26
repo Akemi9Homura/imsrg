@@ -30,8 +30,12 @@ def run_driver(
     smax,
     mr,
     step=1e-4,
+    method="flow_RK4",
 ):
-    label = f"{nucleus}_{'mr' if mr else 'sr'}_{smax:.8g}_ds{step:.8g}"
+    label = (
+        f"{nucleus}_{'mr' if mr else 'sr'}_{method}_"
+        f"{smax:.8g}_ds{step:.8g}"
+    )
     output = root / f"{label}.jcoupled64"
     command = [
         str(executable),
@@ -44,7 +48,7 @@ def run_driver(
         "hw=20",
         "emax=2",
         "basis=oscillator",
-        "method=flow_RK4",
+        f"method={method}",
         f"core_generator={'white-ncsm' if mr else 'white'}",
         f"smax={smax:.8g}",
         f"ds_0={step:.8g}",
@@ -113,34 +117,37 @@ def main():
             )
             assert reference.Lambda2.Norm() == 0.0
 
-            for smax in (0.0, 1e-4):
-                mr_output = run_driver(
-                    executable,
-                    root,
-                    nucleus,
-                    A,
-                    input_file,
-                    reference_file,
-                    smax,
-                    True,
-                )
-                sr_output = run_driver(
-                    executable,
-                    root,
-                    nucleus,
-                    A,
-                    input_file,
-                    reference_file,
-                    smax,
-                    False,
-                )
-                errors = payload_error(sr_output, mr_output)
-                print(
-                    f"{nucleus} SR degeneration s={smax:.1e}: "
-                    f"zero={errors[0]:.3e} one={errors[1]:.3e} "
-                    f"two={errors[2]:.3e}"
-                )
-                assert max(errors) < 1e-10
+            for method in ("flow_RK4", "magnus"):
+                for smax in (0.0, 1e-4):
+                    mr_output = run_driver(
+                        executable,
+                        root,
+                        nucleus,
+                        A,
+                        input_file,
+                        reference_file,
+                        smax,
+                        True,
+                        method=method,
+                    )
+                    sr_output = run_driver(
+                        executable,
+                        root,
+                        nucleus,
+                        A,
+                        input_file,
+                        reference_file,
+                        smax,
+                        False,
+                        method=method,
+                    )
+                    errors = payload_error(sr_output, mr_output)
+                    print(
+                        f"{nucleus} SR degeneration {method} s={smax:.1e}: "
+                        f"zero={errors[0]:.3e} one={errors[1]:.3e} "
+                        f"two={errors[2]:.3e}"
+                    )
+                    assert max(errors) < 1e-10
 
 
 if __name__ == "__main__":
