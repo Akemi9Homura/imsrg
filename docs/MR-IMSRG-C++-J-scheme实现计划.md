@@ -1041,8 +1041,9 @@ direct flow、Magnus 与 I/O 测试以 `2.37 s` 通过，CTest 总数因此由 2
 其中 `MRCorrelatedDriver` 为 `398.51 s`。
 随后从空目录用 GCC 11.4.0 和 `-fsanitize=address,undefined` 重建 current
 HEAD；`MRPrototype/MRSRDriver/MRMagnus/MRJobGenerator/MRMagnusGate`
-`5/5` 以 `16.58 s` 通过，未出现地址或未定义行为诊断。最重的四核
-sanitizer 门未重复运行，因为生产物理源相对既有全通过构建未改变。
+`5/5` 以 `16.58 s` 通过。随后同一干净构建中的 `MRReference/
+MRCorrelatedDriver/MRDenominators` `3/3` 以 `620.95 s` 通过，其中最重的
+四核相关参考态门为 `569.82 s`；全部未出现地址或未定义行为诊断。
 
 Vobig Eqs. (4.6.7),(4.6.8) 的 Bernoulli 相对项停止门将 emax4/6
 `s=1e-4` 单线程流的 scalar commutator 数从固定 `k=8` 的 `65` 降至 `23`。
