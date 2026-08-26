@@ -12,8 +12,10 @@
 
 ## 当前唯一目标
 
-当前目标是在现有 `imsrg++` 生产路径中实现高效、球形的 C++
-J-scheme MR-IMSRG(2)，供 IM-NCSM 与后续 NCSM/FCIQMC 生产计算使用。
+当前目标是在已经验收的球形 C++ J-scheme MR-IMSRG(2) 对易子和
+direct-flow 路径上实现生产 MR-Magnus(2)：得到反 Hermitian 的标量
+`Omega`，并用同一 MR 对易子驱动 BCH，将初始 Hamiltonian 变换为
+可物化给 NCSM/FCIQMC 的 0B/1B/2B Hamiltonian。
 已验收的 `prototype/mrimsrg/` Python m-scheme 实现不再是交付主路，
 而是相关参考态的独立物理 oracle；现有 C++ SR-IMSRG(2) 则是单
 Slater 极限的生产 oracle。
@@ -63,9 +65,10 @@ C++ 入口。
 - 至少输入 `gamma1`、`gamma2`，构造并真正保留 `lambda2`。
 - 当前版本设 `lambda3=0`；这一近似必须写入输出元数据。
 - Hamiltonian 和生成元始终截断到参考态正规序 0B/1B/2B。
-- 先使用现有直接积分 `dH/ds = [eta,H]_(0,1,2B)` 打通生产验收；
-  Magnus/BCH 在直接流通过后复用现有框架，不与首个 MR commutator
-  同时开发。
+- 当前阶段复用现有 `IMSRGSolver` 的生产 Magnus、分段 `Omega` 和 BCH
+  框架；所有 Bernoulli/BCH/BCH-product 嵌套对易子必须通过同一个
+  `MRCommutator` dispatcher。已验收 direct flow 只作独立交叉验证，不再
+  是当前交付目标。
 - 使用 IM-NCSM 的放松解耦：只处理 `Delta e != 0` 的 1p1h 与 2p2h 通道，保留同 HO 量子数参考空间内部耦合。
 - 首选一个有文献公式和 QCombo 输出可核对的生成元；第一批只实现一种。不要同时开发多种生成元。
 - 当前不做显式 3N、`lambda3`、奇核、`Jref!=0` 的非标量密度、
@@ -100,13 +103,18 @@ E0 + one-body + two-body
 2. 建立球形 `gamma1/lambda2` J-coupled 输入与恒等式/J 重构测试。
 3. 在现有 `Commutator` 中复用全部 SR 项，只新增并逐项验证
    `lambda2` 收缩。
-4. 在现有 `Generator` 和 `IMSRGSolver` 中加入 White-NCSM 和
-   `Delta e != 0` 路径，不复制 ODE 框架。
-5. 先让 `He4/O16, Nrefmax=0` 的同一生产入口直接退化到 SR，
-   再让 `Be8/C12, Nrefmax=0` 及 `He4/O16, Nrefmax=2` 逐项复现
-   Python m-scheme 原型。
-6. 复用现有真空正规序、`no2bpack` 和 NCSM 读回路径完成谱验收。
-7. 代数、短流、完整流和性能门禁通过后，才扩展到更大空间。
+4. 复读 Morris--Parzuchowski--Bogner、Hergert、Vobig、Mongelli 的
+   Magnus 章节并逐调用点审计现有 `BCH`/`IMSRGSolver`，冻结符号、乘法
+   顺序、Bernoulli 与截断判据。
+5. 先用 Python m-scheme oracle 验收固定 `Omega` 下每阶 MR-BCH、
+   BCH product 和首步 `dOmega/ds=eta`，再把现有 C++ Magnus/BCH 的所有
+   scalar commutator 调用接到 MR dispatcher；不得另写生产求解器。
+6. 先让 `He4/O16, Nrefmax=0` 的同一生产 MR-Magnus 入口退化到现有 SR
+   Magnus，再让 `Be8/C12, Nrefmax=0` 及 `He4/O16, Nrefmax=2` 的
+   `Omega`、逐阶 BCH 和变换后 Hamiltonian 复现 Python m-scheme 原型。
+7. 用 direct flow、十倍收紧步长/BCH 阈值、真空物化及 NCSM 读回作完整
+   交叉验收；张量观测算符在这一阶段暂不处理。
+8. 代数、短流、完整流和性能门禁通过后，才扩展到更大空间。
 
 ## 最低验收门槛
 

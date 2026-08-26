@@ -1,5 +1,67 @@
 # MR-IMSRG 当前 TODO
 
+## P1：当前唯一目标——生产 C++ J-scheme MR-Magnus(2)
+
+已验收的 direct-flow MR-IMSRG(2) 保持不变并作为交叉验证。当前只实现
+标量 `Omega` 及由它变换出的 Hamiltonian；一般张量观测算符、显式 3N、
+`lambda3` 和 `Jref!=0` 不进入本阶段。
+
+### M0. 文献与现有实现冻结
+
+- [x] 复读 Morris--Parzuchowski--Bogner 2015 原始 Magnus 论文、Hergert
+      2016 综述、Vobig 2020 Secs. 4.5--4.6/App. B.2 和 Mongelli 2022
+      Secs. 5.4--5.6 的原始 PDF；确认 MR-Magnus(2) 的每个嵌套对易子就是
+      已验收的 `lambda3=0` MR commutator，当前 `H(s)` 必须由当前
+      `Omega` 经 MR-BCH 构造后再生成 `eta(s)`。
+- [x] 审计现有 `BCH.cc`、`IMSRGSolver.cc` 和 driver：生产
+      `method=magnus` 使用原有 `Solve_magnus_euler()`，以
+      `BCH_Product(ds*eta,Omega)` 累积 `Omega`，以
+      `BCH_Transform(Hstart,Omega)` 得到当前 Hamiltonian。缺口冻结为
+      BCH/Product/NewOmega/GatherOmega/Transform 的 MR dispatcher 和
+      driver scope，不另写 ODE 或复制 SR Magnus。
+- [x] 在实现计划中冻结现有代码的符号/指数乘法顺序、分段 `Omega` 语义、
+      Bernoulli/BCH 阈值、允许/拒绝的 correction 开关及验收容差。
+
+### M1. Python m-scheme Magnus oracle
+
+- [ ] 基于 `prototype/mrimsrg/commutator.py` 实现最小 scalar MR-BCH：
+      对固定 `Omega,O` 保存每阶 `ad_Omega^k(O)/k!`，检查 Hamiltonian
+      Hermiticity、`Omega/eta` anti-Hermiticity 和逐阶收敛。
+- [ ] 实现与生产 `BCH_Product(dOmega,Omega)` 相同乘法顺序和截断的 oracle；
+      固定随机小模型逐阶验收 Bernoulli 项，且在 `Omega=0` 时严格满足
+      `dOmega/ds=eta`。
+- [ ] 冻结 `He4/O16 Nrefmax=0` 以及 `Be8/C12 Nrefmax=0`、
+      `He4/O16 Nrefmax=2` 的首步、短流 `Omega`、逐阶 BCH 和最终 MR 正规序
+      Hamiltonian fixture；不只保存零体能量。
+
+### M2. 生产 C++ 接入
+
+- [ ] 为现有 scalar `BCH_Transform` 与 `BCH_Product` 增加显式 MR reference
+      上下文；未提供 MR reference 时必须逐调用保持原 SR 路径，MR 时每个
+      嵌套对易子必须调用 `MRCommutator::Commutator`。
+- [ ] 将 `Solve_magnus_euler`、`NewOmega`、`GatherOmega`、Hamiltonian
+      重建与最终 `Transform` 接到同一 dispatcher；删除 driver 对 MR+Magnus
+      的拒绝，同时继续拒绝 MR correction/IMSRG(3)/一般流动算符等未验收组合。
+- [ ] 保持现有 `method=magnus` 的 `ds_0/dsmax/domega/omega_norm_max`、分段
+      与 checkpoint 语义，不创造 MR 专用 ODE 参数或另一套求解器。
+
+### M3. 分层验收
+
+- [ ] 随机 scalar J-scheme 输入展开到 m-scheme，逐阶比较 MR-BCH 与
+      BCH product 的 0B/1B/2B，max-abs `<=1e-10 MeV`。
+- [ ] `lambda2=0` 的 MR 生产入口对 `He4/O16 Nrefmax=0` 逐元素退化到现有
+      SR Magnus：每段 `Omega`、每阶 BCH、`eta` 和最终 Hamiltonian 均比较，
+      不允许核特例或测试专用分支。
+- [ ] 六个相关/单参考固定体系逐项复现 Python m-scheme oracle；短流还须
+      与 direct flow 在共同截断/步长极限下收敛一致。Magnus(2) 与
+      direct-flow IMSRG(2) 长流不要求 bitwise 相同，但差异必须随数值阈值
+      稳定并有矩阵元级记录。
+- [ ] 收紧 `ds/domega` 与 BCH 阈值十倍后，变换后 Hamiltonian 和 NCSM
+      低能谱达到既有容差（能量变化 `<1 keV`）；最终 `Omega` anti-Hermitian、
+      Hamiltonian Hermitian，真空物化/J64/no2bpack 读回通过。
+- [ ] 完整 CTest、sanitizer、emax4/6 性能门通过；资源超过本机能力时按
+      `CLAUDE.md` 使用 point7 Slurm，最后更新机器证据、commit 并 push。
+
 ## P0：生产版 C++ J-scheme MR-IMSRG(2)
 
 当前唯一实现目标是把已验收的 MR 物理放入现有 `imsrg++`

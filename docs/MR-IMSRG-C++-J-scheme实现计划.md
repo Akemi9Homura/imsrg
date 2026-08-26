@@ -29,7 +29,8 @@ Python 原型或为测试复制一套 SR 公式的 wrapper。
   `lambda[2,3,...]` 项，但 MR commutator 保留全部线性 `lambda2` 项。
 - 仅解耦 `Delta e != 0` 的 1p1h/2p2h 通道，保留同 HO 量子数
   参考空间内部耦合。
-- 首先复用现有直接 flow 和 ODE driver；Magnus 是后续独立门禁。
+- direct flow 已验收并冻结为 oracle；当前门禁是复用现有生产 Magnus/BCH
+  框架实现 scalar MR-Magnus(2)。
 
 ## 3. 实现前必须完成的公式审计
 
@@ -866,3 +867,58 @@ direct-flow` 生产 C++ J-scheme MR-IMSRG 范围没有未关闭的实现或验�
   停止条件。
 - 能量接近但矩阵元不同：仍判为失败，禁止以截断误差或基底差异
   做无证据解释。
+
+## 8. 当前阶段：MR-Magnus(2)
+
+### 8.1 文献冻结与数学定义
+
+本阶段以 Morris--Parzuchowski--Bogner 2015 Eqs. (28),(30)、Vobig 2020
+Secs. 4.5--4.6/App. B.2 和 Mongelli 2022 Secs. 5.4--5.6 为直接依据：
+
+```text
+dOmega/ds = sum_k B_k/k! ad_Omega^k(eta),  Omega(0)=0
+H(s)       = sum_k 1/k! ad_Omega^k(H(0))
+ad_Omega^0(X)=X,  ad_Omega^k(X)=[Omega,ad_Omega^(k-1)(X)]
+```
+
+`Omega` 与 `eta` 为 anti-Hermitian，`H(s)` 为 Hermitian；所有对象和每个
+中间嵌套对易子均按 MR 正规序截到 0B/1B/2B，`lambda3=0`。Mongelli
+Sec. 5.6 明确把 Magnus commutator 写成普通 MR commutator，因此不能给
+BCH 另造近似收缩。当前不处理 rank-J 非零张量算符。
+
+现有生产 `method=magnus` 不直接积分上述 Bernoulli ODE，而使用等价的
+逐步指数合成：每步以 `exp(Omega_new)=exp(ds*eta)exp(Omega_old)` 调用
+`BCH_Product(ds*eta,Omega_old)`，随后以
+`exp(Omega) Hstart exp(-Omega)` 调用 `BCH_Transform`。本阶段保留这一
+已有 `imsrg++` 算法、参数和分段策略，只把其中每一个 scalar commutator
+接到已有 MR dispatcher。direct flow 保留作独立交叉验证。
+
+### 8.2 源码最小改动边界
+
+1. `BCH_Transform`/`BCH_Product` 增加显式、非全局的 MR reference 上下文；
+   无上下文时仍调用原 `Commutator::Commutator`，有上下文时调用
+   `MRCommutator::Commutator`。
+2. `Solve_magnus_euler`、`NewOmega`、`GatherOmega`、中途 Hamiltonian
+   重建和最终 Hamiltonian `Transform` 全部传递同一上下文。遗漏任一调用点
+   都会让第二阶及以上嵌套项错误退回 SR，因此用调用点测试锁定。
+3. 第一版继续拒绝 goose-tank/factorized IMSRG(3) corrections、Brueckner
+   BCH、一般附加 flowing operators 与 MR+IMSRG(3)；这些分支没有
+   `lambda2` 公式验收，不能静默走 SR。
+4. 不新增 MR 专用 ODE 参数，不改 White-NCSM、`Delta e!=0` 掩码、自然基、
+   分段 `Omega` 或现有真空物化语义。
+
+### 8.3 验收梯子
+
+1. Python m-scheme oracle 保存固定 `Omega,O` 的每阶 BCH 以及固定
+   `dOmega,Omega` 的每阶 BCH-product；随机 scalar J-scheme 展开后
+   0B/1B/2B max-abs `<=1e-10 MeV`。
+2. `Omega=0` 时首步严格为 `dOmega=ds*eta`；每步保持 `Omega/eta`
+   anti-Hermitian、BCH 后 Hamiltonian Hermitian。
+3. `He4/O16 Nrefmax=0` 的同一 MR driver 对每段 `Omega`、逐阶 BCH、
+   `eta` 和最终 Hamiltonian 逐元素退化到原 SR `method=magnus`。
+4. `Be8/C12 Nrefmax=0` 与 `He4/O16 Nrefmax=2` 逐项复现 Python oracle；
+   短流与 direct flow 在共同小步长极限下收敛一致。IMSRG(2) 截断使两种
+   长流路径不保证 bitwise 相同，不能把 direct flow 当成唯一真值。
+5. 收紧步长/BCH 阈值十倍，最终 Hamiltonian 和下游 NCSM 低能谱变化
+   `<1 keV`；J64/no2bpack 物化读回继续通过。最后运行完整 CTest、
+   sanitizer 和 emax4/6 性能门。
