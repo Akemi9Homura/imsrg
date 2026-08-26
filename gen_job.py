@@ -526,8 +526,38 @@ echo repository_commit={repository_commit}
 if ldd {shlex.quote(str(converter))} | grep 'not found'; then
   exit 1
 fi
-/usr/bin/time -v {converter_command} > {shlex.quote(str(converter_stdout))} 2> {shlex.quote(str(converter_time))}
-/usr/bin/time -v {embed_command} > {shlex.quote(str(embed_stdout))} 2> {shlex.quote(str(embed_time))}
+run_with_rss() {{
+  local command_label="$1"
+  local stdout_file="$2"
+  local resource_file="$3"
+  shift 3
+  local start_seconds=$SECONDS
+  local maximum_rss_kib=0
+  : > "$resource_file"
+  "$@" > "$stdout_file" 2>> "$resource_file" &
+  local sampled_pid=$!
+  while kill -0 "$sampled_pid" 2>/dev/null; do
+    local current_rss_kib
+    current_rss_kib=$(awk '/^VmHWM:/ {{print $2}}' "/proc/$sampled_pid/status" 2>/dev/null || true)
+    if [[ "$current_rss_kib" =~ ^[0-9]+$ ]] && (( current_rss_kib > maximum_rss_kib )); then
+      maximum_rss_kib=$current_rss_kib
+    fi
+    sleep 1
+  done
+  set +e
+  wait "$sampled_pid"
+  local command_status=$?
+  set -e
+  {{
+    echo command_label="$command_label"
+    echo wall_seconds=$((SECONDS - start_seconds))
+    echo maximum_rss_kib="$maximum_rss_kib"
+    echo exit_status="$command_status"
+  }} >> "$resource_file"
+  return "$command_status"
+}}
+run_with_rss converter {shlex.quote(str(converter_stdout))} {shlex.quote(str(converter_time))} {converter_command}
+run_with_rss embed_reference {shlex.quote(str(embed_stdout))} {shlex.quote(str(embed_time))} {embed_command}
 test -s {shlex.quote(str(output_j64))}
 test -s {shlex.quote(str(output_reference))}
 test -s {shlex.quote(str(embed_report))}

@@ -4,6 +4,7 @@
 from dataclasses import replace
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 
@@ -134,6 +135,7 @@ def main():
             pyimsrg_dir=pyimsrg_dir,
         )
         input_script = generate_mr_jscheme_input_slurm(input_settings)
+        subprocess.run(["bash", "-n", str(input_script)], check=True)
         input_contents = input_script.read_text(encoding="utf-8")
         input_metadata = json.loads(
             (input_script.parent / "metadata.json").read_text(encoding="utf-8")
@@ -143,7 +145,12 @@ def main():
         for token in (
             "#SBATCH --partition=c128m1024",
             "#SBATCH --cpus-per-task=128",
-            "/usr/bin/time -v",
+            "run_with_rss()",
+            "/proc/$sampled_pid/status",
+            "echo wall_seconds=",
+            "echo maximum_rss_kib=",
+            "run_with_rss converter",
+            "run_with_rss embed_reference",
             "--interaction",
             "--output",
             "--A 4",
@@ -157,6 +164,8 @@ def main():
         ):
             require(token in input_contents,
                     "generated MR input script is missing: " + token)
+        require("/usr/bin/time" not in input_contents,
+                "point7 MR input script still requires unavailable /usr/bin/time")
         for key in (
             "minipack_sha256", "source_reference_sha256", "converter_sha256",
             "pyimsrg_sha256", "embedder_sha256", "environment_script_sha256",
