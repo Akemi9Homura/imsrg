@@ -349,27 +349,61 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       已有结果只作为已知边界保留，不再据此选择流窗、生成元、ODE 或
       Magnus。当前任务重新收敛到 C++ J-scheme MR-IMSRG 本身的实现、验证
       与性能优化。
-- [ ] **MR-P0：干净构建与生产测试矩阵。** 从当前提交新建 Release 和
+- [~] **MR-P0：干净构建与生产测试矩阵。** 从当前提交新建 Release 和
       sanitizer build，运行全部 MRReference、正规序往返、命名
       `lambda2` contraction、随机 J↔m oracle、White-NCSM denominator/
       generator、SR dispatcher 退化、六个真实参考态 RHS/checkpoint 与
       driver 测试。必须区分已有覆盖与实际缺口；不得用后 NCSM 能量替代
       `E/f/Gamma -> eta -> named RHS` 的逐层断言。
-- [ ] **MR-P1：补齐生产入口验收缺口。** 审计 `imsrg++ -> IMSRGSolver ->
+      干净 Release build 的 8 个 MR CTest 已全部通过，总用时 `403.99 s`；
+      优化后的完整四核相关参考逐命名 contraction/checkpoint oracle 再次以
+      `374.41 s` 通过。ASan+UBSan 首轮在 MR 必经的既有 SR
+      `comm220ss` 空 channel 上发现 Armadillo 空指针引用，已由 commit
+      `5dfa32a4` 加严格零贡献保护；修复后 sanitizer 下 MR driver、SR
+      退化和 denominator 三项通过。sanitized `pyIMSRG` 在测试故意触发
+      `WriteBinary` 拒绝覆盖异常时仍有 libasan/CPython `__cxa_throw`
+      interceptor 冲突；这是当前剩余的测试运行环境问题，不能误记为
+      MRReference 数值失败，也不能据此把 sanitizer 项标成完成。
+- [x] **MR-P1：补齐生产入口验收缺口。** 审计 `imsrg++ -> IMSRGSolver ->
       MRCommutator/Generator` 的真实调用链；对任何只在 helper/pybind 层测试、
       未覆盖生产 dispatcher 的路径增加最小回归。`lambda2=0` 必须逐元素
       退化到现有 SR，相关参考态必须逐命名 contraction 退化到 Python/QCombo
       oracle；优化前先冻结基准输出与容差。
-- [ ] **MR-P2：只剖析和优化 MR-IMSRG RHS。** 在 emax2/4/6/8 固定输入上
+      审计确认真实可执行程序已强制 HO 基、`white-ncsm`、direct flow、
+      单一步空间、NN/NO2B、无额外流动算符，并已有相关参考 driver、
+      `He4/O16 lambda2=0` 逐元素 SR 退化、四个相关参考逐命名 contraction
+      和连续 RK4 checkpoint 门禁；没有发现只在 helper 层成立的核心路径。
+      sanitizer 暴露并修复的 `comm220ss` 空 channel UB 是本轮唯一实际生产
+      调用链缺陷。
+- [~] **MR-P2：只剖析和优化 MR-IMSRG RHS。** 在 emax2/4/6/8 固定输入上
       测量单次完整 `MRCommutator + White-NCSM generator` 的 profiler、峰值
       RSS、临时张量尺寸和 1/多线程复现误差，定位当前真实瓶颈后复用
       `imsrg++` 的 channel/block/cache 基础设施做等价优化。禁止以改变物理
       掩码、舍弃小 `lambda2`、降低空间或缩短流来换性能。
-- [ ] **MR-P3：每个优化提交的强制回归。** 每个边界清楚的优化必须先过
+      emax6 单线程基线（commit `5dfa32a4`，4 次 RHS）为 profiler real
+      `2.14910 s`、峰值 `281084 KiB`，其中 MR setup/VI/addon 为
+      `0.26468/0.26566/0.77661 s`。commit `e3965232` 仅用 `lambda2` 的
+      精确标准耦合 pair 支撑计算 `lambda*X/Y`，setup 降到 `0.03311 s`；
+      commit `6a7227c4` 再跳过 VI 中严格为零的 trace 元素，VI/addon/real
+      降到 `0.14228/0.43116/1.77368 s`。优化前后 emax4/6 流后 J64 均
+      bitwise 相同；emax4 最终 real/MR addon/峰值为
+      `0.19801 s/0.06697 s/54128 KiB`，emax6 的 1/16 线程输出也 bitwise
+      相同。
+      当前 emax8 单线程实测 90 个 J-orbit、3526624 TBME、profiler real
+      `12.33056 s`、峰值 `1377824 KiB`；MR addon `1.98985 s`，而既有 SR
+      commutator `5.67302 s`（`comm222_phss=4.13714 s`）已是主瓶颈。
+      emax2 对应 real/MR addon/峰值为
+      `0.01889 s/0.00997 s/12484 KiB`。下一步补齐各空间临时张量尺寸的
+      统一记录，再评估是否能安全复用既有 SR Pandya 缓存；不能为加速
+      破坏严格 SR 退化。
+- [~] **MR-P3：每个优化提交的强制回归。** 每个边界清楚的优化必须先过
       MR-P0/P1 的小空间代数与生产入口测试，再重跑至少一个 emax4/6 RHS
       性能点；要求数值误差保持既有门禁、Hermiticity/anti-Hermiticity 与
       线程复现不退化，并记录优化前后 wall/RSS。当前阶段不以 NCSM Nmax
       收敛或长流谱行为作为优化验收指标。
+      本轮两个优化均通过 `MRReference` 随机 J↔m/参考实现、真实相关
+      `MRDriver`、`MRSRDriver`，第一项另通过四核完整 oracle 和 sanitizer
+      driver；第二项的 emax4/6 输出相对第一轮冻结基线均逐字节相同。
 
 “最终能量接近”不能替代 E--F；只有
 `E/f/Gamma -> denominator -> eta -> named RHS contractions -> flow -> vacuum H -> NCSM`
