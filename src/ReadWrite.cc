@@ -535,6 +535,171 @@ void ReadWrite::Write_no2bpack( std::string filename, Operator& Hvac )
             << num_obme << " OBMEs, " << num_tbme << " TBMEs" << std::endl;
 }
 
+/// Write real anti-Hermitian Magnus segments in a self-describing, compact
+/// J-scheme format for IM-FCIQMC.  The caller is responsible for undoing
+/// reference normal ordering and transforming each segment back to the HO
+/// basis.  Only independent upper-triangular entries are stored.
+void ReadWrite::WriteOmegaHO(std::string filename, const std::vector<Operator>& omega_segments)
+{
+  if (omega_segments.empty())
+  {
+    std::cerr << "WriteOmegaHO: no Magnus segments supplied." << std::endl;
+    goodstate = false;
+    return;
+  }
+
+  ModelSpace* modelspace = omega_segments.front().GetModelSpace();
+  const uint32_t num_orbits = static_cast<uint32_t>(modelspace->GetNumberOrbits());
+  const uint32_t num_channels = static_cast<uint32_t>(modelspace->GetNumberTwoBodyChannels());
+  const uint32_t num_segments = static_cast<uint32_t>(omega_segments.size());
+  constexpr double antihermitian_tolerance = 1e-10;
+
+  for (uint32_t iseg=0; iseg<num_segments; ++iseg)
+  {
+    const Operator& omega = omega_segments[iseg];
+    if (omega.GetModelSpace() != modelspace or omega.GetParticleRank() > 2 or
+        not omega.IsNumberConserving() or not omega.IsAntiHermitian() or
+        not omega.OneBody.is_finite() or not std::isfinite(omega.ZeroBody))
+    {
+      std::cerr << "WriteOmegaHO: invalid segment " << iseg << std::endl;
+      goodstate = false;
+      return;
+    }
+    double residual = arma::abs(omega.OneBody + omega.OneBody.t()).max();
+    for (const auto& item : omega.TwoBody.MatEl)
+    {
+      if (not item.second.is_finite())
+      {
+        std::cerr << "WriteOmegaHO: non-finite two-body values in segment " << iseg << std::endl;
+        goodstate = false;
+        return;
+      }
+      if (item.first[0] == item.first[1] and item.second.n_elem > 0)
+        residual = std::max(residual, arma::abs(item.second + item.second.t()).max());
+    }
+    if (residual > antihermitian_tolerance or std::abs(omega.ZeroBody) > antihermitian_tolerance)
+    {
+      std::cerr << "WriteOmegaHO: segment " << iseg
+                << " fails real anti-Hermiticity check; residual=" << residual
+                << " zero-body=" << omega.ZeroBody << std::endl;
+      goodstate = false;
+      return;
+    }
+  }
+
+  std::ofstream outfile(filename, std::ios::binary);
+  if (not outfile.good())
+  {
+    std::cerr << "WriteOmegaHO: cannot open " << filename << std::endl;
+    goodstate = false;
+    return;
+  }
+  auto write_value = [&](const auto& x)
+  {
+    outfile.write(reinterpret_cast<const char*>(&x), sizeof(x));
+  };
+
+  const std::array<char,8> magic{{'I','M','O','M','E','G','A','1'}};
+  outfile.write(magic.data(), magic.size());
+  const uint32_t version = 1;
+  const uint32_t endian_marker = 0x01020304U;
+  const uint32_t basis_code = 1;          // harmonic oscillator
+  const uint32_t normal_order_code = 1;   // vacuum normal order
+  const uint32_t precision_bytes = 8;     // IEEE binary64
+  const int32_t exponential_sign = +1;    // H' = exp(Omega) H exp(-Omega)
+  const int32_t segment_order = +1;       // increasing segment index
+  const double hw = modelspace->GetHbarOmega();
+  const int32_t emax = modelspace->GetEmax();
+  write_value(version);
+  write_value(endian_marker);
+  write_value(basis_code);
+  write_value(normal_order_code);
+  write_value(precision_bytes);
+  write_value(exponential_sign);
+  write_value(segment_order);
+  write_value(hw);
+  write_value(emax);
+  write_value(num_orbits);
+  write_value(num_channels);
+  write_value(num_segments);
+
+  for (uint32_t i=0; i<num_orbits; ++i)
+  {
+    Orbit& orbit = modelspace->GetOrbit(i);
+    const int32_t n = orbit.n;
+    const int32_t l = orbit.l;
+    const int32_t j2 = orbit.j2;
+    const int32_t tz2 = orbit.tz2;
+    write_value(n);
+    write_value(l);
+    write_value(j2);
+    write_value(tz2);
+  }
+
+  for (uint32_t ch=0; ch<num_channels; ++ch)
+  {
+    TwoBodyChannel& tbc = modelspace->GetTwoBodyChannel(ch);
+    const int32_t J = tbc.J;
+    const int32_t parity = tbc.parity;
+    const int32_t Tz = tbc.Tz;
+    const uint32_t nkets = static_cast<uint32_t>(tbc.GetNumberKets());
+    write_value(J);
+    write_value(parity);
+    write_value(Tz);
+    write_value(nkets);
+    for (uint32_t iket=0; iket<nkets; ++iket)
+    {
+      Ket& ket = tbc.GetKet(iket);
+      const uint32_t p = static_cast<uint32_t>(ket.p);
+      const uint32_t q = static_cast<uint32_t>(ket.q);
+      write_value(p);
+      write_value(q);
+    }
+  }
+
+  const std::streampos offset_table_position = outfile.tellp();
+  const uint64_t zero_offset = 0;
+  for (uint32_t iseg=0; iseg<num_segments; ++iseg) write_value(zero_offset);
+
+  std::vector<uint64_t> segment_offsets(num_segments);
+  for (uint32_t iseg=0; iseg<num_segments; ++iseg)
+  {
+    segment_offsets[iseg] = static_cast<uint64_t>(outfile.tellp());
+    const Operator& omega = omega_segments[iseg];
+    const uint32_t segment_index = iseg;
+    const uint32_t reserved = 0;
+    write_value(segment_index);
+    write_value(reserved);
+    write_value(omega.ZeroBody);
+    for (uint32_t a=0; a<num_orbits; ++a)
+      for (uint32_t b=a+1; b<num_orbits; ++b)
+        write_value(omega.OneBody(a,b));
+
+    for (uint32_t ch=0; ch<num_channels; ++ch)
+    {
+      const arma::mat& matrix = omega.TwoBody.GetMatrix(ch);
+      const uint32_t nkets = static_cast<uint32_t>(matrix.n_rows);
+      for (uint32_t ibra=0; ibra<nkets; ++ibra)
+        for (uint32_t iket=ibra+1; iket<nkets; ++iket)
+          write_value(matrix(ibra,iket));
+    }
+  }
+
+  const std::streampos end_position = outfile.tellp();
+  outfile.seekp(offset_table_position);
+  for (const uint64_t offset : segment_offsets) write_value(offset);
+  outfile.seekp(end_position);
+  outfile.close();
+  if (not outfile.good())
+  {
+    std::cerr << "WriteOmegaHO: failed while writing " << filename << std::endl;
+    goodstate = false;
+    return;
+  }
+  std::cout << "Wrote " << num_segments << " HO-vacuum J-scheme Magnus segments to "
+            << filename << std::endl;
+}
+
 
 
 /// Read two-body matrix elements from an Oslo-formatted file
@@ -6620,5 +6785,3 @@ void ReadWrite::CopyFile(std::string filename1, std::string filename2)
 //    f2 << f1.rdbuf ();
 //  } 
 }
-
-

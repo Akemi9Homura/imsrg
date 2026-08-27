@@ -1029,6 +1029,80 @@ Operator HartreeFock::TransformToHFBasis( Operator& OpHO)
 }
 
 //**************************************************************************
+/// Inverse of TransformToHFBasis() for number-conserving operators through
+/// the two-body level.  The HF coefficient matrix is orthogonal in each
+/// (l,j,tz) block, so O_HO = C O_HF C^T and V_HO = D V_HF D^T.
+//**************************************************************************
+Operator HartreeFock::TransformFromHFBasis( Operator& OpHF)
+{
+   if (not OpHF.IsNumberConserving() or OpHF.GetParticleRank() > 2)
+   {
+      std::cerr << "TransformFromHFBasis currently supports number-conserving 0B/1B/2B operators only." << std::endl;
+      std::terminate();
+   }
+
+   Operator OpHO(OpHF);
+   OpHO.OneBody = C * OpHF.OneBody * C.t();
+
+   if (OpHF.legs > 3)
+   {
+      for (auto& it : OpHF.TwoBody.MatEl)
+      {
+         const int ch_bra = it.first[0];
+         const int ch_ket = it.first[1];
+         TwoBodyChannel& tbc_bra = OpHO.GetModelSpace()->GetTwoBodyChannel(ch_bra);
+         TwoBodyChannel& tbc_ket = OpHO.GetModelSpace()->GetTwoBodyChannel(ch_ket);
+         const int nbras = it.second.n_rows;
+         const int nkets = it.second.n_cols;
+         arma::mat Dbra(nbras,nbras,arma::fill::zeros);
+         arma::mat Dket(nkets,nkets,arma::fill::zeros);
+
+         for (int i=0; i<nbras; ++i)
+         {
+            Ket& bra_ho = tbc_bra.GetKet(i);
+            for (int j=0; j<nbras; ++j)
+            {
+               Ket& bra_hf = tbc_bra.GetKet(j);
+               Dbra(i,j) = C(bra_ho.p,bra_hf.p) * C(bra_ho.q,bra_hf.q);
+               if (bra_ho.p != bra_ho.q)
+               {
+                  Dbra(i,j) += C(bra_ho.q,bra_hf.p) * C(bra_ho.p,bra_hf.q) * bra_ho.Phase(tbc_bra.J);
+               }
+               if (bra_ho.p == bra_ho.q) Dbra(i,j) *= PhysConst::SQRT2;
+               if (bra_hf.p == bra_hf.q) Dbra(i,j) /= PhysConst::SQRT2;
+            }
+         }
+
+         if (ch_bra == ch_ket)
+         {
+            Dket = Dbra;
+         }
+         else
+         {
+            for (int i=0; i<nkets; ++i)
+            {
+               Ket& ket_ho = tbc_ket.GetKet(i);
+               for (int j=0; j<nkets; ++j)
+               {
+                  Ket& ket_hf = tbc_ket.GetKet(j);
+                  Dket(i,j) = C(ket_ho.p,ket_hf.p) * C(ket_ho.q,ket_hf.q);
+                  if (ket_ho.p != ket_ho.q)
+                  {
+                     Dket(i,j) += C(ket_ho.q,ket_hf.p) * C(ket_ho.p,ket_hf.q) * ket_ho.Phase(tbc_ket.J);
+                  }
+                  if (ket_ho.p == ket_ho.q) Dket(i,j) *= PhysConst::SQRT2;
+                  if (ket_hf.p == ket_hf.q) Dket(i,j) /= PhysConst::SQRT2;
+               }
+            }
+         }
+
+         OpHO.TwoBody.GetMatrix(ch_bra,ch_ket) = Dbra * it.second * Dket.t();
+      }
+   }
+   return OpHO;
+}
+
+//**************************************************************************
 /// If the lowest orbits are different from our previous guess, we should update the reference.
 //**************************************************************************
 void HartreeFock::UpdateReference()
@@ -1718,4 +1792,3 @@ double HartreeFock::GetTransformed3bme( Operator& OpIn, int Jab, int Jde, int J2
   } // for alpha
   return V_hf;
 }
-

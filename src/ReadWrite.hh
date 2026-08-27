@@ -45,6 +45,7 @@ class ReadWrite
    void ReadTBME_OakRidge( std::string spname, std::string tbmename, Operator& Hbare, std::string format);
    void Read_no2bpack( std::string filename, Operator& Hbare);
    void Write_no2bpack( std::string filename, Operator& Hvac);
+   void WriteOmegaHO(std::string filename, const std::vector<Operator>& omega_segments);
    void ReadBareTBME_Navratil( std::string filename, Operator& Hbare);
    void ReadBareTBME_Navratil_from_stream( std::istream& infile, Operator& Hbare);
    void ReadBareTBME_Darmstadt( std::string filename, Operator& Hbare, int E1max, int E2max, int lmax);

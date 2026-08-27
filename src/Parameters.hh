@@ -66,6 +66,7 @@ std::map<std::string,std::string> Parameters::string_par = {
   {"flowfile",			"default"},	// name of output flow file
   {"intfile",			"default"},	// name of output interaction fille
   {"write_H_no2bpack",		"none"},	// write final IMSRG(2) H(s), vacuum normal ordered in the active basis
+  {"write_omega_ho",		"none"},	// write all Magnus segments in HO-basis vacuum-normal-ordered J-scheme format
   {"fmt2",			"me2j"},	// can also be navratil/Navratil, oslo, oakridge, takayuki, nushellx, no2bpack
   {"fmt3",			"me3j"},	// can also be navratil or Navratil to read Petr's TBME format
   {"input_op_fmt",		"navratil"},	// navratil means read Petr Navratil's format for 2b currents. miyagi means Takayuki Miyagi's format.

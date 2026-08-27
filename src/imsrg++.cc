@@ -84,6 +84,7 @@ int main(int argc, char** argv)
   std::string flowfile = parameters.s("flowfile");
   std::string intfile = parameters.s("intfile");
   std::string write_H_no2bpack = parameters.s("write_H_no2bpack");
+  std::string write_omega_ho = parameters.s("write_omega_ho");
   std::string core_generator = parameters.s("core_generator");
   std::string valence_generator = parameters.s("valence_generator");
   std::string fmt2 = parameters.s("fmt2");
@@ -1688,11 +1689,75 @@ int main(int argc, char** argv)
 
 
 
+  if (write_omega_ho != "none")
+  {
+    if (basis != "HF" or method != "magnus")
+    {
+      std::cerr << "write_omega_ho requires basis=HF and method=magnus." << std::endl;
+      return EXIT_FAILURE;
+    }
+    if (IMSRG3 or imsrg3_at_end or imsrgsolver.GetH_s().GetParticleRank() > 2)
+    {
+      std::cerr << "write_omega_ho currently supports IMSRG(2) only." << std::endl;
+      return EXIT_FAILURE;
+    }
+    std::string omega_scratch = rw.GetScratchDir();
+    if (omega_scratch.empty() or omega_scratch.find("/dev/null") != std::string::npos)
+    {
+      std::cerr << "write_omega_ho requires a real scratch directory." << std::endl;
+      return EXIT_FAILURE;
+    }
+
+    imsrgsolver.FlushOmegaToScratch();
+    std::vector<Operator> omega_ho_segments;
+    omega_ho_segments.reserve(imsrgsolver.GetNOmegaWritten());
+    for (int i=0; i<imsrgsolver.GetNOmegaWritten(); ++i)
+    {
+      std::ostringstream inputfile;
+      inputfile << omega_scratch << "/OMEGA_" << std::setw(6) << std::setfill('0') << getpid()
+                << std::setw(3) << std::setfill('0') << i;
+      std::ifstream ifs(inputfile.str(), std::ios::binary);
+      if (not ifs.good())
+      {
+        std::cerr << "write_omega_ho: cannot read scratch segment " << inputfile.str() << std::endl;
+        return EXIT_FAILURE;
+      }
+      Operator omega_hf(modelspace,0,0,0,2);
+      omega_hf.ReadBinary(ifs);
+      ifs.close();
+
+      Operator omega_hf_vac = omega_hf.UndoNormalOrdering();
+      Operator omega_ho_vac = hf.TransformFromHFBasis(omega_hf_vac);
+      Operator omega_roundtrip_hf_vac = hf.TransformToHFBasis(omega_ho_vac);
+      Operator omega_roundtrip = omega_roundtrip_hf_vac.DoNormalOrdering();
+      Operator omega_difference = omega_roundtrip - omega_hf;
+      const double source_norm = omega_hf.Norm();
+      const double roundtrip_error = omega_difference.Norm();
+      const double tolerance = 1e-9 * std::max(1.0, source_norm);
+      std::cout << std::setprecision(12)
+                << "Omega HO export roundtrip segment " << i
+                << ": norm=" << source_norm
+                << " one-body=" << omega_ho_vac.OneBodyNorm()
+                << " two-body=" << omega_ho_vac.TwoBodyNorm()
+                << " zero-body=" << omega_ho_vac.ZeroBody
+                << " error=" << roundtrip_error << std::endl;
+      if (not std::isfinite(roundtrip_error) or roundtrip_error > tolerance)
+      {
+        std::cerr << "write_omega_ho: HF/HO and normal-ordering roundtrip failed for segment "
+                  << i << "; error=" << roundtrip_error << " tolerance=" << tolerance << std::endl;
+        return EXIT_FAILURE;
+      }
+      omega_ho_segments.emplace_back(std::move(omega_ho_vac));
+    }
+    rw.WriteOmegaHO(write_omega_ho, omega_ho_segments);
+    if (not rw.goodstate) return EXIT_FAILURE;
+  }
+
 //  std::cout << "Made it here and write_omega is " << write_omega << std::endl;
   if (write_omega)
   {
     std::string scratch = rw.GetScratchDir();
-    imsrgsolver.FlushOmegaToScratch();
+    if (write_omega_ho == "none") imsrgsolver.FlushOmegaToScratch();
     for (int i=0; i < imsrgsolver.GetNOmegaWritten() ; i++)
     {
        std::ostringstream inputfile,outputfile;
