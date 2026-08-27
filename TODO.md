@@ -145,13 +145,17 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       C++ checker 读回检查标量量子数、有限性及 0B/1B/2B
       anti-Hermiticity；测试同时确认人为破坏的对角 1B 元素会被拒绝，
       Be8/C12 真实生产段的独立 ASan+UBSan 读回也已通过。
-- [ ] `He4/O16 Nrefmax=2` default 长流 jobs `100600/100606` 已启动并
-      通过输入、参考态和 `Omega` 写出检查。O16 default 已在
-      `s=19653.65375` 以残差比 `9.84554e-7`、exit 0、零拒步完成；18 个
-      非空 `Omega` 段及 J64/no2bpack 已物化。同终点 tight job `100658`
-      已经完整脚本审查、`bash -n`、`sbatch --test-only` 后启动，只覆写
-      `ode_tolerance=1e-7` 并设 `eta_criterion=1e-30`。He4 default 继续运行，
-      完成后按同一流程生成其 tight 复算。
+- [x] `O16 Nrefmax=2` default/tight 同终点 Magnus 门禁完成。jobs
+      `100606/100658` 均在 `s=19653.65375`、exit 0、零拒步完成，各物化
+      18 个非空 `Omega` 段；tight 只覆写 `ode_tolerance=1e-7` 并以
+      `eta_criterion=1e-30` 禁用提前停止。compute_A gate job `100666`
+      对 `Nmax=2` 三态给出最大 default/tight 变化 `0.296000 keV`，两条
+      no2bpack 相对各自 lossless J64 的最坏差为 `2.544/4.089 eV`；完整
+      `mrimsrg_magnus_gate_v2` 的 13 项门全部通过，原生 JSON 保存在 point7
+      被忽略的 `result/mr-jscheme-magnus/gates/O16.json`。
+- [ ] `He4 Nrefmax=2` default 长流 job `100600` 已通过输入、参考态和
+      `Omega` 写出检查并继续运行；完成后按同一流程生成精确同终点 tight
+      复算，再执行 `Nmax=8` 三态及 J64/no2bpack/Omega 完整门禁。
 - [ ] 四核均必须达到目标掩码内解耦残差相对初值 `<1e-6`，
       十倍收紧后 NCSM 验收能级变化 `<1 keV`，并保持 Hermiticity、
       anti-Hermiticity、J64/no2bpack 读回窗和已验收的 m-scheme/SR 极限；

@@ -1173,6 +1173,25 @@ O16 Nrefmax=2 default job `100606` 随后在 `s=19653.65375` 完成，最终
 通过完整脚本审查、`bash -n` 和 `sbatch --test-only` 后在 compute_A 启动；
 它禁用提前停止并只写入 `ode_tolerance=1e-7`，不覆写任何步长参数。
 
+job `100658` 随后在同一精确终点正常完成，wall `8587 s`、峰值 RSS
+`12128 KiB`、exit 0，同样无 Magnus 级数拒步并物化 18 个非空 `Omega`
+段。compute_A gate job `100666` 使用与 Be8/C12 相同的 reader、NCSM
+validator 和 Omega validator 生成
+`result/mr-jscheme-magnus/gates/O16.json`，完整 13 项门均为真。`Nmax=2`
+三态的 default/tight lossless J64 谱分别为
+`[-63.8045586684,-55.7528718134,-55.2994927914]` 和
+`[-63.8043015243,-55.7525758129,-55.2992325111] MeV`，最大变化
+`0.296000 keV`。default/tight 的 J64/no2bpack 最坏读回差为
+`2.544/4.089 eV`。完整 J64 的 default/tight 最大 0B/1B/2B 差为
+`0.697460/0.552926/0.524341 keV`；两边 Omega 的 1B/2B
+anti-Hermiticity 违例均为零，0B 最大绝对值为
+`9.067e-23/7.065e-23`。gate JSON SHA-256 为
+`6fd08c49b03559752f7079330595d4b513817caff002548ba2541ee28eae5988`，
+gate reader SHA-256 仍为
+`b416097a5c078e61295adf78043339d1b7dd2e3b435934c69645bb8af877d0a9`。
+因此 O16 的默认/十倍收紧、真空物化、NCSM 谱、packed 读回和 Omega
+完整性已经闭环；四核总门当前只剩 He4 default/tight 对。
+
 He4/O16 长流的 scalar commutator 计数超过六位后，原生
 `WriteFlowStatus` 的七字符 `Ncomm` 紧接前一个 16 字符 `Eta_3` 字段；
 因此纯 `split()` 会把 `0.0000000001184939` 误当成一个浮点数并把计数读成

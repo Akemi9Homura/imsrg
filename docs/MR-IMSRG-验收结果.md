@@ -661,3 +661,35 @@ lossless J64 逐元素比较的 0B/1B/2B 最坏差为
 正式成功，重跑 `100458` 将 `max_iter` 提到 500 后以 exit `0:0` 完成。
 下一门禁仍是 bare/flow 匹配 Nmax 序列和最大可行 Nmax proxy；目前不能据
 Nmax8 单点宣称 emax8 downstream physics 通过。
+
+## 12. O16 emax2 生产 Magnus 同终点验收
+
+O16 `Nrefmax=2` 的默认/十倍收紧 jobs `100606/100658` 使用同一冻结
+NNLOopt `hw=20,emax=2,e2max=4` 输入、生产 executable/library 和参考态，
+并精确流到同一终点 `s=19653.65375`。两条流均 exit 0、Magnus 拒步为零，
+各写出 18 个非空 Omega 段。default/tight 墙钟分别为 `8686/8587 s`，
+峰值 RSS 为 `12428/12128 KiB`。
+
+compute_A job `100666` 用统一 `mrimsrg_magnus_gate_v2` 对两份原生输出执行
+完整门禁，13 项全部通过。lossless J64 的 `Nmax=2` 三态为：
+
+| profile | E0 (MeV) | E1 (MeV) | E2 (MeV) |
+|---|---:|---:|---:|
+| default | -63.804558668424 | -55.752871813409 | -55.299492791398 |
+| tight | -63.804301524287 | -55.752575812918 | -55.299232511071 |
+
+tight-default 三态差为 `0.257144/0.296000/0.260280 keV`，最坏值低于
+`1 keV`。default/tight 各自的 no2bpack 相对 J64 最坏谱差为
+`2.544/4.089 eV`，低于 `5 eV` packed-format 窗。两份 J64 的完整
+0B/1B/2B 最大差为 `0.697460/0.552926/0.524341 keV`；这里仍以实际
+NCSM 谱而不是零体项作 ODE 验收。
+
+default/tight 的 Omega 1B/2B anti-Hermiticity 最大违例均为零，0B 最大
+绝对值为 `9.067e-23/7.065e-23`。正式 J64 SHA-256 分别为
+`7520a293a9242af80c27a05b38e56988762056b522bf119d661627a85372ebc5` 和
+`6dcf4460a30574773aebf86eec2b3932c036dece727af573dad0ce496c18e335`；
+原生 gate JSON 位于 point7 被忽略的
+`result/mr-jscheme-magnus/gates/O16.json`，SHA-256 为
+`6fd08c49b03559752f7079330595d4b513817caff002548ba2541ee28eae5988`。
+O16 至此完成严格生产闭环；四核聚合仍必须等待 He4 的 default/tight
+同终点门禁，不能提前宣称四核全部完成。
