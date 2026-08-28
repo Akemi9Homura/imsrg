@@ -1231,6 +1231,19 @@ He4 精确同终点 tight job `100842` 由根目录单点生成器产生，固�
 生产 executable/library 与环境脚本哈希检查，随后在 node17 正常进入
 `magnus_adaptive` 流。它复用冻结生产 executable，不因 reader 修复重链。
 
+等待 tight 时先完成了 He4 default 可独立执行的半边门禁。compute_A job
+`100847` 用新 reader 顺序读取 184.8 MB flow 的 815548 条状态行，正确得到
+`step=815547,s=407770.88132,Ncomm=35454351` 和残差比
+`9.94895916e-7`。job `100848` 用生产 `Operator::ReadBinary` 检查全部 53
+个 Omega 段：metadata/有限性均通过，1B/2B anti-Hermiticity 最大违例为
+零，0B 最大绝对值 `6.768e-23`。同一作业实际对角化 default J64/no2bpack
+的 `Nmax=8` 三态，分别得到
+`[-20.5012331318,-19.1255628765,-18.3327487902]` 和
+`[-20.5012316420,-19.1255623925,-18.3327483429] MeV`，最大 packing 差
+`1.490 eV`。因此当前能在 tight 完成前独立检查的 default flow、Omega、
+高精度输出和 packed 读回均已通过；剩余硬依赖只有 tight 终点产物、两条
+谱的 ODE 差和最终四核聚合。
+
 最终四核完成判据由 `prototype/mrimsrg/aggregate_magnus_gates.py`
 聚合，不从日志手工摘录。它要求恰有 `He4/Be8/C12/O16`，对应
 `Nrefmax=2/0/0/2`、NCSM `Nmax=8/0/0/2` 和各三态，并强制固定

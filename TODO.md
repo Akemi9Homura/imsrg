@@ -163,7 +163,11 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       经完整脚本审查、`bash -n`、`sbatch --test-only` 和运行时哈希检查后
       在 node17 启动；它只覆写 `ode_tolerance=1e-7` 并以
       `eta_criterion=1e-30` 禁止提前停止。完成后执行 `Nmax=8` 三态及
-      J64/no2bpack/Omega 完整门禁。
+      J64/no2bpack/Omega 完整门禁。等待期间已先完成 default 半边门禁：
+      compute_A job `100847` 用新 reader 正确读取全部 815548 条状态行；job
+      `100848` 检查 53 个 Omega 段的 0B/1B/2B anti-Hermiticity，并实际
+      对角化 J64/no2bpack 的 `Nmax=8` 三态，最大 packing 差 `1.490 eV`，
+      两项均通过。tight 完成前无法做的只剩同终点谱差和完整单核 gate。
 - [x] step 溢出 reader 修复改变 gate implementation SHA-256 后，未重跑
       物理流，直接用新 reader 从原生结果重新生成 Be8/C12/O16 三份 v2
       gate JSON。compute_A jobs `100843/100844/100845` 均 exit 0，三份报告
