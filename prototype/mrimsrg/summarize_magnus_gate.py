@@ -23,7 +23,10 @@ DEFAULT_ODE_PARAMETER_SOURCE = "imsrg++ adaptive Magnus runtime defaults"
 TIGHT_ODE_PARAMETER_SOURCE = (
     "explicit tenfold validation override of the imsrg++ default"
 )
-FLOW_VALUE_WIDTHS = (5, 12, *(16 for _ in range(9)))
+FLOW_STEP_WIDTH = 5
+FLOW_S_WIDTH = 12
+FLOW_BODY_WIDTHS = tuple(16 for _ in range(9))
+FLOW_VALUE_WIDTHS = (FLOW_STEP_WIDTH, FLOW_S_WIDTH, *FLOW_BODY_WIDTHS)
 
 
 def sha256(path: Path) -> str:
@@ -44,13 +47,24 @@ def unique(root: Path, pattern: str) -> Path:
 
 
 def parse_flow_prefix(line: str) -> list[float] | None:
-    """Parse through Ncomm using the fixed widths emitted by IMSRGSolver."""
-    fixed_width = sum(FLOW_VALUE_WIDTHS)
-    if len(line) > fixed_width:
+    """Parse through Ncomm using the widths emitted by IMSRGSolver.
+
+    ``std::setw`` is a minimum width.  Once ``istep`` exceeds five digits it
+    runs directly into the twelve-column fixed-point ``s`` field.  Locate the
+    end of ``s`` from its five fractional digits so the step field may grow;
+    the following nine floating-point fields retain their sixteen columns.
+    """
+    s_decimal = line.find(".")
+    s_end = s_decimal + 6 if s_decimal >= 0 else -1
+    step_width = s_end - FLOW_S_WIDTH
+    fixed_width = s_end + sum(FLOW_BODY_WIDTHS)
+    if step_width >= FLOW_STEP_WIDTH and len(line) > fixed_width:
         fields: list[float] = []
-        start = 0
         try:
-            for width in FLOW_VALUE_WIDTHS:
+            fields.append(float(line[:step_width]))
+            fields.append(float(line[step_width:s_end]))
+            start = s_end
+            for width in FLOW_BODY_WIDTHS:
                 fields.append(float(line[start:start + width]))
                 start += width
             counter = re.match(r"\s*(\d+)", line[start:])

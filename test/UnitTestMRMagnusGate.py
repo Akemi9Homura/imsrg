@@ -80,6 +80,25 @@ def main():
         require(eight_digit[11] == 11849390,
                 "an eight-digit commutator count was truncated")
 
+        he4_overflow_line = (
+            "815547407770.88132   -18.930793319   423.428831521"
+            "     0.000000000     0.000000553     0.033076599"
+            "     0.000000000     0.000000000     0.000000700"
+            "     0.00000000035454351    -0.000000201     16"
+            "  158762.812      12.125 / 12.125"
+        )
+        he4_overflow = parse_flow_prefix(he4_overflow_line)
+        require(he4_overflow is not None,
+                "the completed He4 row with an overflowing step was rejected")
+        require(he4_overflow[0] == 815547,
+                "a six-digit He4 step was truncated or joined to s")
+        require(he4_overflow[1] == 407770.88132,
+                "s was corrupted by an overflowing step")
+        require(he4_overflow[8:11] == [0.0, 7e-7, 0.0],
+                "He4 eta components were parsed incorrectly")
+        require(he4_overflow[11] == 35454351,
+                "He4 eight-digit commutator count was parsed incorrectly")
+
         resources = root / "resource_usage.txt"
         resources.write_text(
             "wall_seconds=73\nmaximum_rss_kib=14152\nexit_status=0\n",

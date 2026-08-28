@@ -1198,8 +1198,21 @@ He4/O16 长流的 scalar commutator 计数超过六位后，原生
 零。gate reader 现按源码的 `5,12,9x16` 固定列宽解析到 `Eta_3`，随后
 读取不限于 `setw(7)` 的完整十进制计数；真实 He4 七位行和合成八位溢出行
 均进入回归，既不改动流也不丢失计数。
+He4 default 最终又暴露 `istep>99999` 时 `setw(5)` 同样只是最小宽度：
+六位 step 会与后面的十二列 `s` 直接粘连。reader 因而改为从 `s` 固定的
+五位小数定位其末端，允许 step 列向左增长，再按九个 16 列字段读取到
+`Eta_3`；真实最终行 `step=815547,s=407770.88132,Ncomm=35454351` 已加入
+回归，防止把它误读为 `step=81554,s=7407770.8813`。
+这条最终行对应的 He4 default job `100600` 已正常完成：残差比
+`9.94896e-7`、wall `158763 s`、峰值 RSS `12416 KiB`、exit 0、级数拒步
+为零，并物化 53 个非空 Omega 段。最终 J64/no2bpack SHA-256 分别为
+`a809dbc92c7a07493a8ebf3edd690b6d31c32b95365e0ec796e7165f34c4f0f6` 和
+`c8725f309c0a0c91916938bbc86bde8e0383764884cc9f17ddb121acc6e92c90`。
 单核 JSON 同时记录该 reader 文件本身的 SHA-256；最终聚合要求四核一致，
 避免同一 v2 schema 下混入修复前后的两种解析实现。
+该修复不改变任何生产流产物，但会改变 gate reader SHA-256；因此最终聚合
+前必须从既有 Be8/C12/O16 原生目录重新生成三份 v2 JSON。这里不重跑流，
+只重做 reader、Omega validator 和下游 NCSM 门禁。
 
 最终四核完成判据由 `prototype/mrimsrg/aggregate_magnus_gates.py`
 聚合，不从日志手工摘录。它要求恰有 `He4/Be8/C12/O16`，对应

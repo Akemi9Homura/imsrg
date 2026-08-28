@@ -131,6 +131,9 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       flow reader 按 `IMSRGSolver::WriteFlowStatus` 的固定列宽读取到 `Eta_3`，
       再读取完整十进制 `Ncomm`；不能用空白切分，也不能把 `setw(7)` 当成
       最大宽度，因为七位计数会紧接 `Eta_3`，八位计数还会继续扩展。
+      `setw(5)` 的 step 也只是最小宽度；必须从十二列 `s` 的五位小数定位
+      字段末端并允许 step 向左增长。真实 He4 最终行
+      `815547/407770.88132/35454351` 必须作为回归固定。
       每份 v2 JSON 保存 gate reader 自身 SHA-256，四核聚合要求一致。
 - [x] `Be8 Nrefmax=0` 与 `C12 Nrefmax=0` 的完整 default/同终点
       tight Magnus 流和 NCSM 读回已通过。二者 default 分别在
@@ -153,9 +156,14 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
       no2bpack 相对各自 lossless J64 的最坏差为 `2.544/4.089 eV`；完整
       `mrimsrg_magnus_gate_v2` 的 13 项门全部通过，原生 JSON 保存在 point7
       被忽略的 `result/mr-jscheme-magnus/gates/O16.json`。
-- [ ] `He4 Nrefmax=2` default 长流 job `100600` 已通过输入、参考态和
-      `Omega` 写出检查并继续运行；完成后按同一流程生成精确同终点 tight
-      复算，再执行 `Nmax=8` 三态及 J64/no2bpack/Omega 完整门禁。
+- [ ] `He4 Nrefmax=2` default 长流 job `100600` 已在
+      `s=407770.88132` 以残差比 `9.94896e-7`、exit 0、零拒步完成；wall
+      `158763 s`、峰值 RSS `12416 KiB`，53 个非空 Omega 段及
+      J64/no2bpack 已物化。下一步按该精确终点生成 tight 复算，再执行
+      `Nmax=8` 三态及 J64/no2bpack/Omega 完整门禁。
+- [ ] step 溢出 reader 修复改变了 gate implementation SHA-256；无需重跑
+      Be8/C12/O16 物理流，但必须用新 reader 从原生结果重新生成三份 v2
+      gate JSON，再与 He4 报告聚合，禁止混用修复前后的 reader 哈希。
 - [ ] 四核均必须达到目标掩码内解耦残差相对初值 `<1e-6`，
       十倍收紧后 NCSM 验收能级变化 `<1 keV`，并保持 Hermiticity、
       anti-Hermiticity、J64/no2bpack 读回窗和已验收的 m-scheme/SR 极限；
