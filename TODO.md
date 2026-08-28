@@ -159,11 +159,16 @@ Vobig 2020 Eqs. (4.6.4),(4.6.7),(4.6.8) 及 App. B.2。完整书目信息、
 - [ ] `He4 Nrefmax=2` default 长流 job `100600` 已在
       `s=407770.88132` 以残差比 `9.94896e-7`、exit 0、零拒步完成；wall
       `158763 s`、峰值 RSS `12416 KiB`，53 个非空 Omega 段及
-      J64/no2bpack 已物化。下一步按该精确终点生成 tight 复算，再执行
-      `Nmax=8` 三态及 J64/no2bpack/Omega 完整门禁。
-- [ ] step 溢出 reader 修复改变了 gate implementation SHA-256；无需重跑
-      Be8/C12/O16 物理流，但必须用新 reader 从原生结果重新生成三份 v2
-      gate JSON，再与 He4 报告聚合，禁止混用修复前后的 reader 哈希。
+      J64/no2bpack 已物化。精确同终点 tight job `100842` 已由生成器产生，
+      经完整脚本审查、`bash -n`、`sbatch --test-only` 和运行时哈希检查后
+      在 node17 启动；它只覆写 `ode_tolerance=1e-7` 并以
+      `eta_criterion=1e-30` 禁止提前停止。完成后执行 `Nmax=8` 三态及
+      J64/no2bpack/Omega 完整门禁。
+- [x] step 溢出 reader 修复改变 gate implementation SHA-256 后，未重跑
+      物理流，直接用新 reader 从原生结果重新生成 Be8/C12/O16 三份 v2
+      gate JSON。compute_A jobs `100843/100844/100845` 均 exit 0，三份报告
+      保持 13/13 通过且 reader SHA-256 统一为
+      `d81158c9a9ed52644babdcdec3572810d630d4ad169ca31c540744d9842aab45`。
 - [ ] 四核均必须达到目标掩码内解耦残差相对初值 `<1e-6`，
       十倍收紧后 NCSM 验收能级变化 `<1 keV`，并保持 Hermiticity、
       anti-Hermiticity、J64/no2bpack 读回窗和已验收的 m-scheme/SR 极限；

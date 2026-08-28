@@ -1214,6 +1214,23 @@ He4 default 最终又暴露 `istep>99999` 时 `setw(5)` 同样只是最小宽度
 前必须从既有 Be8/C12/O16 原生目录重新生成三份 v2 JSON。这里不重跑流，
 只重做 reader、Omega validator 和下游 NCSM 门禁。
 
+该重读已由 compute_A jobs `100843/100844/100845` 完成，三份 v2 报告均
+保持 13/13 通过并统一记录新 reader SHA-256
+`d81158c9a9ed52644babdcdec3572810d630d4ad169ca31c540744d9842aab45`。
+Be8/C12/O16 的最大 default/tight 谱差仍为
+`0.648406/0.769901/0.296000 keV`，最大 J64/no2bpack packing 差仍为
+`1.145/3.305/4.089 eV`。新 JSON SHA-256 分别为
+`2a9438450b82534e87d6275af30cd5bd17f4c395ee9813dd783f913b7f697a57`、
+`3900f9a62aeace1f86db88c7cff6c2a5082a1ff2c03224103f9c0bb519c6bf0c`、
+`bc2a94d71be7d4f9d67a5e7d8083666377806566cdf2896b338e1f08372c9551`。
+
+He4 精确同终点 tight job `100842` 由根目录单点生成器产生，固定
+`target_s=407770.88132`、`eta_criterion=1e-30`，只覆写
+`ode_tolerance=1e-7`。脚本已通过完整人工审查、`bash -n`、
+`sbatch --test-only`，运行时又通过 checkout、interaction、reference、
+生产 executable/library 与环境脚本哈希检查，随后在 node17 正常进入
+`magnus_adaptive` 流。它复用冻结生产 executable，不因 reader 修复重链。
+
 最终四核完成判据由 `prototype/mrimsrg/aggregate_magnus_gates.py`
 聚合，不从日志手工摘录。它要求恰有 `He4/Be8/C12/O16`，对应
 `Nrefmax=2/0/0/2`、NCSM `Nmax=8/0/0/2` 和各三态，并强制固定
