@@ -24,7 +24,7 @@ _REFERENCE_NAMES = {
 }
 _PARTITIONS = ("c128m1024", "c128m512", "compute_C", "compute_A")
 _POINT7_INTERACTION = Path(
-    "/tns/mengziyan/mr-imsrg-inputs/"
+    "/tns/mengziyan/mr-imsrg/inputs/"
     "TwBME_N2LO_opt_hw20_emax2_e2max4.minipack"
 )
 _POINT7_PYTHON = Path("/opt/library/miniconda-3.12.9/bin/python3")

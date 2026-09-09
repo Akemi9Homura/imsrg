@@ -28,6 +28,8 @@ src/.*.swp
 #Work folders should only contain the examples scripts
 work/
 result/
+/inputs/
+/archive/
 refs/
 __pycache__
 prototype/mrimsrg/build/

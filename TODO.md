@@ -1,5 +1,11 @@
 # MR-IMSRG 当前 TODO
 
+- [x] 2026-09-08：远程家目录散落的 10 个项目目录已集中到
+      `/tns/mengziyan/mr-imsrg`，输入放 `inputs/`，旧 checkout/结果放
+      `archive/2026-09-08-home-consolidation/`。删除已核对 Git 历史的
+      15 个冗余 bundle（1.63 GiB），修复 worktree 登记和结果软链接；
+      迁移清单及历史路径解析见 `docs/远程目录归档.md`。
+
 ## P1：当前唯一目标——生产 C++ J-scheme MR-Magnus(2)
 
 已验收的 direct-flow MR-IMSRG(2) 保持不变并作为交叉验证。当前只实现

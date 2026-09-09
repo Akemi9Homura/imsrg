@@ -2,6 +2,7 @@
 
 ## 最高优先级强制规则
 
+0. **远程本项目所有操作集中在一个目录。** point7 唯一项目根目录为 `/tns/mengziyan/mr-imsrg`。代码、额外 worktree、上传输入、构建、作业脚本、结果、日志、同步 bundle、临时文件和归档都必须放在该目录内；禁止在远程家目录或 `/tmp` 散放本项目文件，也不得用根目录外的兼容软链接代替整理。统一使用 `inputs/`、`result/`、`work/`、`archive/` 等子目录；公共核力和已有外部程序可以只读引用。清理前检查运行/排队作业、Git 未提交内容和路径依赖，有用文件先归档并记录路径映射，无用同步副本在核对提交可恢复后删除。历史归档的日志和元数据保留原文及哈希；重新运行必须按新路径生成作业，不能直接重交旧脚本。
 1. **及时 commit，不能丢代码。** 每完成一个边界清楚、已经验证的阶段就立即提交；提交前检查 `git status` 和 `git diff`，只提交本任务相关文件，不夹带工作树中原有的其他改动。不得让已完成的实现长期只留在未提交工作树中。
 2. **遇到问题先自行调研并作出决定。** 在用户已经授权的任务范围内，主动上网查询官方文档、开源代码、论文及其补充材料；论文必须尽量下载并阅读原文 PDF，不能只看网页摘要。结合代码和证据选择方案并继续推进，不因一般技术选择或实现偏好停下来询问用户。只有缺少必要权限、任务范围发生实质变化或操作具有不可恢复风险时才请求用户决定。
 3. **尽量复用已有代码，不重造轮子。** 开始实现前先查找并理解仓库中已有的程序、接口、脚本和测试路径；已有能力可以直接完成任务时必须复用。只有现有实现确实不能满足任务需求时才新增代码，并把新增范围控制在必要的最小边界内，避免复制默认程序已经负责的初始化、运行或验证流程。
@@ -283,7 +284,7 @@ export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-64}
 
 ## point7 运行约定
 
-point7 checkout 位于 `/tns/mengziyan/imsrg`，executable 和 shared library 位于 `/tns/mengziyan/imsrg/build`；生成脚本的 executable、`cd` 和 `LD_LIBRARY_PATH` 必须使用这些路径。相互作用文件位于 `/tns/public/Forces`。
+本项目 point7 checkout 位于 `/tns/mengziyan/mr-imsrg`，当前 CMake executable 和 shared library 位于 `/tns/mengziyan/mr-imsrg/build/src/`；生成脚本必须使用实际构建产物路径，`cd` 使用项目根目录，`LD_LIBRARY_PATH` 包含对应库目录。公共相互作用文件位于 `/tns/public/Forces`；本项目上传的输入统一位于 `/tns/mengziyan/mr-imsrg/inputs/`。
 
 point7 partitions：
 
