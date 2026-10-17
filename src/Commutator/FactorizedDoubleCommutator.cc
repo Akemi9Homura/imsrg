@@ -2,6 +2,7 @@
 #include "FactorizedDoubleCommutator.hh"
 #include "Commutator.hh"
 #include "PhysicalConstants.hh"
+#include "PandyaHelpers.hh"
 
 namespace Commutator
 {
@@ -1689,6 +1690,12 @@ namespace Commutator
           continue;
         }
 
+        // Reuse scalar Eta/Gamma channel and ket lookups within each J sum.
+        // These fixed-size pointer caches are local to this channel (8 KiB total).
+        const bool scalar_pair = Eta.GetJRank()==0 && Eta.GetTRank()==0 && Eta.GetParity()==0
+                              && Gamma.GetJRank()==0 && Gamma.GetTRank()==0 && Gamma.GetParity()==0;
+        detail::ChannelMatrices<> eta_blocks(Eta.TwoBody.MatEl,Eta.nChannels);
+        detail::ChannelMatrices<> gamma_blocks(Gamma.TwoBody.MatEl,Gamma.nChannels);
         arma::mat nnnbar_Eta = arma::mat(nKets_cc * 2, nKets_cc * 2, arma::fill::zeros);
         arma::mat nnnbar_Eta_d = arma::mat(nKets_cc * 2, nKets_cc * 2, arma::fill::zeros);
         for (int ibra_cc = 0; ibra_cc < nKets_cc; ++ibra_cc)
@@ -1766,13 +1773,26 @@ namespace Commutator
               dJ_std = 2;
               jmin += jmin % 2;
             }
+            const detail::TwoBodyElement element(*Z.modelspace,a,d,c,b);
             for (int J_std = jmin; J_std <= jmax; J_std += dJ_std)
             {
               double sixj1 = Z.modelspace->GetSixJ(ja, jb, J_cc, jc, jd, J_std);
               if (std::abs(sixj1) > 1e-8)
               {
-                Etabar -= (2 * J_std + 1) * sixj1 * Eta.TwoBody.GetTBME_J(J_std, a, d, c, b);
-                Gammabar -= (2 * J_std + 1) * sixj1 * Gamma.TwoBody.GetTBME_J(J_std, a, d, c, b);
+                double eta_me, gamma_me;
+                if (scalar_pair)
+                {
+                  element.ScalarPair(eta_blocks,gamma_blocks,J_std,eta_me,gamma_me);
+                  eta_me=element.norm*eta_me;
+                  gamma_me=element.norm*gamma_me;
+                }
+                else
+                {
+                  eta_me=Eta.TwoBody.GetTBME_J(J_std,a,d,c,b);
+                  gamma_me=Gamma.TwoBody.GetTBME_J(J_std,a,d,c,b);
+                }
+                Etabar -= (2 * J_std + 1) * sixj1 * eta_me;
+                Gammabar -= (2 * J_std + 1) * sixj1 * gamma_me;
               }
             }
 
@@ -1844,7 +1864,10 @@ namespace Commutator
       // Inverse Pandya transformation
       //  X^J_ijkl  = - ( 1- P_ij )  sum_J' (2J'+1)  { i j J }  \bar{X}^J'_il`kj`
       //                                             { k l J'}
-#pragma omp parallel for
+// Channel sizes differ strongly. Balance recoupling loops that only access existing
+// matrices; keep the original scheduling for loops allocating dense scratch so the
+// change does not spread the largest temporary matrices over additional workers.
+#pragma omp parallel for schedule(dynamic,1)
       for (int ch = 0; ch < nch_eta; ++ch)
       {
         TwoBodyChannel &tbc = Z.modelspace->GetTwoBodyChannel(ch);
@@ -1982,7 +2005,7 @@ namespace Commutator
       Chi_VI_II_Op.Erase();
       // BUILD CHI_VI
       // Inverse Pandya transformation
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
       for (int ch = 0; ch < nch; ++ch)
       {
         size_t ch_bra = ch_bra_list[ch];
@@ -2218,7 +2241,7 @@ namespace Commutator
       /// diagram IIIa - diagram IIIb
       //  \bar{X}^J_ijkl  = sum_J' (2J'+1)  { i j J }  (-)^(j+k+J')  \bar{X}^J'_il`jk`
       //                                    { k l J'}
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
       for (int ch_cc = 0; ch_cc < n_nonzero; ++ch_cc)
       {
         TwoBodyChannel_CC &tbc_cc = Z.modelspace->GetTwoBodyChannel_CC(ch_cc);
@@ -2352,7 +2375,7 @@ namespace Commutator
       //  X^J_ijkl  = - ( 1- P_ij ) ( 1- P_kl ) (-)^{J + ji + jj}  sum_J' (2J'+1)
       //                (-)^{J' + ji + jk}  { j i J }  \bar{X}^J'_jl`ki`
       //                                    { k l J'}
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
       for (int ch = 0; ch < nch; ++ch)
       {
         int ch_bra = ch_bra_list[ch];
@@ -2852,7 +2875,7 @@ namespace Commutator
       /// Pandya transformation only recouple the angula momentum
       /// IIe and IIf                 barCHI_III_RC   bar_CHI_IV
       /// diagram IIIe and IIIf       bar_CHI_VII_CC
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
       for (int ch_cc = 0; ch_cc < n_nonzero; ++ch_cc)
       {
         TwoBodyChannel_CC &tbc_cc = Z.modelspace->GetTwoBodyChannel_CC(ch_cc);
@@ -3040,7 +3063,7 @@ namespace Commutator
       //  Diagram f
       //  II(f)^J_ijkl  = - 1/2 ( 1- P_ij ) ( 1- P_kl ) sum_J' (2J'+1)  { i j J }  \bar{bar_CHI_gamma_II}^J'_il`kj`
       //
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
       for (int ch = 0; ch < nch; ++ch)
       {
         size_t ch_bra = ch_bra_list[ch];
@@ -3215,7 +3238,7 @@ namespace Commutator
       //  X^J_ijkl  = - ( 1- P_ij ) ( 1- P_kl ) (-)^{J + ji + jj}  sum_J' (2J'+1)
       //                (-)^{J' + ji + jk}  { j i J }  \bar{X}^J'_jl`ki`
       //                                    { k l J'}
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
       for (int ch = 0; ch < nch; ++ch)
       {
         size_t ch_bra = ch_bra_list[ch];
@@ -3401,7 +3424,7 @@ namespace Commutator
       //  X^J_ijkl  = - ( 1- P_ij ) ( 1- P_kl ) (-)^{J + ji + jj}  sum_J' (2J'+1)
       //                (-)^{J' + ji + jk}  { j i J }  \bar{X}^J'_jl`ki`
       //                                    { k l J'}
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
       for (int ch = 0; ch < nch; ++ch)
       {
         int ch_bra = ch_bra_list[ch];
