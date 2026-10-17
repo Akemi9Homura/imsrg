@@ -7,6 +7,183 @@
 namespace Commutator
 {
 
+  namespace
+  {
+    // A one-body action changes just one member of a two-body ket. Prepare
+    // its index and coefficient once, instead of looking them up for every
+    // matrix element in the other channel. Keep normalization separate to
+    // preserve the arithmetic used by GetTBME() and the direct contraction.
+    struct OneBodyTransition
+    {
+      size_t index;
+      double coefficient;
+      int phase;
+      bool identical;
+    };
+
+    struct PairActions
+    {
+      std::array<std::vector<OneBodyTransition>, 4> terms;
+      int phase;
+      bool identical;
+    };
+
+    void AddOneBodyTransition(std::vector<OneBodyTransition> &terms,
+                              const TwoBodyChannel &channel, int a, int b,
+                              double coefficient)
+    {
+      const size_t index = channel.GetLocalIndex(std::min(a, b), std::max(a, b));
+      // KetMap also enforces parity, Tz, angular momentum and antisymmetry.
+      if (index >= channel.GetNumberKets())
+        return;
+      auto ket = channel.GetKet(index);
+      const int phase = a > b ? ket.Phase(channel.J) : 1;
+      terms.push_back({index, coefficient, phase, a == b});
+    }
+
+    PairActions PrepareOneBodyActions(const Operator &X, const Operator &Y,
+                                      const TwoBodyChannel &channel,
+                                      const TwoBodyChannel &opposite, int index,
+                                      bool on_bra)
+    {
+      const auto &ket = channel.GetKet(index);
+      const int p = ket.p;
+      const int q = ket.q;
+      const auto &op = X.modelspace->GetOrbit(p);
+      const auto &oq = X.modelspace->GetOrbit(q);
+      const double jp = op.j2 * 0.5;
+      const double jq = oq.j2 * 0.5;
+      const int Lambda = Y.GetJRank();
+      PairActions actions;
+      actions.identical = p == q;
+      actions.phase = X.modelspace->phase(jp + jq + (on_bra ? opposite.J : -opposite.J) + Lambda);
+
+      const auto &xp = X.GetOneBodyChannel(op.l, op.j2, op.tz2);
+      const auto &xq = X.GetOneBodyChannel(oq.l, oq.j2, oq.tz2);
+      const auto &yp = Y.GetOneBodyChannel(op.l, op.j2, op.tz2);
+      const auto &yq = Y.GetOneBodyChannel(oq.l, oq.j2, oq.tz2);
+      actions.terms[0].reserve(xp.size());
+      actions.terms[1].reserve(p == q ? 0 : xq.size());
+      actions.terms[2].reserve(yp.size());
+      actions.terms[3].reserve(on_bra || p != q ? yq.size() : 0);
+      for (int a : xp)
+        AddOneBodyTransition(actions.terms[0], channel, a, q,
+                             on_bra ? X.OneBody(p, a) : X.OneBody(a, p));
+      if (p != q)
+        for (int a : xq)
+          AddOneBodyTransition(actions.terms[1], channel, p, a,
+                               on_bra ? X.OneBody(q, a) : X.OneBody(a, q));
+      for (int a : yp)
+      {
+        const double ja = X.modelspace->GetOrbit(a).j2 * 0.5;
+        if (not AngMom::Triangle(opposite.J, ja, jq))
+          continue;
+        const double coefficient = X.modelspace->GetSixJ(opposite.J, channel.J, Lambda, jp, ja, jq)
+                                 * (on_bra ? Y.OneBody(p, a) : Y.OneBody(a, p));
+        AddOneBodyTransition(actions.terms[2], opposite, on_bra ? a : q, on_bra ? q : a, coefficient);
+      }
+      if (on_bra || p != q)
+        for (int a : yq)
+        {
+          const double ja = X.modelspace->GetOrbit(a).j2 * 0.5;
+          if (not AngMom::Triangle(opposite.J, ja, jp))
+            continue;
+          const double coefficient = X.modelspace->GetSixJ(opposite.J, channel.J, Lambda, jq, ja, jp)
+                                   * (on_bra ? Y.OneBody(q, a) : Y.OneBody(a, q));
+          AddOneBodyTransition(actions.terms[3], opposite, on_bra ? a : p, on_bra ? p : a, coefficient);
+        }
+      return actions;
+    }
+
+    template<bool on_bra, bool subtract = false>
+    double ContractOneBodyActions(const std::vector<OneBodyTransition> &terms,
+                                  const arma::mat &matrix, int other, bool identical)
+    {
+      double sum = 0;
+      for (const auto &term : terms)
+      {
+        double norm = 1;
+        if (term.identical) norm *= PhysConst::SQRT2;
+        if (identical) norm *= PhysConst::SQRT2;
+        const double value = on_bra ? matrix(term.index, other) : matrix(other, term.index);
+        const double tbme = norm * (term.phase * value);
+        if (subtract)
+          sum -= term.coefficient * tbme;
+        else
+          sum += term.coefficient * tbme;
+      }
+      return sum;
+    }
+
+    // This path requires an ordinary scalar X, so its two-body blocks are
+    // diagonal in channel and Y has the same channel pairs as Z.
+    void comm122st_prepared(const Operator &X, const Operator &Y, Operator &Z)
+    {
+      const double tstart = omp_get_wtime();
+      std::vector<std::array<size_t, 2>> channels;
+      for (const auto &entry : Z.TwoBody.MatEl)
+        channels.push_back(entry.first);
+      const int hZ = Z.IsHermitian() ? 1 : -1;
+
+      #pragma omp parallel for schedule(dynamic, 1) if (not single_thread)
+      for (size_t ii = 0; ii < channels.size(); ++ii)
+      {
+        const auto ch_bra = channels[ii][0];
+        const auto ch_ket = channels[ii][1];
+        const auto &bra_channel = Z.modelspace->GetTwoBodyChannel(ch_bra);
+        const auto &ket_channel = Z.modelspace->GetTwoBodyChannel(ch_ket);
+        const int nbras = bra_channel.GetNumberKets();
+        const int nkets = ket_channel.GetNumberKets();
+        const int J1 = bra_channel.J;
+        const int J2 = ket_channel.J;
+        const double hatfactor = std::sqrt((2 * J1 + 1) * (2 * J2 + 1));
+        const int phase23 = Z.modelspace->phase(J1 - J2 + Z.rank_J);
+        const int transpose_phase = hZ * Z.modelspace->phase(J1 - J2);
+        const auto &Y2 = Y.TwoBody.GetMatrix(ch_bra, ch_ket);
+        const auto &X2bra = X.TwoBody.GetMatrix(ch_bra, ch_bra);
+        const auto &X2ket = X.TwoBody.GetMatrix(ch_ket, ch_ket);
+        auto &Z2 = Z.TwoBody.GetMatrix(ch_bra, ch_ket);
+
+        // Bound scratch space by 128 ket lists plus one bra list per worker.
+        // No dense recoupling matrices or persistent model-space cache.
+        constexpr int block_size = 128;
+        for (int begin = 0; begin < nkets; begin += block_size)
+        {
+          const int end = std::min(begin + block_size, nkets);
+          std::vector<PairActions> ket_actions;
+          ket_actions.reserve(end - begin);
+          for (int iket = begin; iket < end; ++iket)
+            ket_actions.push_back(PrepareOneBodyActions(X, Y, ket_channel, bra_channel, iket, false));
+          const int bra_begin = ch_bra == ch_ket ? begin : 0;
+          for (int ibra = bra_begin; ibra < nbras; ++ibra)
+          {
+            const auto bra = PrepareOneBodyActions(X, Y, bra_channel, ket_channel, ibra, true);
+            const int ket_end = ch_bra == ch_ket ? std::min(end, ibra + 1) : end;
+            for (int iket = begin; iket < ket_end; ++iket)
+            {
+              const auto &ket = ket_actions[iket - begin];
+              double c1 = ContractOneBodyActions<true>(bra.terms[0], Y2, iket, ket.identical);
+              double c2 = bra.identical ? c1 : ContractOneBodyActions<true>(bra.terms[1], Y2, iket, ket.identical);
+              double c3 = ContractOneBodyActions<false>(ket.terms[0], Y2, ibra, bra.identical);
+              double c4 = ket.identical ? c3 : ContractOneBodyActions<false>(ket.terms[1], Y2, ibra, bra.identical);
+              double cijkl = c1 + c2 - c3 - c4;
+              c1 = ContractOneBodyActions<true, true>(bra.terms[2], X2ket, iket, ket.identical);
+              c2 = ContractOneBodyActions<true>(bra.terms[3], X2ket, iket, ket.identical);
+              c3 = ContractOneBodyActions<false, true>(ket.terms[2], X2bra, ibra, bra.identical);
+              c4 = ket.identical ? -c3 : ContractOneBodyActions<false>(ket.terms[3], X2bra, ibra, bra.identical);
+              cijkl += hatfactor * (bra.phase * c1 + phase23 * c2 + phase23 * c3 + ket.phase * c4);
+              const double norm = bra.identical == ket.identical ? 1 + bra.identical : PhysConst::SQRT2;
+              Z2(ibra, iket) += cijkl / norm;
+              if (ch_bra == ch_ket && iket < ibra)
+                Z2(iket, ibra) += transpose_phase * cijkl / norm;
+            }
+          }
+        }
+      }
+      X.profiler.timer["comm122st"] += omp_get_wtime() - tstart;
+    }
+  } // namespace
+
 
   //////////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////
@@ -157,6 +334,13 @@ namespace Commutator
   // void Operator::comm122st( const Operator& X, const Operator& Y )
   void comm122st(const Operator &X, const Operator &Y, Operator &Z)
   {
+    if (X.GetJRank() == 0 && X.GetParity() == 0 && X.GetTRank() == 0
+        && X.TwoBody.IsAllocated() && Y.TwoBody.IsAllocated()
+        && Y.GetJRank() == Z.GetJRank() && Y.GetParity() == Z.GetParity() && Y.GetTRank() == Z.GetTRank())
+    {
+      comm122st_prepared(X, Y, Z);
+      return;
+    }
     double tstart = omp_get_wtime();
     int Lambda = Z.rank_J;
     int hZ = Z.IsHermitian() ? +1 : -1;
