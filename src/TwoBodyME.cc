@@ -117,6 +117,25 @@ void TwoBodyME::Deallocate()
   MatEl.clear();
 }
 
+// Copy channel structure and conventions without reading/copying the elements
+// that callers would immediately erase. Also preserves an empty allocation.
+TwoBodyME TwoBodyME::ZeroedCopy() const
+{
+  TwoBodyME out;
+  out.modelspace=modelspace;
+  out.nChannels=nChannels;
+  out.hermitian=hermitian;
+  out.antihermitian=antihermitian;
+  out.allocated=allocated;
+  out.rank_J=rank_J;
+  out.rank_T=rank_T;
+  out.parity=parity;
+  out.is_reduced=is_reduced;
+  for (const auto &entry : MatEl)
+    out.MatEl.emplace(entry.first,arma::mat(entry.second.n_rows,entry.second.n_cols,arma::fill::zeros));
+  return out;
+}
+
 void TwoBodyME::SetHermitian()
 {
   hermitian = true;

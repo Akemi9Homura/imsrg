@@ -8,6 +8,7 @@
 #include "armadillo"
 #include "PhysicalConstants.hh" // for SQRT2
 #include "AngMom.hh"
+#include "PandyaHelpers.hh"
 #include <cstddef>
 #include <map>
 #include <deque>
@@ -705,7 +706,7 @@ namespace Commutator
     }
     
     std::vector<size_t> ch_bra_list, ch_ket_list;
-    auto ch_iter = X.TwoBody.MatEl;
+    const auto &ch_iter = X.TwoBody.MatEl;
     for (auto &iter : ch_iter)
     { 
       ch_bra_list.push_back(iter.first[0]);
@@ -915,8 +916,8 @@ namespace Commutator
 
 //    TwoBodyME Mpp(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
 //    TwoBodyME Mhh(Z.modelspace, Z.GetJRank(), Z.GetTRank(), Z.GetParity());
-    TwoBodyME Mpp = 0*Z.TwoBody;
-    TwoBodyME Mhh = Mpp;
+    TwoBodyME Mpp = Z.TwoBody.ZeroedCopy();
+    TwoBodyME Mhh = Z.TwoBody.ZeroedCopy();
 
     ConstructScalarMpp_Mhh(X, Y, Z, Mpp, Mhh);
 
@@ -1216,10 +1217,8 @@ namespace Commutator
   {
     double t_start = omp_get_wtime();
 
-    TwoBodyME Mpp = Z.TwoBody;
-    TwoBodyME Mhh = Z.TwoBody;
-    Mpp.Erase();
-    Mhh.Erase();
+    TwoBodyME Mpp = Z.TwoBody.ZeroedCopy();
+    TwoBodyME Mhh = Z.TwoBody.ZeroedCopy();
 
     ConstructScalarMpp_Mhh(X, Y, Z, Mpp, Mhh);
 
@@ -1242,10 +1241,8 @@ namespace Commutator
 
 
     std::vector<size_t> ch_bra_list, ch_ket_list;
-    auto ch_iter = Z.TwoBody.MatEl;
-    // TODO: We'll need to be more careful about this special case.
-    if (Z.GetParticleRank() < 2 and Y.GetParticleRank() > 1)
-      ch_iter = Y.TwoBody.MatEl;
+    const auto &ch_iter = (Z.GetParticleRank() < 2 and Y.GetParticleRank() > 1)
+                       ? Y.TwoBody.MatEl : Z.TwoBody.MatEl;
 
     for (auto &iter : ch_iter)
     {
@@ -1304,10 +1301,11 @@ namespace Commutator
       TwoBodyChannel &tbc_ab_YX = Z.modelspace->GetTwoBodyChannel(ch_ab_YX);
       // If X or Y change parity or isospin, then we need to worry about the fact that we only store
       // ch_bra <= ch_ket. If we need the other ordering we get it by Hermiticity.
-      auto &X_ijab = (ch_bra <= ch_ab_XY) ? X.TwoBody.GetMatrix(ch_bra, ch_ab_XY) : X.TwoBody.GetMatrix(ch_ab_XY, ch_bra).t() * hX;
-      auto &X_abkl = (ch_ab_YX <= ch_ket) ? X.TwoBody.GetMatrix(ch_ab_YX, ch_ket) : X.TwoBody.GetMatrix(ch_ket, ch_ab_YX).t() * hX;
-      auto &Y_ijab = (ch_bra <= ch_ab_YX) ? Y.TwoBody.GetMatrix(ch_bra, ch_ab_YX) : Y.TwoBody.GetMatrix(ch_ab_YX, ch_bra).t() * hY;
-      auto &Y_abkl = (ch_ab_XY <= ch_ket) ? Y.TwoBody.GetMatrix(ch_ab_XY, ch_ket) : Y.TwoBody.GetMatrix(ch_ket, ch_ab_XY).t() * hY;
+      arma::mat xt_bra, xt_ket, yt_bra, yt_ket;
+      const auto &X_ijab = detail::MatrixOrTranspose(X.TwoBody,ch_bra,ch_ab_XY,hX,xt_bra);
+      const auto &X_abkl = detail::MatrixOrTranspose(X.TwoBody,ch_ab_YX,ch_ket,hX,xt_ket);
+      const auto &Y_ijab = detail::MatrixOrTranspose(Y.TwoBody,ch_bra,ch_ab_YX,hY,yt_bra);
+      const auto &Y_abkl = detail::MatrixOrTranspose(Y.TwoBody,ch_ab_XY,ch_ket,hY,yt_ket);
 
       auto &Matrixpp = Mpp.GetMatrix(ch_bra, ch_ket);
       auto &Matrixhh = Mhh.GetMatrix(ch_bra, ch_ket);
@@ -1374,10 +1372,8 @@ namespace Commutator
     if (X.GetParticleRank() < 2 or Y.GetParticleRank() < 2)
       return;
 
-    TwoBodyME Mpp = Z.TwoBody;
-    TwoBodyME Mhh = Z.TwoBody;
-    Mpp.Erase();
-    Mhh.Erase();
+    TwoBodyME Mpp = Z.TwoBody.ZeroedCopy();
+    TwoBodyME Mhh = Z.TwoBody.ZeroedCopy();
     double t_internal = omp_get_wtime();
 
     ConstructScalarMpp_Mhh(X, Y, Z, Mpp, Mhh);
@@ -1473,6 +1469,7 @@ namespace Commutator
   // void Operator::DoPandyaTransformation_SingleChannel(arma::mat& TwoBody_CC_ph, int ch_cc, std::string orientation="normal") const
   void DoPandyaTransformation_SingleChannel(const Operator &Z, arma::mat &TwoBody_CC_ph, int ch_cc, std::string orientation = "normal")
   {
+    detail::ChannelMatrices<> blocks(Z.TwoBody.MatEl, Z.nChannels);
     int herm = Z.IsHermitian() ? 1 : -1;
     TwoBodyChannel_CC &tbc_cc_ket = Z.modelspace->GetTwoBodyChannel_CC(ch_cc);
     int J_cc = tbc_cc_ket.J;
@@ -1505,7 +1502,7 @@ namespace Commutator
     {
       Ket &bra_cc = tbc_cc_bra.GetKet(bras_ph[ibra]);
       // we want to evaluate a<=b and a>=b, so to avoid code duplication, we turn this into a loop over the two orderings
-      std::vector<size_t> ab_switcheroo = {bra_cc.p, bra_cc.q};
+      const std::array<size_t,2> ab_switcheroo = {{bra_cc.p, bra_cc.q}};
       for (int ab_case = 0; ab_case <= 1; ab_case++)
       {
         int a = ab_switcheroo[ab_case]; // this little bit gives us a,b if ab_case=0 and b,a if ab_case=1
@@ -1529,6 +1526,7 @@ namespace Commutator
           double jc = oc.j2 * 0.5;
           double jd = od.j2 * 0.5;
 
+          const detail::TwoBodyElement element(*Z.modelspace,a,d,c,b);
           int jmin = std::max(std::abs(ja - jd), std::abs(jc - jb));
           int jmax = std::min(ja + jd, jc + jb);
           double Xbar = 0;
@@ -1537,7 +1535,7 @@ namespace Commutator
             double sixj = Z.modelspace->GetSixJ(ja, jb, J_cc, jc, jd, J_std);
             if (std::abs(sixj) < 1e-8)
               continue;
-            double tbme = Z.TwoBody.GetTBME_J(J_std, a, d, c, b);
+            double tbme = element.Get(Z.TwoBody,blocks,J_std,J_std);
             Xbar -= (2 * J_std + 1) * sixj * tbme;
           }
           if (orientation == "normal")
@@ -1555,6 +1553,10 @@ namespace Commutator
 
   void DoPandyaTransformation_SingleChannel_XandY(const Operator &X, const Operator &Y, arma::mat &X2_CC_ph, arma::mat &Y2_CC_ph, int ch_cc)
   {
+    detail::ChannelMatrices<> xblocks(X.TwoBody.MatEl, X.nChannels);
+    detail::ChannelMatrices<> yblocks(Y.TwoBody.MatEl, Y.nChannels);
+    const bool ordinary = X.GetParity()==0 && X.GetTRank()==0 && X.GetJRank()==0
+                       && Y.GetParity()==0 && Y.GetTRank()==0 && Y.GetJRank()==0;
     //   int hX = X.IsHermitian() ? 1 : -1;
     int hY = Y.IsHermitian() ? 1 : -1;
     TwoBodyChannel_CC &tbc_cc = X.modelspace->GetTwoBodyChannel_CC(ch_cc);
@@ -1576,7 +1578,7 @@ namespace Commutator
     {
       Ket &bra_cc = tbc_cc.GetKet(kets_ph[ibra]);
       // we want to evaluate a<=b and a>=b, so to avoid code duplication, we turn this into a loop over the two orderings
-      std::vector<size_t> ab_switcheroo = {bra_cc.p, bra_cc.q};
+      const std::array<size_t,2> ab_switcheroo = {{bra_cc.p, bra_cc.q}};
       for (int ab_case = 0; ab_case <= 1; ab_case++)
       {
         int a = ab_switcheroo[ab_case]; // this little bit gives us a,b if ab_case=0 and b,a if ab_case=1
@@ -1610,6 +1612,7 @@ namespace Commutator
           int jjci = oc.j2;
           int jjdi = od.j2;
 
+          const detail::TwoBodyElement element(*X.modelspace,c,b,a,d);
           double normfactor = 1.0;
           if (a == d)
             normfactor *= PhysConst::SQRT2;
@@ -1636,7 +1639,10 @@ namespace Commutator
             // which does all the phase/index lookup stuff once and then just accesses the two matrices.
             double xcbad = 0;
             double yadcb = 0;
-            X.TwoBody.GetTBME_J_norm_twoOps(Y.TwoBody, J_std, J_std, c, b, a, d, xcbad, yadcb);
+            if (ordinary)
+              element.ScalarPair(xblocks,yblocks,J_std,xcbad,yadcb);
+            else
+              X.TwoBody.GetTBME_J_norm_twoOps(Y.TwoBody, J_std, J_std, c, b, a, d, xcbad, yadcb);
             Xbar -= (2 * J_std + 1) * sixj * xcbad;
             Ybar -= (2 * J_std + 1) * sixj * yadcb * hY;
           }
@@ -1715,6 +1721,10 @@ namespace Commutator
         int jjk = ok.j2;
         int jjl = ol.j2;
 
+        const auto il=Z.modelspace->GetKetIndex(std::min(i,l),std::max(i,l));
+        const auto kj=Z.modelspace->GetKetIndex(std::min(k,j),std::max(k,j));
+        const auto ik=Z.modelspace->GetKetIndex(std::min(i,k),std::max(i,k));
+        const auto lj=Z.modelspace->GetKetIndex(std::min(l,j),std::max(l,j));
         double commij = 0;
         double commji = 0;
 
@@ -1730,8 +1740,8 @@ namespace Commutator
           int ch_cc = Z.modelspace->GetTwoBodyChannelIndex(Jprime, parity_cc, Tz_cc);
           TwoBodyChannel_CC &tbc_cc = Z.modelspace->GetTwoBodyChannel_CC(ch_cc);
           int nkets_cc = tbc_cc.GetNumberKets();
-          int indx_il = tbc_cc.GetLocalIndex(std::min(i, l), std::max(i, l)) + (i > l ? nkets_cc : 0);
-          int indx_kj = tbc_cc.GetLocalIndex(std::min(j, k), std::max(j, k)) + (k > j ? nkets_cc : 0);
+          int indx_il = tbc_cc.GetLocalIndex(il) + (i > l ? nkets_cc : 0);
+          int indx_kj = tbc_cc.GetLocalIndex(kj) + (k > j ? nkets_cc : 0);
           double me1 = Zbar[ch_cc](indx_il, indx_kj); // do we need to use at() or is it safe to just use []?
           commij -= (2 * Jprime + 1) * sixj * me1;
         }
@@ -1759,8 +1769,8 @@ namespace Commutator
             int ch_cc = Z.modelspace->GetTwoBodyChannelIndex(Jprime, parity_cc, Tz_cc);
             TwoBodyChannel_CC &tbc_cc = Z.modelspace->GetTwoBodyChannel_CC(ch_cc);
             int nkets_cc = tbc_cc.GetNumberKets();
-            int indx_ik = tbc_cc.GetLocalIndex(std::min(i, k), std::max(i, k)) + (i > k ? nkets_cc : 0);
-            int indx_lj = tbc_cc.GetLocalIndex(std::min(l, j), std::max(l, j)) + (l > j ? nkets_cc : 0);
+            int indx_ik = tbc_cc.GetLocalIndex(ik) + (i > k ? nkets_cc : 0);
+            int indx_lj = tbc_cc.GetLocalIndex(lj) + (l > j ? nkets_cc : 0);
             // we always have i<=k so we should always flip Z_jlki = (-1)^{i+j+k+l} Z_iklj
             // the phase we get from that flip combines with the phase from Pij, to give the phase included below
             //                 double me1 = Zbar.at(ch_cc)(indx_ik, indx_lj) ;
@@ -1939,30 +1949,24 @@ namespace Commutator
         if (Y_bar_ph.size() < 1 or Xt_bar_ph.size() < 1)
           continue;
 
-        // get the phases for taking the transpose of a Pandya-transformed operator
-        arma::mat PhaseMatZ(nKets_cc, nKets_cc, arma::fill::ones);
-        for (index_t iket = 0; iket < nKets_cc; iket++)
+        // Phase matrices factor into one sign per ket; construct the full Y
+        // operand once without dense phase matrices or a second flipped copy.
+        std::vector<int> phases(nKets_cc);
+        for (size_t k=0;k<nKets_cc;++k)
         {
-          const Ket &ket = tbc_cc.GetKet(iket);
-          if (Z.modelspace->phase((ket.op->j2 + ket.oq->j2) / 2) < 0)
-          {
-            PhaseMatZ.col(iket) *= -1;
-            PhaseMatZ.row(iket) *= -1;
-          }
+          const auto &ket=tbc_cc.GetKet(k);
+          phases[k]=Z.modelspace->phase((ket.op->j2+ket.oq->j2)/2);
         }
-        arma::uvec phkets = arma::join_cols(tbc_cc.GetKetIndex_hh(), tbc_cc.GetKetIndex_ph());
-        auto PhaseMatY = PhaseMatZ.rows(phkets) * hy;
-
-        //                                           [      |     ]
-        //     create full Y matrix from the half:   [  Yhp | Y'ph]   where the prime indicates multiplication by (-1)^(i+j+k+l) h_y
-        //                                           [      |     ]   Flipping hp <-> ph and multiplying by the phase is equivalent to
-        //                                           [  Yph | Y'hp]   having kets |kj> with k>j.
-        //
-        //
-        //      so <il|Zbar|kj> =  <il|Xbar|hp><hp|Ybar|kj> + <il|Xbar|ph><ph|Ybar|kj>
-        //
-        arma::mat Y_bar_ph_flip = arma::join_vert(Y_bar_ph.tail_rows(nph_kets) % PhaseMatY, Y_bar_ph.head_rows(nph_kets) % PhaseMatY);
-        Zbar_ch = Xt_bar_ph * arma::join_horiz(Y_bar_ph, Y_bar_ph_flip);
+        const arma::uvec phkets=arma::join_cols(tbc_cc.GetKetIndex_hh(),tbc_cc.GetKetIndex_ph());
+        arma::mat full_y(2*nph_kets,2*nKets_cc);
+        for (size_t k=0;k<nKets_cc;++k)
+          for (size_t r=0;r<2*nph_kets;++r)
+          {
+            const size_t swapped=r<nph_kets?r+nph_kets:r-nph_kets;
+            full_y(r,k)=Y_bar_ph(r,k);
+            full_y(r,k+nKets_cc)=Y_bar_ph(swapped,k)*(hy*phases[phkets[r%nph_kets]]*phases[k]);
+          }
+        Zbar_ch=Xt_bar_ph*full_y;
 
         // If Z is hermitian, then XY is anti-hermitian, and so XY - YX = XY + (XY)^T
         if (Z.IsHermitian() and X.IsHermitian() != Y.IsHermitian())
@@ -1978,7 +1982,14 @@ namespace Commutator
         // By the symmetries of the Pandya-transformed matrix element, that means we pick
         // up a factor hZ * phase(i+j+k+l). The hZ cancels the hXhY we have for the "head" part of the matrix
         // so we end up adding in either case.
-        Zbar_ch.tail_cols(nKets_cc) += Zbar_ch.tail_cols(nKets_cc).t() % PhaseMatZ;
+        for (size_t k=0;k<nKets_cc;++k)
+          for (size_t i=0;i<=k;++i)
+          {
+            const double a=Zbar_ch(i,k+nKets_cc), b=Zbar_ch(k,i+nKets_cc);
+            const int phase=phases[i]*phases[k];
+            Zbar_ch(i,k+nKets_cc)=a+b*phase;
+            if (i!=k) Zbar_ch(k,i+nKets_cc)=b+a*phase;
+          }
       }
 
       X.profiler.timer["Build Z_bar"] += omp_get_wtime() - t_start;
