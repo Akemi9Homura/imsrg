@@ -43,6 +43,10 @@ add_subdirectory(src)
 if(IMSRG_BUILD_PYTHON_BINDINGS)
     #ADD tests to be run directly in the build process
     enable_testing()
+    add_executable(UnitTestRecouplingCache test/UnitTestRecouplingCache.cc)
+    target_link_libraries(UnitTestRecouplingCache PRIVATE IMSRG OpenMP::OpenMP_CXX)
+    target_compile_options(UnitTestRecouplingCache PRIVATE -frounding-math)
+    add_test(NAME UnitTestRecouplingCache COMMAND UnitTestRecouplingCache)
     add_test (
         NAME UnitTest
         COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/UnitTest.py 

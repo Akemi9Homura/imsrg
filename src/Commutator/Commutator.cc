@@ -9,6 +9,7 @@
 #include "PhysicalConstants.hh" // for SQRT2
 #include "AngMom.hh"
 #include "PandyaHelpers.hh"
+#include "ScalarPandyaPlan.hh"
 #include <cstddef>
 #include <map>
 #include <deque>
@@ -1668,7 +1669,8 @@ namespace Commutator
 
   // Take Zbar, and perform a Pandya transform on it and put the result in Z (technically there's a minus sign
   // missing in what is done here, but that's on purpose).
-  void AddInversePandyaTransformation(const std::deque<arma::mat> &Zbar, Operator &Z)
+  static void AddInversePandyaTransformationPlanned(const std::deque<arma::mat> &Zbar, Operator &Z,
+                                                    const detail::ScalarPandyaPlan *plan)
   {
     // Do the inverse Pandya transform
     int nch = Z.modelspace->GetNumberTwoBodyChannels();
@@ -1693,6 +1695,7 @@ namespace Commutator
     {
       int ch = ch_vec[ichbra];
       int ibra = ibra_vec[ichbra];
+      if (plan && plan->Inverse(ch,ibra,Zbar,Z)) continue;
 
       TwoBodyChannel &tbc = Z.modelspace->GetTwoBodyChannel(ch);
       int J = tbc.J;
@@ -1787,6 +1790,11 @@ namespace Commutator
           ZMat(iket, ibra) += hZ * zijkl;
       } // for iket
     } // for ichbra
+  }
+
+  void AddInversePandyaTransformation(const std::deque<arma::mat> &Zbar, Operator &Z)
+  {
+    AddInversePandyaTransformationPlanned(Zbar,Z,nullptr);
   }
 
   //*****************************************************************************************
@@ -1915,6 +1923,7 @@ namespace Commutator
       // Create Pandya-transformed hp and ph matrix elements
       double t_start = omp_get_wtime();
       double t_start_full = t_start;
+      const auto plan=detail::PrepareScalarPandya(*Z.modelspace);
 
       // Construct the intermediate matrix Z_bar
       size_t nch = Z.modelspace->GetNumberTwoBodyChannels_CC();
@@ -1941,7 +1950,8 @@ namespace Commutator
         // Y has dimension (2*nph , nKets_CC)
         // X has dimension (nKets_CC, 2*nph )
         // This function gives  <ij`| X |ab`> *na(1-nb)  and   <ab`| Y |ij`>,  for both orderings ab` and ba`
-        DoPandyaTransformation_SingleChannel_XandY(X, Y, Xt_bar_ph, Y_bar_ph, ch);
+        if (!plan || !plan->Forward(ch,X,Y,Xt_bar_ph,Y_bar_ph))
+          DoPandyaTransformation_SingleChannel_XandY(X, Y, Xt_bar_ph, Y_bar_ph, ch);
 
         //      auto& Zbar_ch = Z_bar.at(ch);
         auto &Zbar_ch = Z_bar[ch];
@@ -2002,7 +2012,7 @@ namespace Commutator
       // the inverse Pandya transformation. Also, the inverse Pandya transformation
       // is just the regular Pandya transformation. The distinction in the code
       // is because some other commutator-specific things are done at the same time.
-      AddInversePandyaTransformation(Z_bar, Z);
+      AddInversePandyaTransformationPlanned(Z_bar, Z, plan.get());
 
       //   Z.modelspace->scalar_transform_first_pass = false;
       X.profiler.timer["InversePandyaTransformation"] += omp_get_wtime() - t_start;

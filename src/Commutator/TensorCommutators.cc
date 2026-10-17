@@ -4,6 +4,7 @@
 #include "AngMom.hh"
 #include "PhysicalConstants.hh"
 #include "PandyaHelpers.hh"
+#include "MemoryBudget.hh"
 
 namespace Commutator
 {
@@ -547,14 +548,16 @@ namespace Commutator
       std::exit(EXIT_FAILURE);
     }
     size_t nchan = vch_bra.size();
-    // Bound the extra dense scratch introduced by parallel channel products.
+    // Bound estimated dense scratch across parallel channel products. The former
+    // 64 MiB cap serialized even modest model spaces; allow 8 GiB by default
+    // (override in MiB with IMSRG_TENSOR_SCRATCH_MB). One worker is always needed.
     // Thirty-two square matrices conservatively estimate transpose operands, nested
     // join/occupation temporaries and the two assembled GEMM operands.
     size_t largest=1;
     for (size_t ch=0;ch<Z.modelspace->GetNumberTwoBodyChannels();++ch)
       largest=std::max(largest,Z.modelspace->GetTwoBodyChannel(ch).GetNumberKets());
     const size_t scratch_per_worker=32*sizeof(double)*largest*largest;
-    const size_t scratch_budget=64*1024*1024;
+    const size_t scratch_budget=detail::MemoryBudgetBytes("IMSRG_TENSOR_SCRATCH_MB",8192);
     const int workers=std::min<size_t>(omp_get_max_threads(),std::max<size_t>(1,scratch_budget/scratch_per_worker));
     #ifndef OPENBLAS_NOUSEOMP
     #pragma omp parallel for schedule(dynamic,1) if (!single_thread && workers>1) num_threads(workers)

@@ -3,6 +3,7 @@
 #include "Commutator.hh"
 #include "PhysicalConstants.hh"
 #include "PandyaHelpers.hh"
+#include "CanonicalSixJ.hh"
 
 namespace Commutator
 {
@@ -1629,6 +1630,7 @@ namespace Commutator
       double t_start = omp_get_wtime();
       double t_internal = omp_get_wtime();
       Z.modelspace->PreCalculateSixJ();
+      const detail::CanonicalSixJ sixjs(*Z.modelspace);
       int norbits = Z.modelspace->all_orbits.size();
       // Two Body channels
       std::vector<size_t> ch_bra_list, ch_ket_list;
@@ -1679,7 +1681,7 @@ namespace Commutator
 
       /// Pandya transformation
       /// construct bar_Gamma, bar_Eta, nnnbar_Eta, nnnbar_Eta_d, bar_CHI_VI
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic, 1)
       for (int ch_cc = 0; ch_cc < n_nonzero; ++ch_cc)
       {
         TwoBodyChannel_CC &tbc_cc = Z.modelspace->GetTwoBodyChannel_CC(ch_cc);
@@ -1776,7 +1778,7 @@ namespace Commutator
             const detail::TwoBodyElement element(*Z.modelspace,a,d,c,b);
             for (int J_std = jmin; J_std <= jmax; J_std += dJ_std)
             {
-              double sixj1 = Z.modelspace->GetSixJ(ja, jb, J_cc, jc, jd, J_std);
+              double sixj1 = sixjs.Get(oa.j2, ob.j2, J_cc, oc.j2, od.j2, J_std);
               if (std::abs(sixj1) > 1e-8)
               {
                 double eta_me, gamma_me;
@@ -1915,7 +1917,7 @@ namespace Commutator
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
 
-              double sixj = Z.modelspace->GetSixJ(ji * 0.5, jj * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
+              double sixj = sixjs.Get(ji, jj, J0, jk, jl, Jprime);
               if (std::abs(sixj) < 1e-8)
                 continue;
               int ch_cc = Z.modelspace->GetTwoBodyChannelIndex(Jprime, parity_cc, Tz_cc);
@@ -1940,7 +1942,7 @@ namespace Commutator
 
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj = Z.modelspace->GetSixJ(jj * 0.5, ji * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
+              double sixj = sixjs.Get(jj, ji, J0, jk, jl, Jprime);
 
               if (std::abs(sixj) < 1e-8)
                 continue;
@@ -2075,7 +2077,7 @@ namespace Commutator
             int Jpmax = std::min(ji + jl, jj + jk) / 2;
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj = Z.modelspace->GetSixJ(ji * 0.5, jj * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
+              double sixj = sixjs.Get(ji, jj, J0, jk, jl, Jprime);
               if (std::abs(sixj) < 1e-8)
                 continue;
               int ch_cc = Z.modelspace->GetTwoBodyChannelIndex(Jprime, parity_cc, Tz_cc);
@@ -2104,7 +2106,7 @@ namespace Commutator
             Jpmax = std::min(ji + jk, jj + jl) / 2;
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj = Z.modelspace->GetSixJ(ji * 0.5, jj * 0.5, J0, jl * 0.5, jk * 0.5, Jprime);
+              double sixj = sixjs.Get(ji, jj, J0, jl, jk, Jprime);
               if (std::abs(sixj) < 1e-8)
                 continue;
               int ch_cc = Z.modelspace->GetTwoBodyChannelIndex(Jprime, parity_cc, Tz_cc);
@@ -2188,7 +2190,7 @@ namespace Commutator
 
 // Diagram IIa and Diagram IIc
 // Diagram IIIc and Diagram IIId
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic, 1)
       for (int ch = 0; ch < nch; ++ch)
       {
         size_t ch_bra = ch_bra_list[ch];
@@ -2300,7 +2302,7 @@ namespace Commutator
             for (int J_std = jmin; J_std <= jmax; J_std++)
             {
               // int phaseFactor = Z.modelspace->phase(J_std + (oc.j2 + ob.j2) / 2);
-              double sixj1 = Z.modelspace->GetSixJ(ja, jb, J_cc, jc, jd, J_std);
+              double sixj1 = sixjs.Get(oa.j2, ob.j2, J_cc, oc.j2, od.j2, J_std);
               if (std::abs(sixj1) > 1e-8)
               {
                 int parity_cc = (oa.l + od.l) % 2;
@@ -2352,7 +2354,7 @@ namespace Commutator
       //      diagram IIIa - diagram IIIb
       // ##########################################
       std::deque<arma::mat> CHI_V_final(n_nonzero);
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic, 1)
       for (int ch_cc = 0; ch_cc < n_nonzero; ++ch_cc)
       {
         CHI_V_final[ch_cc] = bar_Eta[ch_cc] * bar_CHI_V_RC[ch_cc];
@@ -2427,7 +2429,7 @@ namespace Commutator
             int Jpmax = std::min(jj + jl, ji + jk) / 2;
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj1 = Z.modelspace->GetSixJ(jj * 0.5, ji * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
+              double sixj1 = sixjs.Get(jj, ji, J0, jk, jl, Jprime);
               if (std::abs(sixj1) < 1e-8)
                 continue;
               int ch_cc = Z.modelspace->GetTwoBodyChannelIndex(Jprime, parity_cc, Tz_cc);
@@ -2463,7 +2465,7 @@ namespace Commutator
             Jpmax = std::min(ji + jl, jj + jk) / 2;
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj1 = Z.modelspace->GetSixJ(ji * 0.5, jj * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
+              double sixj1 = sixjs.Get(ji, jj, J0, jk, jl, Jprime);
               if (std::abs(sixj1) < 1e-8)
                 continue;
               int ch_cc = Z.modelspace->GetTwoBodyChannelIndex(Jprime, parity_cc, Tz_cc);
@@ -2566,7 +2568,7 @@ namespace Commutator
 
       // this loop appears to be broken.
       // full matrix
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic, 1)
       for (int ch = 0; ch < nch_eta; ++ch)
       {
         TwoBodyChannel &tbc = Z.modelspace->GetTwoBodyChannel(ch);
@@ -2667,7 +2669,7 @@ namespace Commutator
       //// diagram IIIe and IIIf
       if (not Z_is_scalar)
       {
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic, 1)
         for (int ch = 0; ch < nch; ++ch)
         {
           int ch_bra = ch_bra_list[ch];
@@ -2942,7 +2944,7 @@ namespace Commutator
             for (int J_std = jmin; J_std <= jmax; J_std++)
             {
               int phaseFactor = Z.modelspace->phase(J_std + (oc.j2 + ob.j2) / 2);
-              double sixj1 = Z.modelspace->GetSixJ(ja, jb, J_cc, jc, jd, J_std);
+              double sixj1 = sixjs.Get(oa.j2, ob.j2, J_cc, oc.j2, od.j2, J_std);
               if (std::abs(sixj1) > 1e-8)
               {
                 int ch_J2_bc = Z.modelspace->GetTwoBodyChannelIndex(J_std, parity_J2, Tz_J2_bc);
@@ -3033,7 +3035,7 @@ namespace Commutator
       }
 
       // calculate bat_chi_IV * bar_gamma
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic, 1)
       for (int ch_cc = 0; ch_cc < n_nonzero; ++ch_cc)
       {
         bar_CHI_gamma[ch_cc] = bar_CHI_IV[ch_cc] * bar_Gamma[ch_cc];
@@ -3112,7 +3114,7 @@ namespace Commutator
             int Jpmax = std::min(ji + jl, jj + jk) / 2;
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj = Z.modelspace->GetSixJ(ji * 0.5, jj * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
+              double sixj = sixjs.Get(ji, jj, J0, jk, jl, Jprime);
               if (std::abs(sixj) < 1e-8)
                 continue;
               int ch_cc = Z.modelspace->GetTwoBodyChannelIndex(Jprime, parity_cc, Tz_cc);
@@ -3145,7 +3147,7 @@ namespace Commutator
             Jpmax = std::min(int(jj + jl), int(jk + ji)) / 2;
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj = Z.modelspace->GetSixJ(jj * 0.5, ji * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
+              double sixj = sixjs.Get(jj, ji, J0, jk, jl, Jprime);
               if (std::abs(sixj) < 1e-8)
                 continue;
 
@@ -3213,7 +3215,7 @@ namespace Commutator
         CHI_III_final[ch_cc] = arma::mat(nbras * 2, nbras * 2, arma::fill::zeros);
       }
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic, 1)
       for (int ch_cc = 0; ch_cc < n_nonzero; ++ch_cc)
       {
         CHI_III_final[ch_cc] = bar_Gamma[ch_cc] * barCHI_III_RC[ch_cc];
@@ -3290,7 +3292,7 @@ namespace Commutator
 
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj1 = Z.modelspace->GetSixJ(jj * 0.5, ji * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
+              double sixj1 = sixjs.Get(jj, ji, J0, jk, jl, Jprime);
               if (std::abs(sixj1) < 1e-8)
                 continue;
               int ch_cc = Z.modelspace->GetTwoBodyChannelIndex(Jprime, parity_cc, Tz_cc);
@@ -3327,7 +3329,7 @@ namespace Commutator
 
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj1 = Z.modelspace->GetSixJ(ji * 0.5, jj * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
+              double sixj1 = sixjs.Get(ji, jj, J0, jk, jl, Jprime);
               if (std::abs(sixj1) < 1e-8)
                 continue;
               int ch_cc = Z.modelspace->GetTwoBodyChannelIndex(Jprime, parity_cc, Tz_cc);
@@ -3394,7 +3396,7 @@ namespace Commutator
       }
 
       // bar_CHI_VII_CC_ef = bar_CHI_VII_CC * bar_Eta
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic, 1)
       for (int ch_cc = 0; ch_cc < n_nonzero; ++ch_cc)
       {
         TwoBodyChannel_CC &tbc_cc = Z.modelspace->GetTwoBodyChannel_CC(ch_cc);
@@ -3475,8 +3477,8 @@ namespace Commutator
             int Jpmax = std::min(jj + jl, ji + jk) / 2;
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj = Z.modelspace->GetSixJ(jj * 0.5, ji * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
-              double sixj2 = Z.modelspace->GetSixJ(ji * 0.5, jj * 0.5, J0, jl * 0.5, jk * 0.5, Jprime);
+              double sixj = sixjs.Get(jj, ji, J0, jk, jl, Jprime);
+              double sixj2 = sixjs.Get(ji, jj, J0, jl, jk, Jprime);
               if (std::abs(sixj) < 1e-8)
                 continue;
 
@@ -3512,8 +3514,8 @@ namespace Commutator
             Jpmax = std::min(ji + jl, jj + jk) / 2;
             for (int Jprime = Jpmin; Jprime <= Jpmax; ++Jprime)
             {
-              double sixj = Z.modelspace->GetSixJ(ji * 0.5, jj * 0.5, J0, jk * 0.5, jl * 0.5, Jprime);
-              double sixj2 = Z.modelspace->GetSixJ(jj * 0.5, ji * 0.5, J0, jl * 0.5, jk * 0.5, Jprime);
+              double sixj = sixjs.Get(ji, jj, J0, jk, jl, Jprime);
+              double sixj2 = sixjs.Get(jj, ji, J0, jl, jk, Jprime);
               if (std::abs(sixj) < 1e-8)
                 continue;
 

@@ -1,6 +1,7 @@
 add_library(
     Commutator   OBJECT
     Commutator.hh Commutator.cc
+    PandyaHelpers.hh ScalarPandyaPlan.hh CanonicalSixJ.hh MemoryBudget.hh
     DaggerCommutators.hh DaggerCommutators.cc
     TensorCommutators.hh TensorCommutators.cc
     IMSRG3Commutators.hh IMSRG3Commutators.cc
