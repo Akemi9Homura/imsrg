@@ -4,45 +4,12 @@
 #include "Operator.hh"
 #include "PhysicalConstants.hh"
 #include <array>
-#include <cstdint>
 
 namespace Commutator
 {
 namespace detail
 {
-// These caches belong to one channel transformation. Their storage is fixed,
-// and neither matrix pointers nor values survive a change of operator/reference.
-class NineJCache
-{
-  struct Entry { uint64_t key = 0; double value = 0; };
-  std::array<Entry, 8192> entries_{}; // 128 KiB per active worker
-public:
-  double Get(ModelSpace &ms, double a, double b, double c, double d, double e,
-             double f, double g, double h, double i)
-  {
-    const std::array<double, 9> args{{a,b,c,d,e,f,g,h,i}};
-    uint64_t key = 0;
-    for (double j : args)
-    {
-      // Use the original routine for arguments outside the lossless key range.
-      if (!(j >= 0 && j <= 63.5) || 2*j != static_cast<int>(2*j))
-        return ms.GetNineJ(a,b,c,d,e,f,g,h,i);
-      key = (key << 7) | static_cast<uint64_t>(2*j);
-    }
-    ++key; // zero marks an unused entry, including for the all-zero symbol
-    uint64_t hash = key ^ (key >> 30);
-    hash *= UINT64_C(0xbf58476d1ce4e5b9);
-    hash ^= hash >> 27;
-    auto &entry = entries_[hash & (entries_.size()-1)];
-    if (entry.key != key)
-    {
-      entry.value = ms.GetNineJ(a,b,c,d,e,f,g,h,i);
-      entry.key = key;
-    }
-    return entry.value;
-  }
-};
-
+// Channel-local matrix pointers never survive an operator/reference change.
 template<class Index = size_t>
 class ChannelMatrices
 {
