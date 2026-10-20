@@ -4,6 +4,9 @@ module purge
 # /lustre/home/2401110128 tree; point7 does not.
 if [ -d /lustre/home/2401110128 ]; then
     # wm2 default modules verified for this checkout.
+    # GCC 12: the system GCC 8.5 cannot compile OpenMP loops over range-based for
+    # (HFMBPT MP4 code), and binaries built with GCC 12 need its libstdc++ at run time.
+    module load gcc/12.2.0
     module load cmake/3.31.9
     module load OpenBLAS/0.3.17
     module load gsl/2.7.0
