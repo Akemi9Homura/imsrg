@@ -24,6 +24,13 @@ cpus = 64
 # node and on its own node (point7 does not track memory, so co-located jobs
 # share RAM with no protection). Set to None / "" to let Slurm choose.
 nodelist = "node3"
+# Slurm wall-time limit, e.g. "2-00:00:00"; None leaves the partition maximum
+# (point7 has no limit, wm2 allows 5 days and schedules a missing --time as 5 days).
+time_limit = None
+# Magnus keeps every finished Omega segment in memory (about 1.1 GB each at
+# emax=12) unless scratch is set. True writes them to <result_dir>/scratch and
+# keeps only the current one in memory; imsrg++ deletes the files on normal exit.
+use_scratch = False
 
 exe = str(REPO_ROOT / "build" / "imsrg++")
 params = {}
@@ -133,7 +140,7 @@ def path_token(value):
     return f"{value:g}"
 
 
-def add_header(output, partition=partition, qos=qos, cpus=cpus, nodelist=nodelist):
+def add_header(output, partition=partition, qos=qos, cpus=cpus, nodelist=nodelist, time_limit=time_limit):
     lib_dir = REPO_ROOT / "build"
     header_list = [
         "#!/bin/bash -l",
@@ -143,6 +150,8 @@ def add_header(output, partition=partition, qos=qos, cpus=cpus, nodelist=nodelis
     ]
     if nodelist:
         header_list.append(f"#SBATCH --nodelist={nodelist}")
+    if time_limit:
+        header_list.append(f"#SBATCH --time={time_limit}")
     header_list += [
         "#SBATCH --nodes=1",
         "#SBATCH --ntasks-per-node=1",
@@ -194,6 +203,8 @@ def generate_slurm(params: dict):
 
     check_and_make_dir(result_dir)
     check_and_make_dir(scratch_dir)
+    if use_scratch:
+        params["scratch"] = str(scratch_dir)
 
     params["flowfile"] = str(result_dir / f"{prefix}.dat")
     params["intfile"] = str(result_dir / f"{prefix}")
