@@ -1253,3 +1253,51 @@ validator 与正式阈值逐字一致；四核 JREF 及各自 A-dependent bare J
 `passed=false` 或 provenance 不一致即拒绝。输出同时汇总四核最大
 残差比、tight/default 谱差、packing 差、Omega anti-Hermiticity、
 拒步计数、作业号和产物哈希。
+
+## 9. 2026-10-22：并入 our-dev、文献复核与并行化
+
+### 9.1 合并
+
+- `mr-imsrg-dev`（`06c72429`）合并进 `our-dev`（`ee593a20`，含上游 9 月重构与 10 月 SR 对易子优化），合并提交 `4bf54c83`。
+  冲突 6 个文件：CMake 中 MR 库改为与上游一致的 OBJECT 库，`MRCommutator` 链接 `Commutator`（头文件已移到 `src/Commutator/`）与
+  OpenMP，测试列表两边都保留；`comm220ss` 保留上游占据逻辑并加上 MR 分支的空 hh/ket 扇区保护；`BCH.cc` 两边 include 都保留；
+  `HFMBPT.cc` 取上游；`pyIMSRG.cc` 保留上游 `ReNormalOrderCore`、加 MR 绑定，去掉上游已删除的 `DoNormalOrdering→UndoNormalOrdering` 重复绑定。
+- SR/VS 回归：O16 单参考与 O18 sd 价空间（N3LO EM500 srg2.0，hw16，emax4，Magnus）在合并前 `our-dev` 与合并后逐步的流输出
+  （E0、各范数、Ncomm、E(MP2)）在打印精度内相同，有效相互作用文件相同（仅版本行），耗时相同。
+- MR 测试全部通过（含新增 `MRReferencePairOrder`）；`MRCorrelatedDriver` 用时 529 s（机器有其他负载）。fixture
+  `prototype/mrimsrg/data` 不入 Git，本地合并树以软链接指向 `~/mr-imsrg` 的同名目录。
+- He4 Nrefmax=2 嵌入 emax6、emax8 的单个 RK4 步，输出 `H.jcoupled64` 与合并前逐位相同。本机单线程 emax6 稳态每步合并前约 1.1 s、
+  合并后约 0.75 s。本机与其他会话共用，计时只作粗略参考；正式性能测试在集群单节点上做（9.3 节）。
+
+### 9.2 文献复核（三路独立只读审阅）
+
+**正规序与密度。** λ2 的构造、J 耦合与交换相位、真空→MR 正规序（Hergert Phys. Scr. Eq. (20),(22),(41)–(43)；Vobig (3.4.3)）和
+MR→真空反正规序（Vobig (3.4.7)–(3.4.9)）均一致；独立 Python 复算 He4 Nrefmax=2 的 E、λ 项与部分迹恒等式误差 1e-11 到 1e-15。
+- 潜在 bug（已修，`e9816cd6`）：`MRReference::ReadBinary` 对映射后 a>b 的 pair 没有乘交换相位，对称性检查无法发现；现有导出的 pair
+  顺序与 imsrg++ 相同，未触发。新测试把每个 pair 反序并乘相位，要求读回的 Lambda2 相同（修复前差 0.108）。
+- 待定的设计选择：最终 Hamiltonian 变回 HO 基；Vobig 的最终 NCSM 在参考态自然基中做（p.139 脚注 3：Nmax=4 的差异主要来自变到自然基）。
+  全空间谱不受影响，有限 Nmax 的结果不同；放松解耦的充分性证明（6.5.17–6.5.25）要求掩码的 e 标签与最终 NCSM 的基一致，当前不一致。
+  只影响自然基非平凡的参考态（He4/O16 Nrefmax=2）。
+- 次要：λ3=0 只写在 stdout，没有写进输出文件；`export_jref.py` 对非标量残差直接按 M 平均、未报告残差。
+
+**对易子。** λ2 的 0B、1B 各项与 Hergert eq:mr_flow_0b/1b/2b_tens、Gebrerufael (4.49),(4.89b,c) 一致；2B 方程不含 λ2；
+[1+2B,1+2B] 本身不出现 λ2² 项（文档中“舍去 λ2²”对它不起作用，Mongelli 6.239 之后的说法针对 [Ω2,O3]）。随机 m-scheme 镜像误差
+IV/V/VI 为 5.7e-13/2.7e-12/4.3e-12，QCombo 交叉检查 6e-12，0B `ContractLambda2` 相对误差约 1e-15。
+- 文献排印：Mongelli Eq. 5.183 印作 (−2) 且无 Ĵ²，按其定义应为 +2Ĵ²；Eq. 5.160 也漏了 Ĵ²。代码按 Gebrerufael 写并已验证，不要按 Mongelli 修改。
+- 潜在：`ModelSpace::OCC_CUT = 1e-6` 把 0<n<1e-6 的占据按 0 处理（当前最小自然占据 2e-4，未触发）；MR 模式下 `IMSRG3=true` 没有被拒绝。
+
+**生成元、分母、掩码与 Magnus。** White-NCSM 分子（1B n̄_i n_j f，2B n̄n̄nnΓ，丢 λ）与 Vobig 6.5.28–6.5.29 及 6.5.4 的命名一致；
+Vobig 6.5.9 印的 n₁n̄₂ 是笔误。MR-EN 分母与 6.5.31、6.5.33–6.5.34 逐项一致，含 (W−1)E 项；Δe 掩码与 6.5.13–6.5.14 一致（1B 只连
+相同 (l,j,tz)，掩码实际不排除任何 1B 非对角元）。Magnus 导数、截断判据和 BCH 与 Morris Eq. (28),(30)、Vobig 4.6.4/4.6.7 等价。
+- 慢尾来源（确认）：Δ = W·ε + (W−1)E（W 为占据乘积，ε 为归一化 EN 能差）。W≪1 时衰减率 κ ≈ Wε/(Wε+(1−W)|E|)，White 的单位衰减率丢失；
+  s=100→1000 的包络衰减率 ln(1.027e-2/1.31e-3)/900 ≈ 2.3e-3，对应占据约 2.5e-3 的通道；`||eta||/||eta0||` 到 1e-6 约需 s~1e4–1e5。
+  改分母（例如按 W 归一）会改变已发表的生成元，需要用户决定。
+- 次要：`BCH_Transform` 到 40 阶未收敛只警告；`BCH_Product` 的二阶项不全（只在 `hunter_gatherer=true` 时用）；掩码按自然轨道继承的
+  HO 标签评估，Vobig 证明所需的“在同一基下按 Nrefmax 截断”不严格满足，此前未记录。
+
+### 9.3 MR 增量项并行化（`9a73bbeb`）
+
+MR 增量项原先完全串行（`omp` 只出现在计时调用）。按 imsrg++ 对易子的模式改为 `omp parallel for schedule(dynamic,1)`：
+`BuildStandardProducts` 按二体通道；IV 与 VI（迹与主和）按第一个轨道指标，每个输出元素仍由一个线程按原顺序累加；
+V 按 (J, parity, ΔTz) 块，各块偏迹写入自己的缓冲，再按固定块顺序相加。`full_active` 改为 `vector<char>`（`vector<bool>`
+按位存储，并发写会竞争）。emax6 单步 H 在 1/4/16 线程与改前逐位相同，MR 测试全部通过。

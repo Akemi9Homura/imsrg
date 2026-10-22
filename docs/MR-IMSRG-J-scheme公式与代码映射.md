@@ -83,6 +83,8 @@ FCIQMC/shell-model-obs 的 rank-0 TBTD 是约化二体密度；其 m-scheme
 | 0B 公共项 | Hergert Eq. (49) 前两组 | (4.150)--(4.155) | 复用 `comm110ss`、`comm220ss` |
 | 0B MR | `1/4 C2 lambda2` | (4.156)--(4.158c) | 在完整 2B commutator 已累加后做 `(2J+1) trace(C2^J lambda2^J)`；不能只收缩 2B--2B 子项 |
 
+注（2026-10-22 复核）：上表 1B-IV、1B-VI 一栏写的是推导时的矩阵形式；生产代码（`MRCommutator.cc` 的 `comm221_lambda2`）实际用直接偏迹，归一化 pair 存储下的系数为 IV `0.5`、V `0.5`、VI `-1`（受限求和带来的因子 4 和 2），VI 也不只取 `J=0` 块。二者等价：独立的随机 m-scheme 镜像对 Hergert Eq. (50) 的误差 IV/V/VI 为 `5.7e-13/2.7e-12/4.3e-12`。详见实现计划第 9.2 节。
+
 1B-IV--VI 最终都必须加入论文的 `-chi[1<->2]`。生产代码应通过
 `Operator` 的 Hermitian/anti-Hermitian 属性填写另一半矩阵，不能在三组
 内部各自采用不一致的手写共轭规则。
