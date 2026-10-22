@@ -1332,3 +1332,11 @@ White-NCSM 生成元（profiler 中的 `AddToEta`）随后也按 imsrg++ 其他�
 - 首步多出的一次性开销（16 线程约 4.5 s，其中串行的 `PreCalculateSixJ` 约 1.9 s）在长流中摊薄。
 - 内存比合并前高（emax8 单线程峰值 1.35 → 1.9 GB），来自上游 10 月加入的 Pandya plan 与重耦合缓存（默认预算 `IMSRG_SCALAR_PANDYA_CACHE_MB=1024`）。
 - 尚未测：emax10–12 的线程扩展（需要在集群上生成嵌入参考与 J64 输入）；未计时部分的拆分。
+
+### 9.4 配置防护（`f50db95a`）
+
+- `MR_Commutator` 遇到三体算符或全局 IMSRG(3) 开关直接报错：MR 增量项只有 MR-IMSRG(2) 版本，否则会返回缺 MR 项的三体部分。
+- MR 参考下 BCH 在 `max_iter`（40）层嵌套对易子内不收敛时报错；阈值为 0（固定阶，oracle 测试用）与 SR 路径保持原行为（SR 只打印警告）。
+- `MRReference::Validate` 拒绝落在 `[1e-12, OCC_CUT)` 的占据数：SR 收缩会把它们当成空轨道。He4 Nrefmax=2 的 0d 占据约 1e-25（对称性数值零），不受影响；真实最小占据约 2e-4。
+- MR 导出时在算符文件旁写 `<output>.mrmeta.json`：截断（λ3 = 0）、生成元及分子是否含 λ2、分母分区、解耦掩码、输出基（HO、真空正规序）、流参数、参考量子数与输入文件 sha256。算符文件本身逐位不变。
+- 新测试 `MRGuards`；MR 全部 12 个测试与 SR/VS 回归通过。
