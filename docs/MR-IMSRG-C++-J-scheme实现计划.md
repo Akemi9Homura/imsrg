@@ -1336,6 +1336,8 @@ White-NCSM 生成元（profiler 中的 `AddToEta`）随后也按 imsrg++ 其他�
 ### 9.4 配置防护（`f50db95a`）
 
 - `MR_Commutator` 遇到三体算符或全局 IMSRG(3) 开关直接报错：MR 增量项只有 MR-IMSRG(2) 版本，否则会返回缺 MR 项的三体部分。
+  正常的 MR 运行不会触发：驱动在启动时已拒绝 `IMSRG3=true`，现在也拒绝 `imsrg3_at_end=true`（原先漏掉，Magnus 流完后会以 IMSRG(3) 做最后一次 BCH）。
+  库函数层的检查只拦截 Python 脚本或其他代码绕过驱动的情形。
 - MR 参考下 BCH 在 `max_iter`（40）层嵌套对易子内不收敛时报错；阈值为 0（固定阶，oracle 测试用）与 SR 路径保持原行为（SR 只打印警告）。
 - `MRReference::Validate` 拒绝落在 `[1e-12, OCC_CUT)` 的占据数：SR 收缩会把它们当成空轨道。He4 Nrefmax=2 的 0d 占据约 1e-25（对称性数值零），不受影响；真实最小占据约 2e-4。
 - MR 导出时在算符文件旁写 `<output>.mrmeta.json`：截断（λ3 = 0）、生成元及分子是否含 λ2、分母分区、解耦掩码、输出基（HO、真空正规序）、流参数、参考量子数与输入文件 sha256。算符文件本身逐位不变。

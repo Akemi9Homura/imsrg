@@ -476,6 +476,7 @@ int main(int argc, char** argv)
                                   method == "magnus_adaptive";
     if (physical_system != "nuclear" || basis != "oscillator" ||
         !supported_method || nsteps != 1 || input3bme != "none" || IMSRG3 ||
+        imsrg3_at_end ||
         perturbative_triples || goose_tank || use_brueckner_bch ||
         std::abs(BetaCM) > 1e-12 ||
         core_generator != "white-ncsm" || !modelspace.valence.empty() ||
