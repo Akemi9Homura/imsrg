@@ -903,20 +903,20 @@ void TwoBodyME::PrintAllMatrices() const
 
 
 
-int TwoBodyME::Dimension()
+size_t TwoBodyME::Dimension() const
 {
-   int dim = 0;
+   size_t dim = 0;
    for ( auto& itmat : MatEl )
    {
-      int N = itmat.second.n_cols;
+      size_t N = itmat.second.n_cols;
       dim += N*(N+1)/2;
    }
    return dim;
 }
 
-int TwoBodyME::size()
+size_t TwoBodyME::size() const
 {
-  int size=0;
+  size_t size=0;
   for ( auto& itmat : MatEl )
      size += itmat.second.size();
   return size*sizeof(double);

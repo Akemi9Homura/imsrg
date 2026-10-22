@@ -215,6 +215,8 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("UndoNormalOrdering", &Operator::UndoNormalOrdering)
           .def("UndoNormalOrderingCore", &Operator::UndoNormalOrderingCore)
           .def("ReNormalOrderCore", &Operator::ReNormalOrderCore, py::arg("copy_3body")=false )
+          .def("TransformOneAndTwoBody", &Operator::TransformOneAndTwoBody,
+               py::arg("C"), py::arg("validation_tolerance") = 1e-10)
           .def("SetModelSpace", &Operator::SetModelSpace)
           .def("Truncate", &Operator::Truncate)
           .def("DoIsospinAveraging", &Operator::DoIsospinAveraging)
@@ -257,6 +259,61 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("WriteBinary", [](Operator &self, std::string fname) { std::ofstream ofs(fname,std::ios::binary);  self.WriteBinary(ofs); }, py::arg("filename"))
           ;
 
+      py::class_<MRReference>(m, "MRReference")
+          .def(py::init<ModelSpace &, int, int, int, const std::vector<double> &>(),
+               py::arg("modelspace"), py::arg("A"), py::arg("Z"),
+               py::arg("Nrefmax"), py::arg("occupations"), py::keep_alive<1, 2>())
+          .def_readonly("A", &MRReference::A)
+          .def_readonly("Z", &MRReference::Z)
+          .def_readonly("Nrefmax", &MRReference::Nrefmax)
+          .def_readonly("occupations", &MRReference::occupations)
+          .def_readwrite("Lambda2", &MRReference::Lambda2)
+          .def_readonly("NaturalOrbitTransformation",
+                        &MRReference::NaturalOrbitTransformation)
+          .def_readonly("J2", &MRReference::J2)
+          .def_readonly("parity", &MRReference::parity)
+          .def_readonly("emax", &MRReference::emax)
+          .def_readonly("e2max", &MRReference::e2max)
+          .def_readonly("hw", &MRReference::hw)
+          .def_readonly("interaction_sha256", &MRReference::interaction_sha256)
+          .def_readonly("rdm_sha256", &MRReference::rdm_sha256)
+          .def_readonly("wavefunction_sha256", &MRReference::wavefunction_sha256)
+          .def_static("ReadBinary", &MRReference::ReadBinary,
+                      py::arg("modelspace"), py::arg("filename"),
+                      py::arg("validation_tolerance") = 1e-10,
+                      py::keep_alive<0, 1>())
+          .def("WriteBinary", &MRReference::WriteBinary,
+               py::arg("filename"))
+          .def_static("ReadOccupationMap", &MRReference::ReadOccupationMap,
+                      py::arg("modelspace"), py::arg("filename"))
+          .def("EmbedInModelSpace", &MRReference::EmbedInModelSpace,
+               py::arg("target_modelspace"), py::arg("target_interaction_sha256"),
+               py::arg("validation_tolerance") = 1e-10,
+               py::keep_alive<0, 2>())
+          .def("OccupationsMatchModelSpace", &MRReference::OccupationsMatchModelSpace,
+               py::arg("tolerance") = 1e-12)
+          .def("MaximumHermiticityViolation", &MRReference::MaximumHermiticityViolation)
+          .def("MaximumContractionViolation", &MRReference::MaximumContractionViolation)
+          .def("Validate", &MRReference::Validate, py::arg("tolerance") = 1e-10)
+          .def("ContractLambda2", &MRReference::ContractLambda2)
+          .def("DataSize", &MRReference::DataSize)
+          .def("NormalOrder", &MRReference::NormalOrder)
+          .def("UndoNormalOrder", &MRReference::UndoNormalOrder);
+
+      py::class_<MRCommutator::MR1BResult>(m, "MR1BResult")
+          .def_readonly("IV", &MRCommutator::MR1BResult::IV)
+          .def_readonly("V", &MRCommutator::MR1BResult::V)
+          .def_readonly("VI", &MRCommutator::MR1BResult::VI)
+          .def("Total", &MRCommutator::MR1BResult::Total);
+
+      m.def("MR_comm221_lambda2_reference",
+            &MRCommutator::comm221_lambda2_reference,
+            py::arg("X"), py::arg("Y"), py::arg("reference"));
+      m.def("MR_comm221_lambda2", &MRCommutator::comm221_lambda2,
+            py::arg("X"), py::arg("Y"), py::arg("reference"));
+      m.def("MR_Commutator", &MRCommutator::Commutator,
+            py::arg("X"), py::arg("Y"), py::arg("reference"));
+
       py::class_<arma::mat>(m, "ArmaMat")
           .def(py::init<>())
           .def("zeros", [](arma::mat &self, int nrows, int ncols)  { self.zeros(nrows, ncols); },   py::arg("nrows"), py::arg("ncols"))
@@ -294,12 +351,16 @@ PYBIND11_MODULE(pyIMSRG, m)
               { return self.GetTBMEmonopole(a, b, c, d); },     py::arg("a"), py::arg("b"), py::arg("c"), py::arg("d")
            )
           .def("GetTBME_norm", [](TwoBodyME &self, int ch_bra, int ch_ket, int a, int b, int c, int d)
-               { return self.GetTBME_norm(ch_bra, ch_ket, a, b, c, d); }
-           )
-          .def("GetTBMEmonopole_norm", [](TwoBodyME &self, int a, int b, int c, int d)
-              { return self.GetTBMEmonopole_norm(a, b, c, d); },      py::arg("a"), py::arg("b"), py::arg("c"), py::arg("d")
-           )
-          .def("GetChannelMatrix", [](TwoBodyME &self, int J, int p, int Tz)
+               { return self.GetTBME_norm(ch_bra, ch_ket, a, b, c, d); })
+          .def("GetTBME_norm_chij", [](TwoBodyME &self, int ch_bra, int ch_ket,
+                                         size_t ibra, size_t iket)
+               { return self.GetTBME_norm(ch_bra, ch_ket, ibra, iket); })
+          .def(
+              "GetTBMEmonopole_norm", [](TwoBodyME &self, int a, int b, int c, int d)
+              { return self.GetTBMEmonopole_norm(a, b, c, d); },
+              py::arg("a"), py::arg("b"), py::arg("c"), py::arg("d"))
+          .def(
+              "GetChannelMatrix", [](TwoBodyME &self, int J, int p, int Tz)
               { size_t ch = self.modelspace->GetTwoBodyChannelIndex(J,p,Tz); return self.GetMatrix(ch,ch); },
               py::arg("J"), py::arg("parity"), py::arg("Tz")
            )
@@ -366,6 +427,8 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def(py::init<>())
           .def("ReadTBME_Oslo", &ReadWrite::ReadTBME_Oslo)
           .def("ReadTBME_OakRidge", &ReadWrite::ReadTBME_OakRidge, py::arg("spname"), py::arg("tbmename"), py::arg("H"), py::arg("tbme_format") = "ascii")
+          .def("Read_jcoupled64", &ReadWrite::Read_jcoupled64)
+          .def("Write_jcoupled64", &ReadWrite::Write_jcoupled64)
           .def("ReadBareTBME_Jason", &ReadWrite::ReadBareTBME_Jason)
           .def("ReadBareTBME_Navratil", &ReadWrite::ReadBareTBME_Navratil)
           .def("ReadBareTBME_Darmstadt", &ReadWrite::ReadBareTBME_Darmstadt, py::arg("filename"), py::arg("H"), py::arg("e1max"), py::arg("e2max"), py::arg("lmax"))
@@ -500,7 +563,21 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("SetODETolerance", &IMSRGSolver::SetODETolerance)
           .def("Reset", &IMSRGSolver::Reset)
           .def("SetGenerator", &IMSRGSolver::SetGenerator)
-          .def("SetOnly2bEta", [](IMSRGSolver &self, bool tf) { self.GetGenerator().SetOnly2bEta(tf); })
+          .def("SetMRReference", &IMSRGSolver::SetMRReference,
+               py::arg("reference"), py::keep_alive<1, 2>())
+          .def("ClearMRReference", &IMSRGSolver::ClearMRReference)
+          .def("HasMRReference", &IMSRGSolver::HasMRReference)
+          .def("EvaluateCommutator", &IMSRGSolver::EvaluateCommutator,
+               py::arg("X"), py::arg("Y"))
+          .def("EvaluateBCHTransform", &IMSRGSolver::EvaluateBCHTransform,
+               py::arg("initial"), py::arg("omega"))
+          .def("EvaluateBCHProduct", &IMSRGSolver::EvaluateBCHProduct,
+               py::arg("d_omega"), py::arg("omega"))
+          .def("EvaluateMagnusDerivative", &IMSRGSolver::EvaluateMagnusDerivative,
+               py::arg("omega"), py::arg("eta"),
+               py::arg("relative_threshold") = 1e-2)
+          .def("SetOnly2bEta", [](IMSRGSolver &self, bool tf)
+               { self.GetGenerator().SetOnly2bEta(tf); })
           .def("SetDenominatorCutoff", &IMSRGSolver::SetDenominatorCutoff)
           .def("SetDenominatorDelta", &IMSRGSolver::SetDenominatorDelta)
           .def("SetDenominatorDeltaOrbit", &IMSRGSolver::SetDenominatorDeltaOrbit)
@@ -523,6 +600,10 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("EstimateBCHError", &IMSRGSolver::EstimateBCHError)
           .def("UpdateEta", &IMSRGSolver::UpdateEta)
           .def("GetNOmegaWritten", &IMSRGSolver::GetNOmegaWritten)
+          .def("GetMagnusSeriesStepRejections",
+               &IMSRGSolver::GetMagnusSeriesStepRejections)
+          .def("GetMagnusSeriesSegmentRestarts",
+               &IMSRGSolver::GetMagnusSeriesSegmentRestarts)
           .def("GetOmegaSize", &IMSRGSolver::GetOmegaSize)
           .def("GetScratchDir", [](IMSRGSolver &self)  { return self.scratchdir; })
           .def("FlushOmegaToScratch", &IMSRGSolver::FlushOmegaToScratch)
@@ -551,6 +632,19 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def(py::init<>())
           .def("SetType", &Generator::SetType, py::arg("gen_type"))
           .def("SetDenominatorPartitioning", &Generator::SetDenominatorPartitioning, py::arg("Moller_Plessett or Epstein_Nesbet"))
+          .def("SetDenominatorCutoff", &Generator::SetDenominatorCutoff, py::arg("cutoff"))
+          .def("Get1bDenominator", &Generator::Get1bDenominator, py::arg("i"), py::arg("j"))
+          .def("Get1bDenominatorWhiteNCSM",
+               &Generator::Get1bDenominatorWhiteNCSM,
+               py::arg("i"), py::arg("j"))
+          .def(
+              "Get2bDenominator",
+              [](Generator &self, int channel, int bra, int ket)
+              { return self.Get2bDenominator(channel, bra, ket); },
+              py::arg("channel"), py::arg("bra"), py::arg("ket"))
+          .def("Get2bDenominatorWhiteNCSM",
+               &Generator::Get2bDenominatorWhiteNCSM,
+               py::arg("channel"), py::arg("bra"), py::arg("ket"))
           .def("SetUseIsospinAveraging", &Generator::SetUseIsospinAveraging, py::arg("tf"))
           .def("Update", &Generator::Update, py::arg("H"), py::arg("Eta"))
           .def("UpdateGeneral", &Generator::UpdateGeneral, py::arg("H"), py::arg("H_denom"), py::arg("Eta"))
@@ -682,8 +776,12 @@ PYBIND11_MODULE(pyIMSRG, m)
 
 
       py::module BCH = m.def_submodule("BCH", "BCH namespace");
-       BCH.def("BCH_Transform", &BCH::BCH_Transform);
-       BCH.def("BCH_Product", &BCH::BCH_Product);
+       BCH.def("BCH_Transform",
+               [](const Operator &op, const Operator &omega)
+               { return BCH::BCH_Transform(op, omega); });
+       BCH.def("BCH_Product",
+               [](Operator &x, Operator &y)
+               { return BCH::BCH_Product(x, y); });
        BCH.def("SetUseFactorizedCorrection", &BCH::SetUseFactorizedCorrection);
        BCH.def("SetUseFactorizedCorrectionBCH_product", &BCH::SetUseFactorizedCorrectionBCH_product);
        BCH.def("SetUseFactorized_Correct_ZBTerm", &BCH::SetUseFactorized_Correct_ZBTerm);

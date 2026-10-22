@@ -742,11 +742,16 @@ namespace Commutator
       {
          nbarnbar[ph_ket[i]] = tbc_ket.Ket_unocc_ph[i];
       }
-      auto X2 = X.TwoBody.GetMatrix(ch_bra,ch_ket).rows(hh);
-
-      arma::mat Y2 = Y.TwoBody.GetMatrix(ch_bra,ch_ket).rows(hh);
-      Y2.each_row() %= nbarnbar.t();
-      z0 += 2 * (2*J + 1) * hY* arma::sum(arma::diagvec(X2 * Y2.t() ) % nn); // This could be made more efficient, but who cares?
+      // Empty hh or ket sectors contribute exactly zero.  Armadillo's
+      // each_row() binds through colptr(0), which is undefined for a matrix
+      // with zero columns even though the subsequent reduction is empty.
+      if (!hh.empty() && nbarnbar.n_elem > 0)
+      {
+        auto X2 = X.TwoBody.GetMatrix(ch_bra, ch_ket).rows(hh);
+        arma::mat Y2 = Y.TwoBody.GetMatrix(ch_bra, ch_ket).rows(hh);
+        Y2.each_row() %= nbarnbar.t();
+        z0 += 2 * (2 * J + 1) * hY * arma::sum(arma::diagvec(X2 * Y2.t()) % nn);
+      }
 
       // if not channel diagonal, we need to the same thing with ket=hh and bra==pp
       if ( ch_bra != ch_ket)
@@ -765,11 +770,13 @@ namespace Commutator
 	{
            nbarnbar[ph_bra[i]] = tbc_bra.Ket_unocc_ph[i];
 	}
-        auto X2 = X.TwoBody.GetMatrix(ch_bra,ch_ket).cols(hh);
-
-        Y2 = Y.TwoBody.GetMatrix(ch_bra,ch_ket).cols(hh);
-        Y2.each_col() %= nbarnbar;
-        z0 += 2 * (2*J + 1) * hX* arma::sum(arma::diagvec(X2.t() * Y2 ) % nn); // This could be made more efficient, but who cares?
+        if (!hh.empty() && nbarnbar.n_elem > 0)
+        {
+          auto X2 = X.TwoBody.GetMatrix(ch_bra, ch_ket).cols(hh);
+          arma::mat Y2 = Y.TwoBody.GetMatrix(ch_bra, ch_ket).cols(hh);
+          Y2.each_col() %= nbarnbar;
+          z0 += 2 * (2 * J + 1) * hX * arma::sum(arma::diagvec(X2.t() * Y2) % nn);
+        }
 
       }// if ch_bra != ch_ket
 

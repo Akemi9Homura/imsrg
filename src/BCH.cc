@@ -2,9 +2,47 @@
 #include "BCH.hh"
 #include "Commutator.hh"
 #include <iomanip> // for setw, setprecision
+#include "MRCommutator.hh"
+#include "MRReference.hh"
+
+#include <sstream>
+#include <stdexcept>
+
+namespace
+{
+  Operator EvaluateScalarCommutator(const Operator &X, const Operator &Y,
+                                    const MRReference *mr_reference)
+  {
+    if (mr_reference == nullptr)
+      return Commutator::Commutator(X, Y);
+    return MRCommutator::Commutator(X, Y, *mr_reference);
+  }
+}
 
 namespace BCH
 {
+
+  MagnusSeriesError::MagnusSeriesError(
+      Reason reason, std::size_t order, double previous_nested_norm,
+      double nested_norm)
+      : std::runtime_error([&]()
+        {
+          std::ostringstream message;
+          message << "Magnus Bernoulli series ";
+          if (reason == Reason::NonDecreasingNestedNorm)
+            message << "has a non-decreasing nested-commutator norm";
+          else
+            message << "did not converge before the maximum order";
+          message << " at k=" << order
+                  << " (previous norm=" << previous_nested_norm
+                  << ", current norm=" << nested_norm << ")";
+          return message.str();
+        }()),
+        reason_(reason), order_(order),
+        previous_nested_norm_(previous_nested_norm),
+        nested_norm_(nested_norm)
+  {
+  }
 
   bool use_goose_tank_correction = false;
   bool use_brueckner_bch = false;
@@ -88,17 +126,28 @@ namespace BCH
   /// We use the [Baker-Campbell-Hausdorff formula](http://en.wikipedia.org/wiki/Baker-Campbell-Hausdorff_formula)
   /// \f[ Z = X + [Y,X] + \frac{1}{2!}[Y,[Y,X]] + \frac{1}{3!}[Y,[Y,[Y,X]]] + \ldots \f]
   /// with all commutators truncated at the two-body level.
-  Operator BCH_Transform(const Operator &OpIn, const Operator &Omega)
+  Operator BCH_Transform(const Operator &OpIn, const Operator &Omega,
+                         const MRReference *mr_reference)
   {
-    return use_brueckner_bch ? Brueckner_BCH_Transform(OpIn, Omega) : Standard_BCH_Transform(OpIn, Omega);
+    if (mr_reference != nullptr && use_brueckner_bch)
+      throw std::invalid_argument("MR-Magnus does not support Brueckner BCH");
+    return use_brueckner_bch
+             ? Brueckner_BCH_Transform(OpIn, Omega)
+             : Standard_BCH_Transform(OpIn, Omega, mr_reference);
   }
 
   /// X.BCH_Transform(Y) returns \f$ Z = e^{Y} X e^{-Y} \f$.
   /// We use the [Baker-Campbell-Hausdorff formula](http://en.wikipedia.org/wiki/Baker-Campbell-Hausdorff_formula)
   /// \f[ Z = X + [Y,X] + \frac{1}{2!}[Y,[Y,X]] + \frac{1}{3!}[Y,[Y,[Y,X]]] + \ldots \f]
   /// with all commutators truncated at the two-body level.
-  Operator Standard_BCH_Transform(const Operator &OpIn, const Operator &Omega)
+  Operator Standard_BCH_Transform(const Operator &OpIn, const Operator &Omega,
+                                  const MRReference *mr_reference)
   {
+
+    if (mr_reference != nullptr &&
+        (use_goose_tank_correction || use_factorized_correction))
+      throw std::invalid_argument(
+          "MR-Magnus BCH does not support goose-tank or factorized corrections");
 
     double t_start = omp_get_wtime();
     int max_iter = 40;
@@ -176,7 +225,7 @@ namespace BCH
 //        OpNested_last_last = OpNested_last;
 //        OpNested_last = OpNested;
 
-        OpNested = Commutator::Commutator(Omega, OpNested); // the ith nested commutator
+        OpNested = EvaluateScalarCommutator(Omega, OpNested, mr_reference); // the ith nested commutator
 
         int i_min_factorized = bch_skip_ieq1 ? 2 : 1;
         if (i > i_min_factorized and use_factorized_correction)
@@ -283,8 +332,12 @@ namespace BCH
   /// by employing the [Baker-Campbell-Hausdorff formula](http://en.wikipedia.org/wiki/Baker-Campbell-Hausdorff_formula)
   /// \f[ Z = X + Y + \frac{1}{2}[X,Y] + \frac{1}{12}([X,[X,Y]]+[Y,[Y,X]]) + \ldots \f]
   //*****************************************************************************************
-  Operator BCH_Product(Operator &X, Operator &Y)
+  Operator BCH_Product(Operator &X, Operator &Y,
+                       const MRReference *mr_reference)
   {
+    if (mr_reference != nullptr && use_factorized_correction_BCH_Product)
+      throw std::invalid_argument(
+          "MR-Magnus BCH product does not support factorized corrections");
     double tstart = omp_get_wtime();
     double nx = X.Norm();
     double ny = Y.Norm();
@@ -302,13 +355,13 @@ namespace BCH
       Z.ThreeBody.Erase();
       Commutator::use_imsrg3 = false;
     }
-    Operator Nested = Commutator::Commutator(Y, X); // [Y,X]
+    Operator Nested = EvaluateScalarCommutator(Y, X, mr_reference); // [Y,X]
 
     double nxy = Nested.Norm();
     // We assume X is small, but just in case, we check if we should include the [X,[X,Y]] term.
     if (nxy * nx > bch_product_threshold)
     {
-      Z += (1. / 12) * Commutator::Commutator(Nested, X);
+      Z += (1. / 12) * EvaluateScalarCommutator(Nested, X, mr_reference);
       if (use_factorized_correction_BCH_Product)
       {
         Operator Op_2b1b = Nested;
@@ -347,7 +400,7 @@ namespace BCH
         chi = Nested; // save nested commutator from previous step
       }
 
-      Nested = Commutator::Commutator(Y, Nested);
+      Nested = EvaluateScalarCommutator(Y, Nested, mr_reference);
 
       if (k >= 2 and use_factorized_correction_BCH_Product)
       {
@@ -365,6 +418,71 @@ namespace BCH
 
     X.profiler.timer[__func__] += omp_get_wtime() - tstart;
     return Z;
+  }
+
+  /// Evaluate dOmega/ds = sum_k B_k/k! ad_Omega^k(Eta).
+  ///
+  /// Sources: Morris--Parzuchowski--Bogner, Phys. Rev. C 92, 034331
+  /// (2015), Eq. (28), doi:10.1103/PhysRevC.92.034331; Vobig,
+  /// TU Darmstadt dissertation (2020), Eqs. (4.6.4)--(4.6.8),
+  /// urn:nbn:de:tuda-tuprints-113758. Magnus(2) requires every nested
+  /// commutator in this series to be truncated with the same NO2B/MR
+  /// commutator used by the flow.
+  ///
+  /// The finite list is the same Bernoulli sequence already used by
+  /// BCH_Product. Following Vobig Eq. (4.6.7), production stops only at a
+  /// nonzero Bernoulli order k>=2 when the new term is small relative to the
+  /// accumulated derivative. Eq. (4.6.8) requires every nested-commutator
+  /// norm to decrease; violating that condition, or reaching k=8 without
+  /// convergence, raises MagnusSeriesError so the ODE driver can reject the
+  /// trial step. A zero threshold is the exact k<=8 algebra-test mode and
+  /// deliberately never raises a convergence error.
+  Operator MagnusDerivative(const Operator &Omega, const Operator &Eta,
+                             const MRReference *mr_reference,
+                             double relative_threshold)
+  {
+    if (relative_threshold < 0.0)
+      throw std::invalid_argument(
+          "MagnusDerivative relative threshold must be non-negative");
+    if (Omega.GetJRank() != 0 || Omega.GetTRank() != 0 ||
+        Omega.GetParity() != 0 || Eta.GetJRank() != 0 ||
+        Eta.GetTRank() != 0 || Eta.GetParity() != 0)
+      throw std::invalid_argument(
+          "MagnusDerivative currently supports scalar operators only");
+
+    const std::vector<double> bernoulli = {
+        1.0, -0.5, 1. / 6, 0.0, -1. / 30, 0.0, 1. / 42, 0.0,
+        -1. / 30};
+    const std::vector<double> factorial = {
+        1.0, 1.0, 2.0, 6.0, 24.0, 120.0, 720.0, 5040.0, 40320.0};
+
+    Operator derivative = Eta;
+    Operator nested = Eta;
+    double previous_nested_norm = nested.Norm();
+    for (size_t order = 1; order < bernoulli.size(); ++order)
+    {
+      nested = EvaluateScalarCommutator(Omega, nested, mr_reference);
+      const double nested_norm = nested.Norm();
+      if (relative_threshold > 0.0 && previous_nested_norm > 0.0 &&
+          nested_norm >= previous_nested_norm)
+        throw MagnusSeriesError(
+            MagnusSeriesError::Reason::NonDecreasingNestedNorm,
+            order, previous_nested_norm, nested_norm);
+      if (bernoulli[order] != 0.0)
+      {
+        Operator term = (bernoulli[order] / factorial[order]) * nested;
+        derivative += term;
+        if (relative_threshold > 0.0 && order >= 2 &&
+            term.Norm() < relative_threshold * derivative.Norm())
+          return derivative;
+      }
+      if (relative_threshold > 0.0 && order + 1 == bernoulli.size())
+        throw MagnusSeriesError(
+            MagnusSeriesError::Reason::MaximumOrderReached,
+            order, previous_nested_norm, nested_norm);
+      previous_nested_norm = nested_norm;
+    }
+    return derivative;
   }
 
   double EstimateBCHError(Operator &Omega, Operator H)

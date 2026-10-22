@@ -1,6 +1,8 @@
 .vscode/
 build/
 build-src/
+build-py*/
+/build-*/
 #CMake output files
 CMakeFiles/
 CMakeCache.txt
@@ -26,4 +28,10 @@ src/.*.swp
 #Work folders should only contain the examples scripts
 work/
 result/
+/inputs/
+/archive/
+refs/
 __pycache__
+prototype/mrimsrg/build/
+prototype/mrimsrg/build-*/
+prototype/mrimsrg/data/

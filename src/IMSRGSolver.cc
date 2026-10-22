@@ -1,11 +1,14 @@
 #include "IMSRGSolver.hh"
 #include "Commutator.hh"
+#include "MRCommutator.hh"
 #include "BCH.hh"
 #include "Operator.hh"
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <sstream>
 
@@ -109,18 +112,20 @@ void IMSRGSolver::GatherOmega()
   auto &gatherer = Omega[Omega.size() - 2];
   if (hunter.Norm() > 1e-12) // SRS: changed this from 1e-6 to 1e-12. No reason for it to be so big.
   {
-    gatherer = BCH::BCH_Product(hunter, gatherer);
+    gatherer = EvaluateBCHProduct(hunter, gatherer);
   }
   hunter.Erase();
   H_saved = *H_0;
   for (size_t i = 0; i < Omega.size() - 1; i++)
   {
-    H_saved = BCH::BCH_Transform(H_saved, Omega[i]);
+    H_saved = EvaluateBCHTransform(H_saved, Omega[i]);
   }
 }
 
 void IMSRGSolver::SetHin(Operator &H_in)
 {
+  if (mr_reference != nullptr && mr_reference->modelspace != H_in.GetModelSpace())
+    throw std::invalid_argument("new Hamiltonian does not match IMSRGSolver MR reference");
   modelspace = H_in.GetModelSpace();
   H_0 = &H_in;
   FlowingOps[0] = H_in;
@@ -135,6 +140,42 @@ void IMSRGSolver::SetHin(Operator &H_in)
   {
     Omega.back() = Eta;
   }
+}
+
+void IMSRGSolver::SetMRReference(const MRReference& reference)
+{
+  if (modelspace == nullptr || reference.modelspace != modelspace)
+    throw std::invalid_argument("IMSRGSolver and MRReference use different ModelSpace objects");
+  reference.Validate();
+  mr_reference = &reference;
+}
+
+Operator IMSRGSolver::EvaluateCommutator(const Operator& X,
+                                         const Operator& Y) const
+{
+  if (mr_reference == nullptr)
+    return Commutator::Commutator(X, Y);
+  return MRCommutator::Commutator(X, Y, *mr_reference);
+}
+
+Operator IMSRGSolver::EvaluateBCHTransform(const Operator& initial,
+                                           const Operator& omega) const
+{
+  return BCH::BCH_Transform(initial, omega, mr_reference);
+}
+
+Operator IMSRGSolver::EvaluateBCHProduct(Operator& d_omega,
+                                         Operator& omega) const
+{
+  return BCH::BCH_Product(d_omega, omega, mr_reference);
+}
+
+Operator IMSRGSolver::EvaluateMagnusDerivative(const Operator& omega,
+                                                const Operator& eta,
+                                                double relative_threshold) const
+{
+  return BCH::MagnusDerivative(
+      omega, eta, mr_reference, relative_threshold);
 }
 
 void IMSRGSolver::SetOmega(size_t i, Operator &om)
@@ -207,6 +248,20 @@ void IMSRGSolver::SetDsmax(double d)
 void IMSRGSolver::Solve()
 {
 
+  if (mr_reference != nullptr)
+  {
+    if (method != "flow" && method != "flow_adaptive" &&
+        method != "flow_euler" && method != "flow_RK4" &&
+        method != "magnus" && method != "magnus_euler" &&
+        method != "magnus_adaptive")
+      throw std::invalid_argument(
+          "MR-IMSRG supports direct flow and the production Magnus solver only");
+    if (FlowingOps.size() != 1)
+      throw std::invalid_argument("MR-IMSRG currently evolves only the Hamiltonian");
+    if (BCH::use_goose_tank_correction)
+      throw std::invalid_argument("MR-IMSRG does not support goose-tank corrections");
+  }
+
   if (s < 1e-4)
     WriteFlowStatusHeader(std::cout);
 
@@ -277,6 +332,13 @@ void IMSRGSolver::Solve_flow_euler()
 
 
 // This is the default solver
+/// Legacy imsrg++ finite-step Magnus path. The algorithm below explicitly
+/// forms dOmega = ds*Eta and composes exp(Omega_new) =
+/// exp(dOmega)*exp(Omega_old) with BCH_Product, i.e. exponential Euler.
+/// Vobig's dissertation (2020), Sec. 4.6 and Appendix B.2, notes that fixed
+/// step Euler is possible but reports using adaptive GSL RKF45 instead. Its
+/// retention as an algebra oracle (rather than the MR production solver) is
+/// this repository's tested engineering choice, not a literature mandate.
 void IMSRGSolver::Solve_magnus_euler()
 {
   istep = 0;
@@ -338,16 +400,16 @@ void IMSRGSolver::Solve_magnus_euler()
     Eta *= ds; // Here's the Euler step.
 
     // accumulated generator (aka Magnus operator) exp(Omega) = exp(dOmega) * exp(Omega_last)
-    Omega.back() = BCH::BCH_Product(Eta, Omega.back());
+    Omega.back() = EvaluateBCHProduct(Eta, Omega.back());
 
     // transformed Hamiltonian H_s = exp(Omega) H_0 exp(-Omega)
     if ((Omega.size() + n_omega_written) < 2)
     {
-      FlowingOps[0] = BCH::BCH_Transform(*H_0, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
     }
     else
     {
-      FlowingOps[0] = BCH::BCH_Transform(H_saved, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
     }
 
     if (norm_eta < 1.0 and generator.GetType() == "shell-model-atan")
@@ -427,16 +489,16 @@ void IMSRGSolver::Solve_magnus_backoff()
 
     // accumulated generator (aka Magnus operator) exp(Omega) = exp(dOmega) *
     // exp(Omega_last)
-    Omega.back() = BCH::BCH_Product(Eta, Omega.back());
+    Omega.back() = EvaluateBCHProduct(Eta, Omega.back());
 
     // transformed Hamiltonian H_s = exp(Omega) H_0 exp(-Omega)
     if ((Omega.size() + n_omega_written) < 2)
     {
-      FlowingOps[0] = BCH::BCH_Transform(*H_0, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
     }
     else
     {
-      FlowingOps[0] = BCH::BCH_Transform(H_saved, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
     }
 
     //     if (norm_eta < 1.0 and generator.GetType() == "shell-model-atan") {
@@ -524,17 +586,17 @@ void IMSRGSolver::Solve_magnus_modified_euler()
 
     // accumulated generator (aka Magnus operator) exp(Omega) = exp(dOmega) * exp(Omega_last)
     //      Omega.back() = Eta.BCH_Product( Omega.back() );
-    Omega.back() = BCH::BCH_Product(Eta, Omega.back());
+    Omega.back() = EvaluateBCHProduct(Eta, Omega.back());
 
     if ((Omega.size() + n_omega_written) < 2)
     {
       //        FlowingOps[0] = H_0->BCH_Transform( Omega.back() );
-      FlowingOps[0] = BCH::BCH_Transform(*H_0, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
     }
     else
     {
       //        FlowingOps[0] = H_saved.BCH_Transform( Omega.back() );
-      FlowingOps[0] = BCH::BCH_Transform(H_saved, Omega.back());
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
     }
 
     //      generator.Update(&FlowingOps[0],&Eta);
@@ -588,9 +650,9 @@ void IMSRGSolver::Solve_flow_RK4()
     for (int i = 0; i < nops; i++)
     {
       if (i == 0)
-        K1[i] = Commutator::Commutator(Eta, FlowingOps[i] + goosetank_chi);
+        K1[i] = EvaluateCommutator(Eta, FlowingOps[i] + goosetank_chi);
       else
-        K1[i] = Commutator::Commutator(Eta, FlowingOps[i]);
+        K1[i] = EvaluateCommutator(Eta, FlowingOps[i]);
       Ktmp[i] = FlowingOps[i] + 0.5 * ds * K1[i];
     }
     //      Operator K1 = Commutator::Commutator( Eta, Hs );
@@ -602,9 +664,9 @@ void IMSRGSolver::Solve_flow_RK4()
     {
       //        K2[i] = Commutator::Commutator( Eta, FlowingOps[i]+Ktmp[i]);
       if (i == 0)
-        K2[i] = Commutator::Commutator(Eta, Ktmp[i] + goosetank_chi);
+        K2[i] = EvaluateCommutator(Eta, Ktmp[i] + goosetank_chi);
       else
-        K2[i] = Commutator::Commutator(Eta, Ktmp[i]);
+        K2[i] = EvaluateCommutator(Eta, Ktmp[i]);
       Ktmp[i] = FlowingOps[i] + 0.5 * ds * K2[i];
     }
     //      Operator K2 = Commutator::Commutator( Eta, Hs+Htmp );
@@ -616,9 +678,9 @@ void IMSRGSolver::Solve_flow_RK4()
     {
       //        K3[i] = Commutator::Commutator( Eta, FlowingOps[i]+Ktmp[i]);
       if (i == 0)
-        K3[i] = Commutator::Commutator(Eta, Ktmp[i] + goosetank_chi);
+        K3[i] = EvaluateCommutator(Eta, Ktmp[i] + goosetank_chi);
       else
-        K3[i] = Commutator::Commutator(Eta, Ktmp[i]);
+        K3[i] = EvaluateCommutator(Eta, Ktmp[i]);
       Ktmp[i] = FlowingOps[i] + 1.0 * ds * K3[i];
     }
     //      Operator K3 = Commutator::Commutator( Eta, Hs+Htmp );
@@ -630,9 +692,9 @@ void IMSRGSolver::Solve_flow_RK4()
     {
       //        K4[i] = Commutator::Commutator( Eta, FlowingOps[i]+Ktmp[i]);
       if (i == 0)
-        K4[i] = Commutator::Commutator(Eta, Ktmp[i] + goosetank_chi);
+        K4[i] = EvaluateCommutator(Eta, Ktmp[i] + goosetank_chi);
       else
-        K4[i] = Commutator::Commutator(Eta, Ktmp[i]);
+        K4[i] = EvaluateCommutator(Eta, Ktmp[i]);
       //        Ktmp[i] = FlowingOps[i] + 1.0*ds*K2[i];
       FlowingOps[i] += ds / 6.0 * (K1[i] + 2 * K2[i] + 2 * K3[i] + K4[i]);
     }
@@ -861,7 +923,7 @@ void IMSRGSolver::operator()(const std::deque<Operator> &x, std::deque<Operator>
     {
       for (size_t i = 0; i < x.size(); ++i)
       {
-        dxdt[i] = Commutator::Commutator(Eta, x[i]);
+        dxdt[i] = EvaluateCommutator(Eta, x[i]);
       }
     }
   }
@@ -878,16 +940,16 @@ void IMSRGSolver::operator()(const std::deque<Operator> &x, std::deque<Operator>
     auto &Omega_s = x.back();
     Operator &H_s = FlowingOps[0];
     if ((Omega.size() + n_omega_written) > 1)
-      H_s = BCH::BCH_Transform(H_saved, Omega_s);
+      H_s = EvaluateBCHTransform(H_saved, Omega_s);
     //       H_s = H_saved.BCH_Transform(Omega_s);
     else
-      H_s = BCH::BCH_Transform(*H_0, Omega_s);
+      H_s = EvaluateBCHTransform(*H_0, Omega_s);
     //       H_s = H_0->BCH_Transform(Omega_s);
     //     generator.Update(&H_s,&Eta);
     generator.Update(H_s, Eta);
     if (dxdt.size() < x.size())
       dxdt.resize(x.size());
-    dxdt.back() = Eta - 0.5 * Commutator::Commutator(Omega_s, Eta);
+    dxdt.back() = EvaluateMagnusDerivative(Omega_s, Eta);
   }
   else if (ode_mode == "Restored")
   {
@@ -931,21 +993,219 @@ void IMSRGSolver::operator()(const std::deque<Operator> &x, std::deque<Operator>
   WriteFlowStatus(std::cout);
 }
 
+/// Integrate the full Bernoulli Magnus ODE and reconstruct H(s) by BCH in
+/// every RHS evaluation. This follows Morris--Parzuchowski--Bogner,
+/// Phys. Rev. C 92, 034331 (2015), Eqs. (28),(30), and Vobig's TU Darmstadt
+/// dissertation (2020), Eq. (4.6.4) and Appendix B.2
+/// (urn:nbn:de:tuda-tuprints-113758).
+///
+/// Vobig used GSL RKF45. We reuse imsrg++'s Boost odeint infrastructure and
+/// use controlled Dormand--Prince 5(4): the same class of adaptive embedded
+/// 5(4) Runge--Kutta method, but not the same Butcher tableau. The public
+/// name "magnus_adaptive" and its selection as the MR production path are
+/// repository choices, not terminology prescribed by those references.
 void IMSRGSolver::Solve_ode_magnus()
 {
+  if (!(ds > 0.0) || !(ds_max > 0.0))
+    throw std::invalid_argument(
+        "magnus_adaptive requires positive ds and dsmax");
   ode_mode = "Omega";
+  istep = 0;
+  Elast = H_0->ZeroBody;
+  cumulative_error = 0.0;
+  magnus_series_step_rejections = 0;
+  magnus_series_segment_restarts = 0;
+  generator.Update(FlowingOps[0], Eta);
   WriteFlowStatus(std::cout);
   WriteFlowStatus(flowfile);
-  //   using namespace boost::numeric::odeint;
   namespace odeint = boost::numeric::odeint;
-  namespace pl = std::placeholders;
-  //   runge_kutta4<vector<Operator>, double, vector<Operator>, double, vector_space_algebra> stepper;
-  odeint::runge_kutta4<std::deque<Operator>, double, std::deque<Operator>, double, odeint::vector_space_algebra> stepper;
-  auto system = *this;
-  auto monitor = ode_monitor;
-  //   size_t steps = integrate_const(stepper, system, Omega, s, smax, ds, monitor);
-  odeint::integrate_const(stepper, system, Omega, s, smax, ds, monitor);
-  monitor.report();
+  using error_stepper = odeint::runge_kutta_dopri5<
+      std::deque<Operator>, double, std::deque<Operator>, double,
+      odeint::vector_space_algebra>;
+  auto controlled = odeint::make_controlled<error_stepper>(
+      ode_e_abs, ode_e_rel);
+
+  std::deque<Operator> state{Omega.back()};
+  double current_s = s;
+  double trial_step = std::min(ds, ds_max);
+  double rhs_s = current_s;
+  auto system = [this, &rhs_s](const std::deque<Operator>& x,
+                               std::deque<Operator>& dxdt,
+                               const double evaluation_s)
+  {
+    rhs_s = evaluation_s;
+    const Operator& omega = x.back();
+    if ((Omega.size() + n_omega_written) > 1)
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, omega);
+    else
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, omega);
+    generator.Update(FlowingOps[0], Eta);
+    if (dxdt.size() != 1)
+      dxdt.resize(1);
+    if (Eta.Norm() < eta_criterion)
+      dxdt.back() = 0.0 * Eta;
+    else
+      dxdt.back() = EvaluateMagnusDerivative(omega, Eta);
+  };
+
+  auto log_series_event = [this](const std::string& message)
+  {
+    std::cout << message << std::endl;
+    if (!flowfile.empty())
+    {
+      std::ofstream output(flowfile, std::ios::app);
+      output << message << '\n';
+    }
+  };
+  std::size_t consecutive_series_failures = 0;
+  std::size_t series_rejections_current_segment = 0;
+  constexpr std::size_t maximum_consecutive_series_failures = 64;
+  constexpr std::size_t series_rejections_before_segment_restart = 8;
+
+  while (current_s < smax)
+  {
+    Omega.back() = state.back();
+    if ((Omega.size() + n_omega_written) > 1)
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
+    else
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
+    generator.Update(FlowingOps[0], Eta);
+    if (Eta.Norm() < eta_criterion)
+      break;
+
+    trial_step = std::min({trial_step, ds_max, smax - current_s});
+    boost::numeric::odeint::controlled_step_result result;
+    try
+    {
+      result = controlled.try_step(system, state, current_s, trial_step);
+    }
+    catch (const BCH::MagnusSeriesError& error)
+    {
+      // try_step only overwrites its in/out state after an accepted step, but
+      // restore explicitly from the accepted segment state to make rejection
+      // semantics independent of that implementation detail.
+      state.back() = Omega.back();
+      current_s = s;
+      controlled.reset();
+      ++consecutive_series_failures;
+      if (consecutive_series_failures >
+          maximum_consecutive_series_failures)
+        throw std::runtime_error(
+            "magnus_adaptive exceeded the consecutive Magnus-series "
+            "failure limit");
+
+      const double stage_tolerance =
+          32.0 * std::numeric_limits<double>::epsilon() *
+          std::max(1.0, std::abs(current_s));
+      const bool failed_at_accepted_state =
+          std::abs(rhs_s - current_s) <= stage_tolerance;
+      std::ostringstream message;
+      message << "Magnus series rejected at s=" << std::setprecision(16)
+              << current_s << ", stage_s=" << rhs_s << ": "
+              << error.what();
+
+      if (failed_at_accepted_state)
+      {
+        if (Omega.back().Norm() <= 1e-12)
+          throw std::runtime_error(
+              message.str() +
+              "; the series fails at Omega=0 and cannot be recovered by "
+              "step reduction or segmentation");
+
+        // The accepted Omega itself is too large for a reliable Bernoulli
+        // derivative. Materialize that exact accepted transformation before
+        // NewOmega() resets the local segment, then retry at the same s.
+        if ((Omega.size() + n_omega_written) > 1)
+          FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
+        else
+          FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
+        generator.Update(FlowingOps[0], Eta);
+        NewOmega();
+        state.back() = Omega.back();
+        ++magnus_series_segment_restarts;
+        consecutive_series_failures = 0;
+        series_rejections_current_segment = 0;
+        trial_step = std::min(trial_step, ds_max);
+        message << "; materialized the accepted segment and restarted with "
+                   "Omega=0, trial ds="
+                << trial_step;
+      }
+      else
+      {
+        const double old_trial_step = trial_step;
+        trial_step *= 0.5;
+        const double minimum_trial_step =
+            32.0 * std::numeric_limits<double>::epsilon() *
+            std::max(1.0, std::abs(current_s));
+        if (!(trial_step > minimum_trial_step))
+          throw std::runtime_error(
+              message.str() + "; trial step reached the floating-point floor");
+        ++magnus_series_step_rejections;
+        ++series_rejections_current_segment;
+        message << "; rejected trial ds=" << old_trial_step
+                << " and reduced ds to " << trial_step;
+
+        // A state can satisfy Eq. (4.6.8) itself while every forward RK
+        // stage leaves the convergence domain. Repeatedly halving toward the
+        // floating-point floor cannot resolve that geometry. After a bounded
+        // number of genuine step-reduction attempts, materialize the exact
+        // accepted state and restart the local Magnus coordinate at zero.
+        if (series_rejections_current_segment >=
+                series_rejections_before_segment_restart &&
+            Omega.back().Norm() > 1e-12)
+        {
+          if ((Omega.size() + n_omega_written) > 1)
+            FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
+          else
+            FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
+          generator.Update(FlowingOps[0], Eta);
+          NewOmega();
+          state.back() = Omega.back();
+          ++magnus_series_segment_restarts;
+          consecutive_series_failures = 0;
+          series_rejections_current_segment = 0;
+          message << "; repeated stage failures reached the bounded retry "
+                     "limit, materialized the accepted segment, and "
+                     "restarted with Omega=0";
+        }
+        else
+        {
+          message << " and will retry from the unchanged accepted state";
+        }
+      }
+      log_series_event(message.str());
+      continue;
+    }
+    if (result != odeint::success)
+    {
+      state.back() = Omega.back();
+      current_s = s;
+      continue;
+    }
+
+    s = current_s;
+    ++istep;
+    consecutive_series_failures = 0;
+    Omega.back() = state.back();
+    if ((Omega.size() + n_omega_written) > 1)
+      FlowingOps[0] = EvaluateBCHTransform(H_saved, Omega.back());
+    else
+      FlowingOps[0] = EvaluateBCHTransform(*H_0, Omega.back());
+    generator.Update(FlowingOps[0], Eta);
+    WriteFlowStatus(flowfile);
+    WriteFlowStatus(std::cout);
+
+    if (Omega.back().Norm() > omega_norm_max && current_s < smax)
+    {
+      NewOmega();
+      state.back() = Omega.back();
+      series_rejections_current_segment = 0;
+      // A segment reset changes the meaning of the local state. Do not reuse
+      // Dormand--Prince's FSAL derivative from the previous segment.
+      controlled.reset();
+    }
+  }
+  ds = trial_step;
 }
 
 #endif
@@ -973,7 +1233,7 @@ Operator IMSRGSolver::InverseTransform(Operator &OpIn)
   {
     Operator negomega = -(*omega);
     //    OpOut = OpOut.BCH_Transform( negomega );
-    OpOut = BCH::BCH_Transform(OpOut, negomega);
+    OpOut = EvaluateBCHTransform(OpOut, negomega);
   }
   return OpOut;
 }
@@ -1010,7 +1270,7 @@ Operator IMSRGSolver::Transform_Partial(Operator &OpIn, int n)
       omega.ReadBinary(ifs);
       //     if (OpIn.GetJRank()>0) cout << "step " << i << endl;
       //     OpOut = OpOut.BCH_Transform( omega );
-      OpOut = BCH::BCH_Transform(OpOut, omega);
+      OpOut = EvaluateBCHTransform(OpOut, omega);
       std::cout << "norm of omega = " << omega.Norm() << std::endl;
       std::cout << " op zero body = " << OpOut.ZeroBody << std::endl;
       //     if (OpIn.GetJRank()>0)cout << "done" << endl;
@@ -1031,7 +1291,7 @@ Operator IMSRGSolver::Transform_Partial(Operator &OpIn, int n)
 //       
 //       Omega[i].ThreeBody.SetMode("pn");
 //    }
-    OpOut = BCH::BCH_Transform(OpOut, Omega[i]);
+    OpOut = EvaluateBCHTransform(OpOut, Omega[i]);
     //     if (OpIn.GetJRank()>0)cout << "done" << endl;
   }
 
@@ -1058,24 +1318,24 @@ Operator IMSRGSolver::Transform_Partial(Operator &&OpIn, int n)
       std::ifstream ifs(filename.str(), std::ios::binary);
       omega.ReadBinary(ifs);
       //     OpOut = OpOut.BCH_Transform( omega );
-      OpOut = BCH::BCH_Transform(OpOut, omega);
+      OpOut = EvaluateBCHTransform(OpOut, omega);
     }
   }
 
   for (size_t i = std::max(n - n_omega_written, 0); i < Omega.size(); ++i)
   {
     //    OpOut = OpOut.BCH_Transform( Omega[i] );
-    OpOut = BCH::BCH_Transform(OpOut, Omega[i]);
+    OpOut = EvaluateBCHTransform(OpOut, Omega[i]);
   }
   return OpOut;
 }
 
 // count number of equations to be solved
-int IMSRGSolver::GetSystemDimension()
+size_t IMSRGSolver::GetSystemDimension()
 {
-  int dim = 1; // zero-body part
+  size_t dim = 1; // zero-body part
 
-  int N = H_0->OneBody.n_cols;
+  size_t N = H_0->OneBody.n_cols;
   dim += N * (N + 1) / 2;
   dim += H_0->TwoBody.Dimension();
   return dim;
@@ -1178,7 +1438,7 @@ double IMSRGSolver::CalculatePerturbativeTriples()
   // If we've split the Omegas up, we combine them here, implicitly summing the 3N generated by each.
   Operator omega = Omega[0];
 //  for (size_t n=1; n<Omega.size(); n++) omega += Omega[n];
-  for (size_t n=1; n<Omega.size(); n++) omega = BCH::BCH_Product(omega,Omega[n]);
+  for (size_t n=1; n<Omega.size(); n++) omega = EvaluateBCHProduct(omega,Omega[n]);
 
   Operator &Hs = FlowingOps[0];
 
@@ -1221,7 +1481,7 @@ double IMSRGSolver::CalculatePerturbativeTriples(Operator &Op_0)
   // If we've split the Omegas up, we combine them here, implicitly summing the 3N generated by each.
   Operator omega = Omega[0];
 //  for (size_t n=1; n<Omega.size(); n++) omega += Omega[n];
-  for (size_t n=1; n<Omega.size(); n++) omega = BCH::BCH_Product(omega,Omega[n]);
+  for (size_t n=1; n<Omega.size(); n++) omega = EvaluateBCHProduct(omega,Omega[n]);
 
   Operator &Hs = FlowingOps[0];
 

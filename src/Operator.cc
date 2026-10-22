@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <deque>
 #include <array>
+#include <stdexcept>
 #include <gsl/gsl_math.h>
 #include <math.h>
 #include "omp.h"
@@ -22,6 +23,91 @@
 //===================================================================================
 //  START IMPLEMENTATION OF OPERATOR METHODS
 //===================================================================================
+
+Operator Operator::TransformOneAndTwoBody(const arma::mat& C,
+                                          double validation_tolerance) const
+{
+  if (modelspace == nullptr)
+    throw std::invalid_argument("basis transformation requires an Operator ModelSpace");
+  if (validation_tolerance <= 0.0)
+    throw std::invalid_argument("basis-transformation tolerance must be positive");
+  if (!IsNumberConserving())
+    throw std::invalid_argument("basis transformation currently supports number-conserving operators only");
+  if (GetParticleRank() > 2)
+    throw std::invalid_argument("basis transformation currently supports NN/NO2B operators only");
+
+  const arma::uword norbits = modelspace->GetNumberOrbits();
+  if (C.n_rows != norbits || C.n_cols != norbits)
+    throw std::invalid_argument("basis-transformation matrix dimension does not match ModelSpace");
+  const arma::mat identity = arma::eye<arma::mat>(norbits, norbits);
+  if (arma::norm(C.t() * C - identity, "inf") > validation_tolerance)
+    throw std::invalid_argument("basis-transformation matrix is not orthogonal");
+
+  // A scalar spherical basis transformation may mix radial orbitals, but not
+  // l, j, or tz channels.  Enforcing this here prevents a formally valid dense
+  // matrix multiplication from silently invalidating the J-coupled storage.
+  for (index_t old_orbit : modelspace->all_orbits)
+  {
+    const Orbit& old_label = modelspace->GetOrbit(old_orbit);
+    for (index_t new_orbit : modelspace->all_orbits)
+    {
+      if (std::abs(C(old_orbit, new_orbit)) <= validation_tolerance)
+        continue;
+      const Orbit& new_label = modelspace->GetOrbit(new_orbit);
+      if (old_label.l != new_label.l || old_label.j2 != new_label.j2 ||
+          old_label.tz2 != new_label.tz2)
+        throw std::invalid_argument("basis transformation mixes different spherical one-body channels");
+    }
+  }
+
+  Operator transformed(*this);
+  transformed.OneBody = C.t() * OneBody * C;
+  if (GetParticleRank() < 2)
+    return transformed;
+
+  // D(old pair,new pair) in the normalized antisymmetric pair basis.  This is
+  // the same convention and phase as HartreeFock::TransformToHFBasis() and
+  // HFMBPT::{TransformHOToNATBasis,TransformHFToNATBasis}().
+  auto pair_transformation = [&](int channel_index)
+  {
+    TwoBodyChannel& channel = modelspace->GetTwoBodyChannel(channel_index);
+    const int npairs = channel.GetNumberKets();
+    arma::mat D(npairs, npairs, arma::fill::zeros);
+    for (int i = 0; i < npairs; ++i)
+    {
+      Ket& old_pair = channel.GetKet(i);
+      for (int j = 0; j < npairs; ++j)
+      {
+        Ket& new_pair = channel.GetKet(j);
+        double value = C(old_pair.p, new_pair.p) * C(old_pair.q, new_pair.q);
+        if (old_pair.p != old_pair.q)
+          value += C(old_pair.q, new_pair.p) * C(old_pair.p, new_pair.q) *
+                   old_pair.Phase(channel.J);
+        if (old_pair.p == old_pair.q)
+          value *= PhysConst::SQRT2;
+        if (new_pair.p == new_pair.q)
+          value /= PhysConst::SQRT2;
+        D(i, j) = value;
+      }
+    }
+    return D;
+  };
+
+  std::map<int, arma::mat> pair_transformations;
+  for (const auto& matrix_element : TwoBody.MatEl)
+  {
+    const int ch_bra = matrix_element.first[0];
+    const int ch_ket = matrix_element.first[1];
+    if (pair_transformations.count(ch_bra) == 0)
+      pair_transformations.emplace(ch_bra, pair_transformation(ch_bra));
+    if (pair_transformations.count(ch_ket) == 0)
+      pair_transformations.emplace(ch_ket, pair_transformation(ch_ket));
+    transformed.TwoBody.GetMatrix(ch_bra, ch_ket) =
+        pair_transformations.at(ch_bra).t() * matrix_element.second *
+        pair_transformations.at(ch_ket);
+  }
+  return transformed;
+}
 //===================================================================================
 
 // double  Operator::bch_transform_threshold = 1e-6;

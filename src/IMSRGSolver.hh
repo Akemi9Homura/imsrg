@@ -27,6 +27,7 @@
 #include "Operator.hh"
 #include "Generator.hh"
 #include "IMSRGProfiler.hh"
+#include "MRReference.hh"
 #include "ReadWrite.hh"
 
 //using namespace std;
@@ -38,9 +39,9 @@ class IMSRGSolver
   public:
 
 //  private:
-  ModelSpace* modelspace;
+  ModelSpace* modelspace = nullptr;
 //  ReadWrite* rw;
-  Operator* H_0; 
+  Operator* H_0 = nullptr;
   std::deque<Operator> FlowingOps;
   Operator H_saved;
   Operator Eta;
@@ -63,6 +64,9 @@ class IMSRGSolver
   bool magnus_adaptive;
   bool hunter_gatherer;
   bool perturbative_triples;
+  const MRReference* mr_reference = nullptr;
+  std::size_t magnus_series_step_rejections = 0;
+  std::size_t magnus_series_segment_restarts = 0;
 
   double Elast;
   double cumulative_error;
@@ -110,6 +114,14 @@ class IMSRGSolver
   void SetOmega(size_t i, Operator& om);
   size_t GetOmegaSize(){return Omega.size();};
   int GetNOmegaWritten(){return n_omega_written;};
+  std::size_t GetMagnusSeriesStepRejections() const
+  {
+    return magnus_series_step_rejections;
+  }
+  std::size_t GetMagnusSeriesSegmentRestarts() const
+  {
+    return magnus_series_segment_restarts;
+  }
   Operator Transform_Partial(Operator& OpIn, int n);
   Operator Transform_Partial(Operator&& OpIn, int n);
 
@@ -126,8 +138,18 @@ class IMSRGSolver
   void SetMagnusAdaptive(bool b=true){magnus_adaptive = b;};
   void SetHunterGatherer(bool b=true){hunter_gatherer = b;};
   void SetPerturbativeTriples(bool b=true){perturbative_triples = b;};
+  void SetMRReference(const MRReference& reference);
+  void ClearMRReference(){mr_reference = nullptr;};
+  bool HasMRReference() const {return mr_reference != nullptr;};
+  Operator EvaluateCommutator(const Operator& X, const Operator& Y) const;
+  Operator EvaluateBCHTransform(const Operator& initial,
+                                const Operator& omega) const;
+  Operator EvaluateBCHProduct(Operator& d_omega, Operator& omega) const;
+  Operator EvaluateMagnusDerivative(const Operator& omega,
+                                     const Operator& eta,
+                                     double relative_threshold = 1e-2) const;
 
-  int GetSystemDimension();
+  size_t GetSystemDimension();
   double GetS(){return s;};
   Operator& GetH_s(){return FlowingOps[0];};
   void SetH_s( Operator& Hset){ FlowingOps[0] = Hset;};
@@ -214,4 +236,3 @@ class IMSRGSolver
 
 
 #endif
-

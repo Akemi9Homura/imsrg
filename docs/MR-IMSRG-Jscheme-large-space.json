@@ -1,0 +1,1253 @@
+{
+  "schema": "mrimsrg_jscheme_large_space_acceptance_v15",
+  "implementation_commit": "460a009dff957cd261da429c0e474ac3767c59f5",
+  "baseline_profiler_commit": "1f02961a2c8ab9560ece346284ab4dd2d7a25337",
+  "shell_model_obs_commit": "4b10afab0218711b0278ef66ad73e88bc7791c34",
+  "host": "DESKTOP-EIV63LR",
+  "cpu": "13th Gen Intel(R) Core(TM) i5-13400F",
+  "case": {
+    "nucleus": "He4",
+    "nrefmax": 2,
+    "reference_definition": "validated emax2 Nrefmax=2 NCSM reference embedded with zero added occupations/lambda2 and identity added NAT block",
+    "hw_mev": 20.0,
+    "emax": 4,
+    "e2max": 8,
+    "interaction": "/home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax4_e2max8.minipack",
+    "interaction_sha256": "d3dff5faa2a58d8c234914170caffa3649d0cd3805a1344818f4f4d3c37fd19e",
+    "j_orbits": 30,
+    "j_channels": 60,
+    "jcoupled64_tbme_records": 34320,
+    "reference_bytes": 558748,
+    "bare_jcoupled64_bytes": 965220,
+    "flowed_jcoupled64_bytes": 965220,
+    "initial_zero_body_mev": -17.01349079857194,
+    "short_flow": {
+      "method": "fixed-step RK4",
+      "smax": 0.0001,
+      "step": 0.0001,
+      "rhs_evaluations": 4,
+      "final_zero_body_mev": -17.015850996230,
+      "final_h_norm_mev": 2839.610622073,
+      "export_zero_body_consistency_mev": 0.0
+    },
+    "flow_command": "OMP_NUM_THREADS=<1|64> OPENBLAS_NUM_THREADS=<1|64> build/src/imsrg++ 2bme=<He4-bare.jcoupled64> fmt2=jcoupled64 3bme=none reference=He4 valence_space=He4 A=4 hw=20 emax=4 basis=oscillator method=flow_RK4 core_generator=white-ncsm mr_reference_file=<He4-emax4.jref> smax=0.0001 ds_0=0.0001 dsmax=0.0001 eta_criterion=0 BetaCM=0 nucleon_mass_correction=false write_H_jcoupled64=<output.jcoupled64>"
+  },
+  "input_bridges": {
+    "embedded_reference_roundtrip": {
+      "maximum_contraction_violation": 1.8492152253912764e-15,
+      "maximum_hermiticity_violation": 0.0
+    },
+    "minipack_to_jcoupled64": {
+      "uses_dense_mscheme": false,
+      "roundtrip_max_abs_mev": 0.0,
+      "command": "prototype/mrimsrg/build-current/mrimsrg_minipack_to_j64 --interaction /home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax4_e2max8.minipack --output <He4-bare.jcoupled64> --A 4"
+    }
+  },
+  "single_thread_baseline": {
+    "omp_num_threads": 1,
+    "openblas_num_threads": 1,
+    "wall_seconds": 1.37070,
+    "maximum_rss_kib": 54360,
+    "profiler_seconds": {
+      "mr_comm221_lambda2_setup": 0.00655,
+      "mr_comm221_lambda2_iv": 0.00889,
+      "mr_comm221_lambda2_v": 0.62826,
+      "mr_comm221_lambda2_vi": 0.49227,
+      "mr_comm221_lambda2_total": 1.13605,
+      "mr_lambda2_commutator_addons": 1.13638,
+      "existing_sr_commutator": 0.04881,
+      "generator_update": 0.10457
+    }
+  },
+  "single_thread_after_vi_factorization": {
+    "omp_num_threads": 1,
+    "openblas_num_threads": 1,
+    "wall_seconds": 0.88348,
+    "maximum_rss_kib": 54596,
+    "output_max_abs_vs_baseline_mev": 0.0,
+    "profiler_seconds": {
+      "mr_comm221_lambda2_setup": 0.00656,
+      "mr_comm221_lambda2_iv": 0.00868,
+      "mr_comm221_lambda2_v": 0.61618,
+      "mr_comm221_lambda2_vi": 0.02206,
+      "mr_comm221_lambda2_vi_trace": 0.00284,
+      "mr_comm221_lambda2_total": 0.65354,
+      "mr_lambda2_commutator_addons": 0.65384,
+      "existing_sr_commutator": 0.04564,
+      "generator_update": 0.10650
+    },
+    "vi_speedup": 22.315049864007253,
+    "whole_short_flow_speedup": 1.5514782451215647
+  },
+  "single_thread_after_v_pandya_reuse": {
+    "omp_num_threads": 1,
+    "openblas_num_threads": 1,
+    "wall_seconds": 0.60232,
+    "maximum_rss_kib": 54708,
+    "output_max_abs_vs_baseline_mev": 0.0,
+    "profiler_seconds": {
+      "mr_comm221_lambda2_setup": 0.00643,
+      "mr_comm221_lambda2_iv": 0.00842,
+      "mr_comm221_lambda2_v": 0.33186,
+      "mr_comm221_lambda2_v_build": 0.28199,
+      "mr_comm221_lambda2_v_blas": 0.04633,
+      "mr_comm221_lambda2_v_partial_trace": 0.00292,
+      "mr_comm221_lambda2_vi": 0.02366,
+      "mr_comm221_lambda2_vi_trace": 0.00285,
+      "mr_comm221_lambda2_total": 0.37043,
+      "mr_lambda2_commutator_addons": 0.37074,
+      "existing_sr_commutator": 0.04570,
+      "generator_update": 0.10882
+    },
+    "v_speedup_vs_after_vi": 1.856738409597878,
+    "whole_short_flow_speedup_vs_baseline": 2.275872226664017
+  },
+  "single_thread_after_lambda_active_support": {
+    "implementation_commit": "cef4fce6d94132c20d0dce939297b45041f7645a",
+    "omp_num_threads": 1,
+    "openblas_num_threads": 1,
+    "wall_seconds": 0.40846,
+    "maximum_rss_kib": 54532,
+    "support_definition": "exact union of spherical orbits present in nonzero standard-coupled lambda2 elements; no numerical threshold",
+    "output_bitwise_equal_to_previous": true,
+    "profiler_seconds": {
+      "mr_comm221_lambda2_setup": 0.00618,
+      "mr_comm221_lambda2_iv": 0.00827,
+      "mr_comm221_lambda2_v": 0.14725,
+      "mr_comm221_lambda2_v_build": 0.13835,
+      "mr_comm221_lambda2_v_blas": 0.00656,
+      "mr_comm221_lambda2_v_partial_trace": 0.00179,
+      "mr_comm221_lambda2_vi": 0.02237,
+      "mr_comm221_lambda2_vi_trace": 0.00291,
+      "mr_comm221_lambda2_total": 0.18413,
+      "mr_lambda2_commutator_addons": 0.18446,
+      "existing_sr_commutator": 0.04488,
+      "generator_update": 0.10467
+    },
+    "v_speedup_vs_pandya_reuse": 2.253718166383701,
+    "whole_short_flow_speedup_vs_pandya_reuse": 1.474611957107183,
+    "whole_short_flow_speedup_vs_baseline": 3.3557753513195907
+  },
+  "single_thread_after_skinny_pandya_build": {
+    "implementation_commit": "dea9125bb734b195c2237d6b96ab96c4e42042db",
+    "omp_num_threads": 1,
+    "openblas_num_threads": 1,
+    "wall_seconds": 0.31187,
+    "maximum_rss_kib": 54200,
+    "output_bitwise_equal_to_previous": true,
+    "profiler_seconds": {
+      "mr_comm221_lambda2_setup": 0.00626,
+      "mr_comm221_lambda2_iv": 0.00843,
+      "mr_comm221_lambda2_v": 0.04127,
+      "mr_comm221_lambda2_v_build": 0.03444,
+      "mr_comm221_lambda2_v_blas": 0.00486,
+      "mr_comm221_lambda2_v_partial_trace": 0.00154,
+      "mr_comm221_lambda2_vi": 0.02265,
+      "mr_comm221_lambda2_vi_trace": 0.00264,
+      "mr_comm221_lambda2_total": 0.07872,
+      "mr_lambda2_commutator_addons": 0.07901,
+      "existing_sr_commutator": 0.04528,
+      "generator_update": 0.11116
+    },
+    "v_speedup_vs_active_support": 3.567967046280591,
+    "whole_short_flow_speedup_vs_active_support": 1.3097123801583994,
+    "whole_short_flow_speedup_vs_baseline": 4.39510052265367
+  },
+  "single_thread_after_white_ncsm_monopole_cache": {
+    "implementation_commit": "6e02676ce00e237efdbf6cb71df9315f7c576143",
+    "omp_num_threads": 1,
+    "openblas_num_threads": 1,
+    "wall_seconds": 0.22238,
+    "maximum_rss_kib": 54836,
+    "output_bitwise_equal_to_previous": true,
+    "profiler_seconds": {
+      "mr_comm221_lambda2_total": 0.09118,
+      "mr_lambda2_commutator_addons": 0.09151,
+      "existing_sr_commutator": 0.04907,
+      "generator_update": 0.00324,
+      "white_ncsm_monopole_cache": 0.00049
+    },
+    "generator_speedup_vs_skinny_pandya_build": 34.30864197530864,
+    "whole_short_flow_speedup_vs_skinny_pandya_build": 1.4024192823095603
+  },
+  "thread_reproducibility": {
+    "compared_threads": [1, 64],
+    "thread64_wall_seconds": 1.10230,
+    "thread64_reported_rss_mb": 80.562,
+    "zero_body_max_abs_mev": 0.0,
+    "one_body_max_abs_mev": 0.0,
+    "two_body_max_abs_mev": 4.440892098500626e-16,
+    "passed": true,
+    "note": "64 threads remain slower for this small emax4 short flow; a bounded single-block OpenMP experiment did not improve V and was reverted"
+  },
+  "emax6_gate": {
+    "implementation_commit": "dcc47f1ab825033bdedef8dbf1c9509a52018539",
+    "nucleus": "He4",
+    "nrefmax": 2,
+    "reference_definition": "validated emax2 Nrefmax=2 NCSM reference embedded with zero added occupations/lambda2 and identity added NAT block",
+    "parent_interaction": "/home/mengziyan/Forces/N2LO_opt/step1/TwBME_N2LO_opt_bare_hw20_emax14_e2max28.minipack",
+    "parent_interaction_sha256": "118c4c27ab7e2b1f3ae8df8ea24beb2784df681dd286bdb3ae5f42dbe09b9d7d",
+    "interaction": "/home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax6_e2max12.minipack",
+    "interaction_sha256": "199d5a7a3e060427582d112bd2ab36688db199629ddebb6e097a4676980b913b",
+    "interaction_bytes": 4371048,
+    "interaction_parent_subset_max_abs_A4_mev": 0.0,
+    "interaction_parent_subset_max_abs_A16_mev": 0.0,
+    "rejected_candidate_sha256": "ea5aa61aefb572a11d00389e5d12cf158aab6c19afa35682856323fbefc83571",
+    "rejected_candidate_max_abs_mev": 3.814697265625e-06,
+    "hw_mev": 20.0,
+    "emax": 6,
+    "e2max": 12,
+    "j_orbits": 56,
+    "j_channels": 84,
+    "jcoupled64_tbme_records": 467032,
+    "reference_bytes": 7501332,
+    "bare_jcoupled64_bytes": 13090620,
+    "flowed_jcoupled64_bytes": 13090620,
+    "reference_maximum_contraction_violation": 1.8492152253912764e-15,
+    "reference_maximum_hermiticity_violation": 0.0,
+    "short_flow": {
+      "method": "fixed-step RK4",
+      "smax": 0.0001,
+      "step": 0.0001,
+      "rhs_evaluations": 4,
+      "initial_zero_body_mev": -17.0135029683,
+      "final_zero_body_mev": -17.016801664428,
+      "final_h_norm_mev": 10983.182992216,
+      "export_zero_body_consistency_mev": 0.0
+    },
+    "single_thread": {
+      "wall_seconds": 11.70,
+      "maximum_rss_kib": 281132,
+      "profiler_seconds": {
+        "mr_comm221_lambda2_setup": 0.25535,
+        "mr_comm221_lambda2_iv": 0.05588,
+        "mr_comm221_lambda2_v": 7.75061,
+        "mr_comm221_lambda2_v_build": 5.85507,
+        "mr_comm221_lambda2_v_blas": 1.87293,
+        "mr_comm221_lambda2_v_partial_trace": 0.01706,
+        "mr_comm221_lambda2_vi": 0.23092,
+        "mr_comm221_lambda2_vi_trace": 0.02224,
+        "mr_comm221_lambda2_total": 8.29293,
+        "mr_lambda2_commutator_addons": 8.29651,
+        "existing_sr_commutator": 0.59551,
+        "generator_update": 2.18994
+      }
+    },
+    "single_thread_after_lambda_active_support": {
+      "implementation_commit": "cef4fce6d94132c20d0dce939297b45041f7645a",
+      "wall_seconds": 6.81,
+      "maximum_rss_kib": 280880,
+      "output_bitwise_equal_to_previous": true,
+      "profiler_seconds": {
+        "mr_comm221_lambda2_setup": 0.25213,
+        "mr_comm221_lambda2_iv": 0.05507,
+        "mr_comm221_lambda2_v": 2.85127,
+        "mr_comm221_lambda2_v_build": 2.76455,
+        "mr_comm221_lambda2_v_blas": 0.07208,
+        "mr_comm221_lambda2_v_partial_trace": 0.00744,
+        "mr_comm221_lambda2_vi": 0.23404,
+        "mr_comm221_lambda2_vi_trace": 0.02272,
+        "mr_comm221_lambda2_total": 3.39270,
+        "mr_lambda2_commutator_addons": 3.39644,
+        "existing_sr_commutator": 0.60095,
+        "generator_update": 2.19426
+      },
+      "v_speedup": 2.718300967638982,
+      "v_build_speedup": 2.117910690709157,
+      "v_blas_speedup": 25.984045504994448,
+      "whole_short_flow_speedup": 1.7180616740088106
+    },
+    "single_thread_after_skinny_pandya_build": {
+      "implementation_commit": "dea9125bb734b195c2237d6b96ab96c4e42042db",
+      "wall_seconds": 4.15,
+      "maximum_rss_kib": 281244,
+      "output_bitwise_equal_to_previous": true,
+      "profiler_seconds": {
+        "mr_comm221_lambda2_setup": 0.25217,
+        "mr_comm221_lambda2_iv": 0.05714,
+        "mr_comm221_lambda2_v": 0.17009,
+        "mr_comm221_lambda2_v_build": 0.11056,
+        "mr_comm221_lambda2_v_blas": 0.04772,
+        "mr_comm221_lambda2_v_partial_trace": 0.00614,
+        "mr_comm221_lambda2_vi": 0.23371,
+        "mr_comm221_lambda2_vi_trace": 0.02233,
+        "mr_comm221_lambda2_total": 0.71329,
+        "mr_lambda2_commutator_addons": 0.71716,
+        "existing_sr_commutator": 0.61893,
+        "generator_update": 2.19142
+      },
+      "v_speedup_vs_active_support": 16.763301781409844,
+      "v_build_speedup_vs_active_support": 25.004974674384947,
+      "whole_short_flow_speedup_vs_active_support": 1.6409638554216865
+    },
+    "single_thread_after_white_ncsm_monopole_cache": {
+      "implementation_commit": "6e02676ce00e237efdbf6cb71df9315f7c576143",
+      "wall_seconds": 1.97885,
+      "maximum_rss_kib": 281204,
+      "output_bitwise_equal_to_previous": true,
+      "profiler_seconds": {
+        "mr_comm221_lambda2_total": 0.72069,
+        "mr_lambda2_commutator_addons": 0.72469,
+        "existing_sr_commutator": 0.61142,
+        "generator_update": 0.04257,
+        "white_ncsm_monopole_cache": 0.00278
+      },
+      "generator_speedup_vs_skinny_pandya_build": 51.4780361757106,
+      "whole_short_flow_speedup_vs_skinny_pandya_build": 2.0971776536877482
+    },
+    "thread_reproducibility": {
+      "compared_threads": [1, 64],
+      "thread64_wall_seconds": 14.20,
+      "thread64_maximum_rss_kib": 422324,
+      "zero_body_max_abs_mev": 0.0,
+      "one_body_max_abs_mev": 0.0,
+      "two_body_max_abs_mev": 8.881784197001252e-16,
+      "passed": true,
+      "note": "64 threads oversubscribe the 10-core development host and do not constitute a speedup result"
+    },
+    "dense_mscheme_hamiltonian_constructed": false,
+    "full_emax6_flow_claimed": false
+  },
+  "emax6_finite_s_pilot": {
+    "status": "maximum_feasible_nmax_proxy_passed_exact_full_space_not_tested",
+    "nucleus": "He4",
+    "nrefmax": 2,
+    "reference_definition": "validated emax2 Nrefmax=2 NCSM reference embedded in emax6; added occupations and lambda2 are zero and the added NAT block is the identity",
+    "interaction_sha256": "199d5a7a3e060427582d112bd2ab36688db199629ddebb6e097a4676980b913b",
+    "input_jcoupled64_sha256": "c9fe9aa915b2021e2273092809b40e3e33a86ea891c4d4673710e5c74dd78776",
+    "reference_sha256": "4d61bca6fee4255b287d71a62ba761e914b2c51852fadafb457884745ce6482a",
+    "flow": {
+      "job": 100432,
+      "repository_commit_recorded_by_generator": "c07645cea9455e189868332565d332905785b9e7",
+      "executable_sha256": "ec23d40cae0171908edc2539abcab2d05d1759a47b9b357333628e51d8d50aac",
+      "shared_library_sha256": "c7eb668df585e96c29b0c7e659288ef16cbeecefcf358d9d390399488261927b",
+      "environment_script_sha256": "a7bf1fd3710323c472158a38e049660502fa7cd2b48ca35b39e927688b65f471",
+      "method": "direct adaptive ODE",
+      "generator": "white-ncsm",
+      "cumulative_start_s": 0.0,
+      "cumulative_target_s": 0.02,
+      "ode_tolerance": 1e-9,
+      "eta_criterion": 1e-6,
+      "scalar_commutators": 25,
+      "wall_seconds": 10.48084,
+      "maximum_rss_mb": 886.555,
+      "initial_mr_zero_body_mev": -17.0135029683,
+      "final_mr_zero_body_mev": -17.647652206934,
+      "initial_h_norm_mev": 10983.183256021,
+      "final_h_norm_mev": 10983.131266136,
+      "initial_eta_one_body_norm": 0.174704917,
+      "initial_eta_two_body_norm": 1.184367907,
+      "initial_eta_norm": 1.197183840166387,
+      "final_eta_one_body_norm": 0.168573392,
+      "final_eta_two_body_norm": 1.138064530,
+      "final_eta_norm": 1.1504815787028086,
+      "eta_norm_ratio_to_initial": 0.9609898998828053,
+      "strict_eta_target_reached": false,
+      "export_zero_body_consistency_mev": 0.0,
+      "jcoupled64_sha256": "7d85afb66797f066c536d5e563ff2210ef60630f91206d1eb3f9beb6af786e60",
+      "no2bpack_sha256": "055529426538a0d64a4a472b1706aeea679e37f944f3ce562bc35e1d4968e6ee",
+      "completed_normally": true
+    },
+    "ode_tolerance_gate": {
+      "tight_job": 100434,
+      "compared_tolerances": [1e-9, 1e-10],
+      "tight_wall_seconds": 10.59893,
+      "tight_maximum_rss_mb": 886.730,
+      "tight_jcoupled64_sha256": "0f1b50baa84233e6f03c237ff9b1376aed2f57bc706795dc03c66661c542093b",
+      "tight_no2bpack_sha256": "4a5219e6dc147d96e7cbe1d823196a2a9d26ab04fff415613acf861e867d584a",
+      "jcoupled64_max_abs_mev": {
+        "zero_body": 1.1812772982011666e-13,
+        "one_body": 1.1254192022747131e-13,
+        "two_body": 4.156675004196586e-13
+      },
+      "nmax8_tight_lowest_three_mev": [
+        -26.274719477423861,
+        -24.644862164914279,
+        -24.568058723542215
+      ],
+      "maximum_ncsm_energy_abs_kev": 1.2e-10,
+      "target_kev": 1.0,
+      "passed": true
+    },
+    "format_gate": {
+      "bare_no2bpack_sha256": "9e0a4ff620f6421fbf027a14c7df15a3dd021e6008bd0f61d63853f5df56fca0",
+      "production_no2bpack_sha256": "055529426538a0d64a4a472b1706aeea679e37f944f3ce562bc35e1d4968e6ee",
+      "independent_exporter_no2bpack_sha256": "037dff8c77637769af287be24d6f123fd587ab650a9bb1ca5337d12a4781aa38",
+      "production_and_independent_bytes_identical": false,
+      "nmax8_lowest_three_spectra_identical_within_printed_double_precision": true,
+      "interpretation": "byte equality is not claimed; the independent write paths reproduce the same tested Nmax8 low spectrum after NCSM readback",
+      "passed": true
+    },
+    "ncsm_readback": {
+      "executable_sha256": "94e3a43364026f0827725c77ba960d910ae5de820412ff7f0593ad70519c24c0",
+      "environment_script_sha256": "a7bf1fd3710323c472158a38e049660502fa7cd2b48ca35b39e927688b65f471",
+      "m_orbits": 336,
+      "basis_dimensions": {
+        "Nmax2": 59,
+        "Nmax4": 952,
+        "Nmax6": 7916,
+        "Nmax8": 44350,
+        "Nmax10": 183866
+      },
+      "lowest_three_mev": {
+        "s0": {
+          "Nmax2": [-17.013502881259512, -13.761246467855941, -13.761246401684351],
+          "Nmax4": [-22.36179373346409, -17.013503365606475, -17.01350330063476],
+          "Nmax6": [-24.709626730047656, -22.361794426919182, -22.361794354140788],
+          "Nmax8": [-26.172002205647026, -24.58842893251818, -24.518402577919915],
+          "Nmax10": [-26.790750085985497, -25.724162227169941, -25.685500172685412]
+        },
+        "s0.02": {
+          "Nmax2": [-17.64989570260116, -13.968772994597295, -13.966632777151661],
+          "Nmax4": [-22.710357794851848, -17.189905744161859, -17.189883358403964],
+          "Nmax6": [-24.902818276284233, -22.461091855718426, -22.455373576790695],
+          "Nmax8": [-26.274719477423741, -24.64486216491418, -24.56805872354213],
+          "Nmax10": [-26.860681522445383, -25.759991076790971, -25.716247291042066]
+        }
+      },
+      "two_j": {
+        "s0_Nmax10": [0, 4, 0],
+        "s0.02_Nmax10": [0, 4, 0]
+      },
+      "nmax10_jobs": {
+        "s0": {
+          "job": 100441,
+          "repository_commit": "48453e4feaa4144d41b34610e1d2a96febadcb06",
+          "script_sha256": "9b984c1ffbd0a0ad768469c5cb3f5f02fbfe129e6f860c832989b9c37f323742",
+          "log_sha256": "71cdd41e1edc856d6e9ad98f472953bec85554c8f804ee80ca2ae5bcc546b7b6",
+          "wall_seconds": 174,
+          "maximum_rss_kib": 448636,
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        },
+        "s0.02": {
+          "job": 100442,
+          "repository_commit": "48453e4feaa4144d41b34610e1d2a96febadcb06",
+          "script_sha256": "829e19250fe8c6b718a6818b5987971d8a14a9ca8105def94b66e99b3b9c273d",
+          "log_sha256": "3736589a262a5c4a7a29b1ed48ee132c9d374d136e7b7238c7e879358b595de3",
+          "wall_seconds": 175,
+          "maximum_rss_kib": 449508,
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        }
+      }
+    },
+    "maximum_feasible_nmax_proxy": {
+      "maximum_tested_nmax": 10,
+      "full_emax6_space_nmax": 24,
+      "full_space_run": false,
+      "adjacent_ground_state_gap_mev": {
+        "s0": [5.348290852204578, 2.347832996583566, 1.462375475599369, 0.618747880338471],
+        "s0.02": [5.060462092250688, 2.192460481432384, 1.371901201139508, 0.585962045021642]
+      },
+      "adjacent_gap_improvement_kev": [
+        287.828759953889,
+        155.372515151182,
+        90.474274459861,
+        32.785835316830
+      ],
+      "flow_minus_bare_ground_state_kev": {
+        "Nmax2": -636.392821341648,
+        "Nmax4": -348.564061387759,
+        "Nmax6": -193.191546236577,
+        "Nmax8": -102.717271776715,
+        "Nmax10": -69.931436459886
+      },
+      "requirements": {
+        "each_adjacent_gap_must_not_worsen": true,
+        "maximum_abs_flow_minus_bare_at_largest_nmax_kev": 100.0
+      },
+      "each_adjacent_gap_improved": true,
+      "largest_nmax_abs_flow_minus_bare_kev": 69.931436459886,
+      "passed": true,
+      "claim_limit": "highest-feasible-Nmax pilot only; no emax6 full-space drift or exact prototype_downstream_stability_v1 pass is claimed"
+    }
+  },
+  "direct_flow_restart": {
+    "workflow_commit": "fee05bdf39d1dea355d2b7119ef979aa80cf2722",
+    "nucleus": "He4",
+    "nrefmax": 2,
+    "method": "flow",
+    "generator": "white-ncsm",
+    "continuous_interval": [0.0, 0.02],
+    "split_intervals": [[0.0, 0.01], [0.01, 0.02]],
+    "ds_0": 0.001,
+    "dsmax": 0.01,
+    "ode_tolerance": 1e-10,
+    "eta_criterion": 1e-12,
+    "restart_definition": "materialize vacuum J64 in HO order, then re-enter the same HO-to-NAT, MR normal-ordering and autonomous direct-flow path",
+    "comparison_command": "python3 prototype/mrimsrg/compare_jcoupled64.py <continuous.jcoupled64> <split2.jcoupled64> --absolute-tolerance 1e-10",
+    "emax2": {
+      "input_jcoupled64_sha256": "255bcc0eb27f67daabfa8643cb82d6a634ecf2f04ec83cb765181b4f54089760",
+      "reference_sha256": "1c9934aa92b50cc55122f15434b0093a860d99ae50a745d89848f76f1f608898",
+      "executable_sha256": "bc97059f5730db93fb0c1eadeb9af9ee8acca52d53bf4a753e8c5836c32fd74d",
+      "continuous_output_sha256": "2c86f952ddc6a32bab7f3b7a8f092820cd9601c78ffec32e470936e85f393cc5",
+      "split_output_sha256": "f10e9870f1030c7359f77436e0cb80e802d2ca30a32b60106c3a8b4fb400a539",
+      "continuous_wall_seconds": 0.17,
+      "split_wall_seconds": [0.15, 0.15],
+      "maximum_rss_kib": 14840,
+      "reported_final_status_abs_differences": {
+        "mr_zero_body_mev": 0.0,
+        "h_norm_mev": 0.0,
+        "eta1_norm": 0.0,
+        "eta2_norm": 0.0
+      },
+      "vacuum_jcoupled64_comparison": {
+        "zero_body_max_abs_mev": 3.2862601528904634e-14,
+        "one_body_max_abs_mev": 2.1316282072803006e-14,
+        "two_body_max_abs_mev": 6.150635556423367e-14,
+        "two_body_relative_frobenius": 1.870074219740616e-15,
+        "worst_two_body_record": [0, 1, 2, 3, 1]
+      }
+    },
+    "emax4": {
+      "input_jcoupled64_sha256": "616393b0f3264efc04535568a76ca649fda274298fb3b4bf80a10d947e995e75",
+      "reference_sha256": "331f46dbd8ec2928fbaceda10dff43d6b3f7012e51130d2eb4e388886a96d4b4",
+      "executable_sha256": "e9782ee4a86da04b45be24c11bd46a091a668b8c21f3ffec7778420d88bfb246",
+      "continuous_output_sha256": "26864df93f0fdd06040f175adae7cd0284ae9ae3719a61e2548c58af9bcdf728",
+      "split_output_sha256": "be3958d5f3c0285c57bbc0bf3a67d0d835652220c8d491df73450123aa54ae0d",
+      "continuous_wall_seconds": 1.06,
+      "split_wall_seconds": [0.85, 0.86],
+      "maximum_rss_kib": 89144,
+      "reported_final_status_abs_differences": {
+        "mr_zero_body_mev": 0.0,
+        "h_norm_mev": 0.0,
+        "eta1_norm": 0.0,
+        "eta2_norm": 0.0
+      },
+      "vacuum_jcoupled64_comparison": {
+        "zero_body_max_abs_mev": 2.3092638912203256e-14,
+        "one_body_max_abs_mev": 2.1316282072803006e-14,
+        "two_body_max_abs_mev": 5.917488721252084e-14,
+        "two_body_relative_frobenius": 8.04872432220931e-16,
+        "worst_two_body_record": [0, 1, 2, 3, 1]
+      }
+    },
+    "absolute_tolerance_mev": 1e-10,
+    "passed": true,
+    "interpretation": "J64 is a Hamiltonian-segment restart, not a serialized adaptive-stepper state; the observed difference is only the vacuum/MR normal-ordering and ODE roundoff level"
+  },
+  "point7_emax4_direct_flow": {
+    "repository_commit": "6bd0c20027e898128e4a6efd0d5b93a8cadc01e3",
+    "input_jcoupled64_sha256": "616393b0f3264efc04535568a76ca649fda274298fb3b4bf80a10d947e995e75",
+    "reference_sha256": "331f46dbd8ec2928fbaceda10dff43d6b3f7012e51130d2eb4e388886a96d4b4",
+    "executable_sha256": "ec23d40cae0171908edc2539abcab2d05d1759a47b9b357333628e51d8d50aac",
+    "shared_library_sha256": "c7eb668df585e96c29b0c7e659288ef16cbeecefcf358d9d390399488261927b",
+    "initial": {
+      "cumulative_s": 0.0,
+      "mr_zero_body_mev": -17.01349079857193,
+      "hamiltonian_norm_mev": 2839.611206683361,
+      "eta_one_body_norm": 0.1689547015552203,
+      "eta_two_body_norm": 1.0652211671267082,
+      "eta_norm": 1.0785368913822095,
+      "white_ncsm_numerator_norm_mev": 77.57210686820989
+    },
+    "segments": [
+      {
+        "job": 100413,
+        "cumulative_start_s": 0.0,
+        "cumulative_target_s": 100.0,
+        "segment_smax": 100.0,
+        "ode_tolerance": 1e-9,
+        "eta_criterion": 1e-6,
+        "scalar_commutators": 2407,
+        "wall_seconds": 159.37581,
+        "maximum_rss_mb": 166.988,
+        "mr_zero_body_mev": -23.958558086817575,
+        "hamiltonian_norm_mev": 2854.4464289752023,
+        "eta_one_body_norm": 0.001770718339035211,
+        "eta_two_body_norm": 0.010929100985903602,
+        "eta_norm": 0.011071616494273757,
+        "eta_norm_ratio_to_initial": 0.010265403606254784,
+        "white_ncsm_numerator_norm_mev": 0.26982629528124025,
+        "white_ncsm_numerator_ratio_to_initial": 0.0034783932804565705,
+        "jcoupled64_sha256": "c45495a0b6e55df2ae48cdd2fdf6a8b0bf0e8cdf49ab9764fc930e64b0fc1636",
+        "no2bpack_sha256": "7640dd3027b37df5f3cc969d422e63f6b713b98f3df6065920dcca9473771f85",
+        "completed_normally": true,
+        "eta_criterion_reached": false
+      },
+      {
+        "job": 100423,
+        "cumulative_start_s": 100.0,
+        "cumulative_target_s": 1000.0,
+        "segment_smax": 900.0,
+        "ode_tolerance": 1e-9,
+        "eta_criterion": 1e-6,
+        "scalar_commutators": 3523,
+        "wall_seconds": 187.55869,
+        "maximum_rss_mb": 167.191,
+        "mr_zero_body_mev": -24.102026628739885,
+        "hamiltonian_norm_mev": 2941.2430678448923,
+        "eta_one_body_norm": 0.00025876251707537574,
+        "eta_two_body_norm": 0.001389192184066194,
+        "eta_norm": 0.0014130863259241406,
+        "eta_norm_ratio_to_initial": 0.0013101882162910403,
+        "white_ncsm_numerator_norm_mev": 0.03415621742920626,
+        "white_ncsm_numerator_ratio_to_initial": 0.0004403157115125869,
+        "jcoupled64_sha256": "67d8f1716259cc408b2458f5cdeee28f777c62c8c5775fcab0e9aaf4873c300f",
+        "no2bpack_sha256": "dcf8ef5705d14f829205df44dadd22b558dbee28fea046ae8ab4f5bb0a8b6e05",
+        "completed_normally": true,
+        "eta_criterion_reached": false
+      }
+    ],
+    "white_ncsm_tail_diagnostic": {
+      "tool": "prototype/mrimsrg/diagnose_white_ncsm_tail.py",
+      "selected_channel_count": 21840,
+      "formula_source": "Vobig 2020 Eqs. 6.5.28-6.5.34",
+      "small_denominator_or_cutoff_tail": false,
+      "s1000_dominant_denominators_mev": "approximately 24.1",
+      "cause": "hierarchy of small fractional-occupation products in the published directional White-NCSM numerator",
+      "operator_norm_reconstruction_tolerance": 1e-12,
+      "paper_context": "Vobig Fig. 6.7 plots White-NCSM to s approximately 100 and Sec. 4.8 uses a 1e-4 to 1e-3 second-order-energy convergence criterion; it does not establish eta/eta0 <= 1e-6"
+    },
+    "strict_relative_eta_target": 1e-6,
+    "strict_target_reached": false,
+    "passed_environment_and_materialization": true
+  },
+  "emax4_downstream_flow_window": {
+    "nucleus": "He4",
+    "reference": "Nrefmax=2 emax2 reference embedded in emax4",
+    "ncsm_reader": "prototype/mrimsrg/build-emax4/mrimsrg_validate",
+    "ncsm_reader_basis_sha256": "d3dff5faa2a58d8c234914170caffa3649d0cd3805a1344818f4f4d3c37fd19e",
+    "full_space_nmax": 16,
+    "basis_dimensions": {
+      "Nmax2": 59,
+      "Nmax4": 952,
+      "Nmax6": 7556,
+      "Nmax8": 35658,
+      "Nmax16": 313601
+    },
+    "ground_state_mev": {
+      "s0": {
+        "Nmax2": -17.01349070942774,
+        "Nmax4": -22.361779780540747,
+        "Nmax6": -24.445871866370105,
+        "Nmax8": -25.1530264233765,
+        "Nmax16": -25.291223277555638
+      },
+      "s0.02": {
+        "Nmax2": -17.471115060424815,
+        "Nmax4": -22.554373327553488,
+        "Nmax6": -24.530654043264754,
+        "Nmax8": -25.208371999830185,
+        "Nmax16": -25.336699632708306
+      },
+      "s0.1": {
+        "Nmax2": -19.043455825146676,
+        "Nmax4": -23.20087921298597,
+        "Nmax6": -24.803144544651833,
+        "Nmax8": -25.381000468346478,
+        "Nmax16": -25.478750953909806
+      }
+    },
+    "nmax8_lowest_three_mev": {
+      "s0": [-25.1530264233765, -22.892425666779602, -22.75400754450943],
+      "s0.02_no2bpack": [-25.208371999830185, -22.924549261672482, -22.79281658264279],
+      "s0.02_jcoupled64": [-25.208371273985055, -22.924549137086156, -22.792816437274936],
+      "s1_no2bpack": [-25.867220656258546, -23.721549808974743, -23.611685772732244],
+      "s10_no2bpack": [-25.690113668987728, -23.772379134867162, -23.54244755532542],
+      "s100_no2bpack": [-30.588114430473844, -30.132864821010024, -29.387613833092008],
+      "s1000_no2bpack": [-42.62051058038752, -41.509820406441825, -39.010184393577056]
+    },
+    "truncation_error_to_same_s_full_space_kev": {
+      "s0": {
+        "Nmax2": 8277.732568127899,
+        "Nmax4": 2929.443497014891,
+        "Nmax6": 845.351411185533,
+        "Nmax8": 138.196854179139
+      },
+      "s0.02": {
+        "Nmax2": 7865.584572283491,
+        "Nmax4": 2782.326305154818,
+        "Nmax6": 806.045589443552,
+        "Nmax8": 128.327632878121
+      },
+      "s0.1": {
+        "Nmax2": 6435.29512876313,
+        "Nmax4": 2277.871740923835,
+        "Nmax6": 675.606409257973,
+        "Nmax8": 97.750485563328
+      }
+    },
+    "full_space_drift_from_bare_kev": {
+      "s0.02": -45.476355152668,
+      "s0.1": -187.527676354168
+    },
+    "s0.02_generator_diagnostic": {
+      "eta_norm": 1.0417503906844712,
+      "eta_norm_ratio_to_initial": 0.9658922184380784,
+      "white_ncsm_numerator_norm_mev": 75.31227777801628,
+      "white_ncsm_numerator_ratio_to_initial": 0.9708680196860849,
+      "strict_relative_eta_target": 1e-6,
+      "strict_target_reached": false
+    },
+    "s0.02_float32_no2bpack_minus_float64_jcoupled64_kev": [
+      -0.00072584513,
+      -0.000124586326,
+      -0.000145367853
+    ],
+    "s0.02_ode_tolerance_gate": {
+      "compared_tolerances": [1e-9, 1e-10],
+      "jcoupled64_max_abs_mev": {
+        "zero_body": 1.243e-14,
+        "one_body": 2.842e-14,
+        "two_body": 3.675e-14
+      },
+      "maximum_ncsm_energy_abs_kev": 3e-11,
+      "target_kev": 1.0,
+      "passed": true
+    },
+    "finite_s_operational_gate": {
+      "name": "prototype_downstream_stability_v1",
+      "literature_basis": "Vobig 2020 Sec. 6.5.5 uses post-NCSM flow plateaus to identify useful intermediate evolution and diagnoses renewed energy drift as omitted induced interactions",
+      "thresholds_are_literature_values": false,
+      "threshold_rationale": "an explicit prototype accuracy budget chosen before emax6 production; it must not be reported as a theorem or a published IM-NCSM threshold",
+      "thresholds": {
+        "maximum_full_space_drift_kev": 100.0,
+        "minimum_each_nmax_improvement_kev": 0.0,
+        "maximum_packing_error_kev": 1.0,
+        "maximum_ode_error_kev": 1.0,
+        "maximum_eta_norm_ratio_to_initial": 1.0
+      },
+      "point_diagnostics": {
+        "s0.02": {
+          "maximum_packing_error_kev": 0.00072584513,
+          "maximum_ode_error_kev": 3e-11,
+          "eta_norm_ratio_to_initial": 0.9658922184380784
+        }
+      },
+      "selection": "largest tested s passing every threshold",
+      "expected_selected_candidate": "s0.02"
+    },
+    "strict_decoupling_gate": {
+      "maximum_eta_norm_ratio_to_initial": 1e-6,
+      "best_eta_norm_ratio_to_initial": 0.0013101882162910403,
+      "best_tested_s": 1000.0,
+      "passed": false
+    },
+    "interpretation": {
+      "strict_decoupling_result_obtained": false,
+      "short_flow_accelerator_candidate_s": 0.02,
+      "candidate_claim": "finite-flow IM-NCSM accelerator candidate only; it improves every tested Nmax truncation error and passes ODE/format gates, but reduces the generator residual by only about 3.4 percent",
+      "long_flow_claim": "s=100 and s=1000 are rejected as downstream Hamiltonians because their Nmax8 spectra exhibit severe IMSRG(2) truncation drift",
+      "magnus_claim": "changing to Magnus may improve integration and restart mechanics but cannot by itself remove the observed IMSRG(2) truncation drift",
+      "next_gate": "freeze a finite-s downstream-stability criterion before emax6 production flow; retain the independent strict eta gate as failed"
+    }
+  },
+  "emax8_resource_gate": {
+    "nucleus": "He4",
+    "reference": "validated emax2 Nrefmax=2 NCSM reference embedded with zero added occupations/lambda2 and identity added NAT block",
+    "canonical_interaction": {
+      "parent_sha256": "118c4c27ab7e2b1f3ae8df8ea24beb2784df681dd286bdb3ae5f42dbe09b9d7d",
+      "child_path": "/home/mengziyan/Forces/N2LO_opt/TwBME_N2LO_opt_hw20_emax8_e2max16.minipack",
+      "child_sha256": "3fd1a0038e8c6f00cd93ec26113f02fcb19dd51268a95238da67b17e12fd4bda",
+      "child_bytes": 29802216,
+      "retained_records": 3526624,
+      "A4_maximum_abs_mev": 0.0,
+      "A16_maximum_abs_mev": 0.0,
+      "passed": true
+    },
+    "inputs": {
+      "j_orbits": 90,
+      "j_channels": 108,
+      "m_orbits": 660,
+      "bare_jcoupled64_bytes": 98779732,
+      "bare_jcoupled64_sha256": "cd14cd4beac528bd0ed04461041c06d14024b0b531c5bedfcd2625f1ebeb9cce",
+      "reference_bytes": 56496044,
+      "reference_sha256": "9af7a6e0dc0bcdd812e9c292c15016028fa5f7a7d1a1337c960cb464b64a68b3",
+      "reference_maximum_contraction_violation": 1.8492152253912764e-15,
+      "reference_maximum_hermiticity_violation": 0.0,
+      "bare_no2bpack_sha256": "e1653533d5bc4e45137ce8d264190af71944679b90fd5ece1b729d397ab06946"
+    },
+    "storage": {
+      "j_operator_bytes": 56333448,
+      "dense_mscheme_two_body_bytes": 1517978880000,
+      "one_cross_block_scratch_bytes": 67184640,
+      "old_all_cross_blocks_scratch_bytes": 702458784,
+      "ordered_cross_blocks": 105,
+      "dense_mscheme_lossless_validator_viable": false,
+      "dense_mscheme_failure": "std::bad_alloc before diagonalization; expected from the 1.518 TB dense two-body allocation",
+      "production_jscheme_constructed_dense_mscheme_hamiltonian": false
+    },
+    "fixed_rk4_resource_job": {
+      "job": 100444,
+      "repository_commit": "925f65636d553e2e9a3e52d41564a1e0bb75c214",
+      "method": "flow_RK4",
+      "ds": 0.0001,
+      "smax": 0.0001,
+      "rhs_evaluations": 4,
+      "cpus": 64,
+      "wall_seconds": 17.2822,
+      "maximum_rss_mb": 2070.297,
+      "initial_mr_zero_body_mev": -17.0135029683,
+      "final_mr_zero_body_mev": -17.017091905266,
+      "initial_h_norm_mev": 31413.462155786,
+      "final_h_norm_mev": 31413.462037118,
+      "initial_eta_one_body_norm": 0.174803347,
+      "final_eta_one_body_norm": 0.174772655,
+      "initial_eta_two_body_norm": 1.214269979,
+      "final_eta_two_body_norm": 1.214014842,
+      "export_zero_body_consistency_mev": 0.0,
+      "executable_sha256": "ec23d40cae0171908edc2539abcab2d05d1759a47b9b357333628e51d8d50aac",
+      "script_sha256": "a8c7469b00bd711f3d6a823a499cc61110d2f6336ee8edadeb566b94a6db77a0",
+      "metadata_sha256": "76122cfb8e7d1eada39848c2454b2a6f858ead4ee9ba2d593674680dd9273bfd",
+      "log_sha256": "7370fe1fc774eb90be6371f909ad28c477fdab562a1b8c41f6d8407e96bc71c9",
+      "output_jcoupled64_sha256": "2cafa65030a2e6cb423ffe62bd591edcf789114174b0b1bc49288121ad9ac0b1",
+      "output_no2bpack_sha256": "45c9f630067daebd27091373d8db5646e75eec8198d7f45b364f34088feac35b",
+      "slurm_state": "COMPLETED",
+      "exit_code": "0:0",
+      "passed": true
+    },
+    "native_no2bpack_nmax8_readback": {
+      "validator_sha256": "ef9dab0d96deba5e524e85355c38cf42ae4303d8a05ff0625887b2449692e941",
+      "dimension": 44838,
+      "bare": {
+        "job": 100447,
+        "states_mev": [-26.217052992370352, -24.709627375507832, -24.709627301702245],
+        "two_j": [0, 4, 0],
+        "wall_seconds": 81,
+        "maximum_rss_kib": 2385856,
+        "script_sha256": "45056934984bb8206c46b7e8c60b3a4b8da9c17dc25e3425a1e1889bf1c643f5",
+        "metadata_sha256": "ff2e1059dd9101184787289f3c6981fbbab2acdb09cb9ee1034a7f16d5a066eb",
+        "log_sha256": "d9a60c58bbda20a8fd21cd2cc2103e198b793a7fd401dba011be8aceddd4f33e",
+        "slurm_state": "COMPLETED",
+        "exit_code": "0:0"
+      },
+      "fixed_rk4": {
+        "job": 100448,
+        "states_mev": [-26.217786322985859, -24.709987825043299, -24.709967967694425],
+        "two_j": [0, 4, 0],
+        "wall_seconds": 75,
+        "maximum_rss_kib": 2386220,
+        "script_sha256": "26c4ff88050010b004396089954f7871058944b81da4dd9c441acb487ab9b25f",
+        "metadata_sha256": "dad798671402f656f6f4014670b866d8412c010ae19d83c8b95f652bf57578cd",
+        "log_sha256": "3643debfb6d994d3ad8f922afd39840e4b1afa24a43f58d2a1de12b3ebf37f95",
+        "slurm_state": "COMPLETED",
+        "exit_code": "0:0"
+      },
+      "fixed_rk4_minus_bare_ground_state_kev": -0.733330615507,
+      "claim": "native format/resource readback only; s=1e-4 is not a downstream physics acceptance point",
+      "passed": true
+    },
+    "finite_s_flow": {
+      "target_s": 0.02,
+      "generator": "white-ncsm",
+      "denominator_partitioning": "Epstein_Nesbet",
+      "ds_0": 0.001,
+      "dsmax": 0.01,
+      "eta_criterion": 1e-6,
+      "initial_eta_norm": 1.2267875904259313,
+      "final_eta_norm": 1.177058295336264,
+      "eta_norm_ratio_to_initial": 0.9594638098088344,
+      "strict_relative_eta_target": 1e-6,
+      "strict_target_reached": false,
+      "runs": {
+        "tol1e-9": {
+          "job": 100451,
+          "ode_tolerance": 1e-9,
+          "scalar_commutators": 25,
+          "wall_seconds": 67.67063,
+          "maximum_rss_mb": 5194.719,
+          "final_mr_zero_body_mev": -17.702389315370,
+          "final_h_norm_mev": 31413.438082568,
+          "final_eta_one_body_norm": 0.168842095,
+          "final_eta_two_body_norm": 1.164885650,
+          "export_zero_body_consistency_mev": 0.0,
+          "script_sha256": "463dbf4758b65d3a7793329072c805653a3e16cabd5ff3b3d872c2006d2257eb",
+          "metadata_sha256": "c6d1d418b3142a40ca323cb3d6231388aaa48fd290b33ee8bae6ae440f6f83ee",
+          "log_sha256": "5042a2e28b2fc6aa7806454b221bb70b99430dda21c9d9618dade55c69397bc7",
+          "flow_sha256": "66bf9c5bf0c3c27b1a3c6a7e2a943b50f15bbe5beac4717da011bb2b9b9ebeb1",
+          "jcoupled64_sha256": "ac7dacb7ffe324d403042bccc1b4e20a3c389d560bc4f3bb3770a219e811f049",
+          "no2bpack_sha256": "247c5587d595d90606c8501a427bc8879c37238903180db4898d26d31ba5e7ba",
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        },
+        "tol1e-10": {
+          "job": 100452,
+          "ode_tolerance": 1e-10,
+          "scalar_commutators": 31,
+          "wall_seconds": 85.03911,
+          "maximum_rss_mb": 5227.641,
+          "final_mr_zero_body_mev": -17.702389315371,
+          "final_h_norm_mev": 31413.438082568,
+          "final_eta_one_body_norm": 0.168842095,
+          "final_eta_two_body_norm": 1.164885650,
+          "export_zero_body_consistency_mev": 0.0,
+          "script_sha256": "c7b4ba0853ee0620ab93fc6eb49a766153ac81c214a3fe3e5a6a9110a56f3090",
+          "metadata_sha256": "34ac4a4f08343fa36e44d5780422b89be67a8b4e58d5d2ff5a1305aec8756ca8",
+          "log_sha256": "d16d29e315e79b232d2b90347b730861940cb4a611c875a6219245056def33f1",
+          "flow_sha256": "d803eac4e0658c2e05e926c3613b41a690882f022d771b615f91913fd1d832e6",
+          "jcoupled64_sha256": "afaee59509bc55b59dd418f5133637f6b01a0e587fd6feeb8137190c3a62048e",
+          "no2bpack_sha256": "94f9523b94b800f3761ddcda325ef2fcb33d70c469df637402d23403d9fd368c",
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        }
+      },
+      "jcoupled64_ode_comparison": {
+        "tool_commit": "1ff267bd93883d8428864c2d8e00d94e77a9e360",
+        "zero_body_max_abs_mev": 4.796163466380676e-14,
+        "one_body_max_abs_mev": 6.532274721138265e-14,
+        "two_body_max_abs_mev": 1.900701818158268e-13,
+        "two_body_relative_frobenius": 8.282582824138365e-16,
+        "absolute_tolerance_mev": 1e-10,
+        "passed": true
+      },
+      "native_no2bpack_nmax8_ode_gate": {
+        "dimension": 44838,
+        "tol1e-9": {
+          "job": 100458,
+          "max_iter": 500,
+          "states_mev": [-26.356103569740927, -24.779063666930607, -24.775134512563209],
+          "two_j": [0, 4, 0],
+          "wall_seconds": 75,
+          "maximum_rss_kib": 2384720,
+          "script_sha256": "3110d75a6a3c1851ce8b0318b6f754d2863930db33e54a5fcc4aec992aa8e957",
+          "metadata_sha256": "ff2ae3a85fd5a73b08f6fe98dc7274cb4f4ef380cbfc7caa3180b517761bb9d7",
+          "log_sha256": "0652554e60facfbeaee2bcaf402e0b8cd210bcc5669b97de75c42ca64060ab53",
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        },
+        "tol1e-10": {
+          "job": 100456,
+          "max_iter": 400,
+          "states_mev": [-26.356103569740977, -24.779063666930597, -24.77513451256317],
+          "two_j": [0, 4, 0],
+          "wall_seconds": 72,
+          "maximum_rss_kib": 2384780,
+          "script_sha256": "4ee5511d3e7ae5ce148d3d099c4a0b9c462d505241808a09c5aee96c2fd34ce5",
+          "metadata_sha256": "c0e9988fcce34b28930091fd41c41d9774c3fc6ca022df5426c28689c96e1996",
+          "log_sha256": "12d1270be21f45735cfcee7a5438fd947b6376590072dfc4fe5c123cb54aad2f",
+          "slurm_state": "COMPLETED",
+          "exit_code": "0:0"
+        },
+        "maximum_energy_abs_kev": 4.973799150320701e-11,
+        "target_kev": 1.0,
+        "discarded_attempt": {
+          "job": 100454,
+          "max_iter": 400,
+          "slurm_state": "FAILED",
+          "exit_code": "1:0",
+          "reason": "nonzero child status despite a complete printed spectrum; not used as accepted evidence"
+        },
+        "passed": true
+      },
+      "claim": "finite-s integration and Nmax8 ODE gate only; downstream physics acceptance still requires matched bare/flow Nmax sequences"
+    },
+    "next_gate": "downstream Nmax studies are frozen by user decision; continue only MR implementation, validation, and measured capacity work",
+    "physics_acceptance_claimed": false
+  },
+  "emax12_capacity_gate": {
+    "claim": "fixed one-step C++ J-scheme MR-IMSRG capacity/profiler gate only; no finite-s downstream-physics claim",
+    "point7_worktree": "/tns/mengziyan/mr-imsrg-e604e181",
+    "generator_commit": "6975c2e6740e63af8144a1d2485772849e83f27f",
+    "executable_build_commit": "e604e1818e72c339ea495641dfcd6f8e4556d100",
+    "executable_sha256": "45d581c378aab6d27fed287cf026027319cb110586e79b21be52b992a3f2f05e",
+    "libimsrg_sha256": "c7eb668df585e96c29b0c7e659288ef16cbeecefcf358d9d390399488261927b",
+    "case": {
+      "nucleus": "He4",
+      "nrefmax": 2,
+      "hw_mev": 20.0,
+      "emax": 12,
+      "e2max": 24,
+      "j_orbits": 182,
+      "j_channels": 156,
+      "jcoupled64_tbme_records": 73842036,
+      "reference_definition": "validated emax2 Nrefmax=2 NCSM reference carried through the prior emax8 embedding and extended with zero added occupations/lambda2 plus an identity added NAT block"
+    },
+    "input_preparation": {
+      "job": 100531,
+      "slurm_state": "COMPLETED",
+      "exit_code": "0:0",
+      "slurm_runtime_seconds": 71,
+      "minipack": "/tns/public/Forces/N2LO_opt/2BME/TwBME_N2LO_opt_bare_hw20_emax12_e2max24.minipack",
+      "minipack_sha256": "b735e7d79280dac9ffdc6d77b3e975c41edf5dd4cd1bf9156ed4d12d60e1c3b1",
+      "source_reference_sha256": "9af7a6e0dc0bcdd812e9c292c15016028fa5f7a7d1a1337c960cb464b64a68b3",
+      "bare_jcoupled64_bytes": 2067713204,
+      "bare_jcoupled64_sha256": "0f11452d7be66547050eb5feb837956098a9d13240cc313e5d01709b87c35553",
+      "embedded_reference_bytes": 1181746556,
+      "embedded_reference_sha256": "f273a851a8501d168a18160859dc93c4fa105040b24199f000ddb34155f67b07",
+      "embed_report_sha256": "5a5ddd92d467a4377b72cd0edd1264ba770952c080de98e087e456704237e11d",
+      "converter_wall_seconds": 42,
+      "converter_maximum_rss_kib": 8087548,
+      "converter_roundtrip_max_abs_mev": 0.0,
+      "embed_wall_seconds": 13,
+      "embed_maximum_rss_kib": 4298452,
+      "maximum_reference_contraction_violation": 1.8492152253912764e-15,
+      "maximum_reference_hermiticity_violation": 0.0
+    },
+    "flow": {
+      "job": 100535,
+      "node": "node8",
+      "cpus": 64,
+      "slurm_state": "COMPLETED",
+      "exit_code": "0:0",
+      "slurm_runtime_seconds": 227,
+      "method": "flow_RK4",
+      "smax": 0.0001,
+      "step": 0.0001,
+      "rhs_evaluations": 4,
+      "process_wall_seconds": 185,
+      "profiler_real_seconds": 183.76964,
+      "maximum_rss_kib": 26264640,
+      "initial_zero_body_mev": -17.0134907986,
+      "final_zero_body_mev": -17.017145544706,
+      "initial_eta_one_body_norm": 0.174860419,
+      "initial_eta_two_body_norm": 1.220236947,
+      "final_eta_one_body_norm": 0.174830444,
+      "final_eta_two_body_norm": 1.219977725,
+      "combined_eta_ratio": 0.9997883894887515,
+      "export_zero_body_consistency_mev": 0.0,
+      "flowed_jcoupled64_bytes": 2067713204,
+      "flowed_jcoupled64_sha256": "3f8a9e84327b25c3bdb95a3fe7890b43ddca95d4c2eda6e4507dbb86ec513cfc",
+      "flowed_no2bpack_bytes": 1893611492,
+      "flowed_no2bpack_sha256": "79b43f95a7d3824c803ebe6c76a69302982f8e38876917a8c1a020208fbdd585",
+      "profiler_seconds": {
+        "mr_comm221_lambda2_iv": 0.30983,
+        "mr_comm221_lambda2_v": 2.54807,
+        "mr_comm221_lambda2_v_build": 1.13381,
+        "mr_comm221_lambda2_vi": 4.13056,
+        "mr_comm221_lambda2_setup": 0.92176,
+        "mr_comm221_lambda2_total": 7.91174,
+        "mr_lambda2_commutator_addons": 8.69811,
+        "commutator_scalar_scalar": 12.80946,
+        "update_eta": 12.62689,
+        "comm222_phss": 4.83058,
+        "comm222_pp_hh_221ss": 5.62760
+      },
+      "mr_addon_fraction_of_profiler_real": 0.04733159405438243,
+      "profiler_memory_kib": {
+        "mr_iv_dense_output_avoided": 2305898,
+        "mr_v_dense_output_avoided": 381307,
+        "mr_dense_ly_lx_avoided": 2302859,
+        "mr_standard_products_peak": 6494
+      }
+    },
+    "discarded_scheduling_attempt": {
+      "job": 100533,
+      "node": "master",
+      "reason": "cancelled before interaction read because only about 31 GiB was free despite 64 idle cores; no physics output used"
+    },
+    "optimization_decision": "the exact-support MR addon is 4.7 percent of process real time and V build is 0.6 percent; do not add a recoupling plan/cache unless a later measured case makes it limiting",
+    "passed": true
+  },
+  "emax2_strict_decoupling_gate": {
+    "claim": "strict production C++ J-scheme MR-IMSRG decoupling and materialization acceptance; not a downstream finite-s IM-NCSM physics claim",
+    "point7_worktree": "/tns/mengziyan/mr-imsrg-e604e181",
+    "repository_commit": "57c63ab59c289fc4eb7555b130447eac0e53d89b",
+    "executable_sha256": "3b3b110382c21a18585adeeb029efa58f5e61607e402c9e6e12eaecf355d9aac",
+    "libimsrg_sha256": "c7eb668df585e96c29b0c7e659288ef16cbeecefcf358d9d390399488261927b",
+    "case": {
+      "nucleus": "He4",
+      "nrefmax": 2,
+      "hw_mev": 20.0,
+      "emax": 2,
+      "e2max": 4,
+      "generator": "white-ncsm",
+      "denominator_partitioning": "Epstein_Nesbet",
+      "mask": "Delta e != 0 one- and two-body channels in each connected natural-orbital block",
+      "lambda3": 0,
+      "force_sha256": "76b7243ef53d30955c0293d29da73688dc3839942143ccf147739108bb58ff84",
+      "bare_jcoupled64_sha256": "55a3c161f78bde8586c997f332f89f0f1043a467af3c5ae90c1f98ed8fd344e2",
+      "reference_sha256": "1c9934aa92b50cc55122f15434b0093a860d99ae50a745d89848f76f1f608898",
+      "j_orbits": 12,
+      "jcoupled64_tbme_records": 890
+    },
+    "frozen_gate": {
+      "initial_eta_norm": 0.7035911887073647,
+      "maximum_eta_norm_ratio_to_initial": 1e-6,
+      "maximum_eta_norm": 7.035911887073647e-7,
+      "job_eta_criterion": 7e-7,
+      "job_criterion_is_stricter_than_relative_gate": true
+    },
+    "stage1_s0_to_s1000": {
+      "job": 100540,
+      "ode_tolerance": 1e-10,
+      "wall_seconds": 55,
+      "maximum_rss_kib": 57268,
+      "exit_status": 0,
+      "final_eta_norm": 0.000797125559872436,
+      "final_eta_norm_ratio_to_initial": 0.0011329385197914607,
+      "final_mr_zero_body_mev": -18.896587129722555,
+      "final_hamiltonian_norm": 454.76738496794616,
+      "jcoupled64_sha256": "7b02f6774a86ae7ec0db2409a59e9e8773a2f3a75969cce154528bc8747cbdf0",
+      "no2bpack_sha256": "2a8550006d5b96f0888e6ff3aa2cdf19534c40601e361141c6baebd0d3121021",
+      "script_sha256": "51fd3a81982e2199bc382027c7493e67604da52978062e5677c77917f29b63f3",
+      "metadata_sha256": "be12b95300330af01dac6761de980a00791bf17a987011f81e9fb06f03100838"
+    },
+    "stage2_s1000_to_strict_gate": {
+      "nominal_cumulative_target_s": 10000000.0,
+      "physical_criterion_crossing_cumulative_s_approx": 407740.0,
+      "post_criterion_behavior": "the generator is zeroed after the 7e-7 criterion and the adaptive solver advances to the nominal target without changing H",
+      "runs": {
+        "tol1e-10": {
+          "job": 100548,
+          "node": "node19",
+          "cpus": 1,
+          "ode_tolerance": 1e-10,
+          "wall_seconds": 8037,
+          "maximum_rss_kib": 20348,
+          "exit_status": 0,
+          "scalar_commutators": 1312179,
+          "final_mr_zero_body_mev": -18.928838401312017,
+          "final_hamiltonian_norm": 423.51349694619364,
+          "final_eta_one_body_norm": 1.260072660160466e-11,
+          "final_eta_two_body_norm": 6.999999862409854e-7,
+          "final_eta_norm": 6.999999863543985e-7,
+          "final_eta_norm_ratio_to_initial": 9.948958963520224e-7,
+          "export_zero_body_consistency_mev": 0.0,
+          "jcoupled64_sha256": "794acdf4b6a7ea7e273c1a5088cfa60ac1eedda4016e91d322cece96cce1f699",
+          "no2bpack_sha256": "99294eb6cb4e41e0ab4306ac21f3cd16e31654209449f5b812f20579aa4712e3",
+          "script_sha256": "ff1cf223a301b3430d9dfc3b54e4340418170372f1462bac90d961c1fdc0f3af",
+          "metadata_sha256": "ca4f0710f80f87c063ca94b1d7a5f5b38fce578bddda9c28ce310af1ed25e027",
+          "resource_usage_sha256": "a8600cc7a530ebde29977b2ed6db0e41e0bf3ac3791052672f56d120beedc020"
+        },
+        "tol1e-9": {
+          "job": 100550,
+          "node": "node20",
+          "cpus": 1,
+          "ode_tolerance": 1e-9,
+          "wall_seconds": 8099,
+          "maximum_rss_kib": 22504,
+          "exit_status": 0,
+          "scalar_commutators": 1312667,
+          "final_mr_zero_body_mev": -18.928838401312273,
+          "final_hamiltonian_norm": 423.5134969461659,
+          "final_eta_one_body_norm": 1.2620381700804722e-11,
+          "final_eta_two_body_norm": 6.999999835923135e-7,
+          "final_eta_norm": 6.999999837060807e-7,
+          "final_eta_norm_ratio_to_initial": 9.948958925880216e-7,
+          "export_zero_body_consistency_mev": 0.0,
+          "jcoupled64_sha256": "851c5b0e5c3bb63545ce061e8de168c8495e9b4057b1f062aef976a41f1cd2ec",
+          "no2bpack_sha256": "d05f98dbf44ed6edf644f1aefb7677eb80ca711374e9f1ecf892cca3ed57c570",
+          "script_sha256": "f93626210df27667152df204861fdb984ce1f634bbc201d04261615b151cb4b2",
+          "metadata_sha256": "c4610545abcc7916754c050087ac9a72c9bbed7f5b66cb9e3911c3e81a4ebba3",
+          "resource_usage_sha256": "c36549087855a9adb24b38e93e6793f1948850ee52e6365b16683b895ecbe6d8"
+        }
+      }
+    },
+    "independent_tail_diagnostic": {
+      "selected_channel_count": 354,
+      "eta_reconstruction_max_abs": 1.1102230246251565e-16,
+      "final_minimum_absolute_denominator_mev": 18.9287400429785,
+      "initial_white_ncsm_numerator_norm_mev": 42.105838574666,
+      "final_white_ncsm_numerator_norm_mev": 1.325027484378092e-5,
+      "final_white_ncsm_numerator_ratio_to_initial": 3.146897269433144e-7,
+      "initial_strict_diagnostic_norm_mev": 19.128471188215606,
+      "final_strict_diagnostic_norm_mev": 10.877519076719361,
+      "final_strict_diagnostic_ratio_to_initial": 0.5686559563328107,
+      "strict_diagnostic_is_formal_gate": false,
+      "note": "the lambda2-dependent D-Ddagger diagnostic is recorded but is not the published White-NCSM fixed-point criterion; the frozen acceptance gate is Rgen"
+    },
+    "ode_tolerance_gate": {
+      "zero_body_max_abs_mev": 5.801581437481218e-12,
+      "one_body_max_abs_mev": 3.1938895972416503e-12,
+      "two_body_max_abs_mev": 4.2765058161364777e-10,
+      "two_body_relative_frobenius": 1.8449962003520438e-11,
+      "maximum_nmax2_spectral_abs_kev": 2.383870878475136e-8,
+      "target_kev": 1.0,
+      "passed": true
+    },
+    "vacuum_materialization_readback": {
+      "nmax": 2,
+      "dimension": 59,
+      "tol1e-10_jcoupled64_states_mev": [-20.491153528295364, -18.623849111074836, -17.992696341929598],
+      "tol1e-10_no2bpack_states_mev": [-20.491154343100256, -18.623848209905105, -17.992695407456925],
+      "tol1e-9_jcoupled64_states_mev": [-20.491153528295833, -18.623849111063205, -17.992696341953437],
+      "tol1e-9_no2bpack_states_mev": [-20.491154343106047, -18.62384820991085, -17.992695407462726],
+      "maximum_jcoupled64_no2bpack_abs_kev": 0.0009344907105912625,
+      "target_kev": 1.0,
+      "passed": true
+    },
+    "production_driver_restart": {
+      "repository_commit": "d96f7a04c0dc37380c6858637fbf618863203773",
+      "executable_sha256": "06b7f6f804fb99697f82d522a4060402681ee48560ff09e9d6edfc0d69675309",
+      "libimsrg_sha256": "0de9d655358af82e649d221041ef27b661c31105dc6b3c6b8bf85552ab7f0834",
+      "input_jcoupled64_sha256": "794acdf4b6a7ea7e273c1a5088cfa60ac1eedda4016e91d322cece96cce1f699",
+      "restart_scalar_commutators": 0,
+      "zero_body_max_abs_mev": 1.5987211554602254e-14,
+      "one_body_max_abs_mev": 8.881784197001252e-15,
+      "two_body_max_abs_mev": 7.105427357601002e-15,
+      "export_zero_body_consistency_mev": 0.0,
+      "passed": true
+    },
+    "regression": {
+      "tests": ["MRReference", "MRDriver", "MRSRDriver", "MRCorrelatedDriver", "MRDenominators", "MRJobGenerator", "MRTailDiagnostic"],
+      "mr_correlated_driver_seconds": 373.60,
+      "suite_seconds": 417.82,
+      "failed": 0,
+      "passed": true
+    },
+    "passed": true
+  },
+  "capacity_claim": {
+    "largest_actually_run_emax": 12,
+    "largest_analytically_sized_emax": 14,
+    "dense_mscheme_hamiltonian_constructed": false,
+    "emax2_strict_full_flow_passed": true,
+    "emax12_fixed_rk4_step_passed": true,
+    "full_emax4_flow_claimed": false,
+    "full_emax6_flow_claimed": false
+  },
+  "regression": {
+    "ctest": ["MRReference", "MRDriver", "MRSRDriver", "MRCorrelatedDriver", "MRDenominators", "MRJobGenerator", "MRTailDiagnostic"],
+    "mr_correlated_driver_seconds": 373.60,
+    "strict_endpoint_suite_seconds": 417.82,
+    "emax2_python_oracle_rhs_max_abs_mev": 3.105959933691338e-12,
+    "emax6_lambda_active_support_thread_reproducibility": {
+      "compared_threads": [1, 64],
+      "thread64_wall_seconds": 8.71,
+      "thread64_maximum_rss_kib": 432260,
+      "zero_body_max_abs_mev": 0.0,
+      "one_body_max_abs_mev": 0.0,
+      "two_body_max_abs_mev": 8.881784197001252e-16,
+      "passed": true
+    },
+    "lambda_active_support_point7_full_flow_jobs": [100385, 100387, 100389, 100391],
+    "lambda_active_support_point7_full_flow_pending": false,
+    "point7_maximum_vacuum_h_abs_vs_previous_mev": 8.384404281969182e-13,
+    "maximum_ncsm_spectral_abs_vs_previous_mev": 1.7408297026122455e-13,
+    "skinny_pandya_mr_correlated_driver_seconds": 352.52,
+    "skinny_pandya_point7_full_flow_jobs": [100393, 100395, 100397, 100399],
+    "skinny_pandya_point7_full_flow_jobs_validate_through_commit": "dea9125bb734b195c2237d6b96ab96c4e42042db",
+    "skinny_pandya_point7_full_flow_pending": false,
+    "skinny_pandya_cpp_python_full_flow_max_abs_mev": {
+      "He4": 2.2121837121528776e-08,
+      "Be8": 3.898388312186247e-08,
+      "C12": 8.871268164512003e-10,
+      "O16": 1.0712355447139998e-09
+    },
+    "skinny_pandya_maximum_vacuum_h_abs_vs_previous_mev": 8.526512829121202e-13,
+    "skinny_pandya_maximum_ncsm_spectral_abs_vs_previous_mev": 1.9895196601282805e-13,
+    "white_ncsm_monopole_cache_mr_correlated_driver_seconds": 354.53,
+    "point7_full_flow_jobs": [100401, 100403, 100405, 100407],
+    "point7_full_flow_jobs_validate_through_commit": "6e02676ce00e237efdbf6cb71df9315f7c576143",
+    "white_ncsm_monopole_cache_cpp_python_full_flow_max_abs_mev": {
+      "He4": 2.2121837122223343e-08,
+      "Be8": 3.898388312206044e-08,
+      "C12": 8.870841838870547e-10,
+      "O16": 1.0712284392866422e-09
+    },
+    "white_ncsm_monopole_cache_maximum_vacuum_h_abs_vs_previous_mev": 9.308109838457312e-13,
+    "white_ncsm_monopole_cache_maximum_ncsm_spectral_abs_vs_previous_mev": 1.1368683772161603e-13,
+    "sanitizer_regression": {
+      "cmake_environment_commit": "04202213b71a46978f88dee205da4f9af5eb4149",
+      "build_type": "RelWithDebInfo",
+      "cxx_flags": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+      "python_host_instrumented": false,
+      "preload_order": ["libasan.so", "libstdc++.so.6"],
+      "asan_options": "detect_leaks=0:halt_on_error=1:abort_on_error=1",
+      "ubsan_options": "print_stacktrace=1:halt_on_error=1",
+      "leak_detection_scope_note": "disabled only in Python-hosted CTest because non-instrumented CPython retains process-global allocations; address and undefined-behaviour failures remain fatal",
+      "mr_reference_seconds": 15.51,
+      "short_suite_seconds": 46.85,
+      "short_suite": ["MRDriver", "MRSRDriver", "MRDenominators", "MRJobGenerator", "MRTailDiagnostic", "MRDownstreamWindow"],
+      "mr_correlated_driver_seconds": 465.57,
+      "normal_build_seven_test_seconds": 41.40,
+      "writebinary_rejection_caught": true,
+      "address_or_undefined_reports": 0,
+      "passed": true
+    },
+    "local_regression_passed": true,
+    "passed": true
+  }
+}

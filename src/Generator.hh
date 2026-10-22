@@ -80,6 +80,9 @@ class Generator
   void ConstructGenerator_ShellModel(std::function<double (double,double)>& eta_func);
   void ConstructGenerator_ShellModel_3body(std::function<double (double,double)>& eta_func);
   void ConstructGenerator_ShellModel_NpNh(std::function<double(double,double)>& eta_func);
+  /// Vobig White-NCSM generator: lambda-free directional numerator and
+  /// leading MR Epstein-Nesbet norm denominator, with Delta-e != 0 mask.
+  void ConstructGenerator_WhiteNCSM();
   void ConstructGenerator_HartreeFock();
   void ConstructGenerator_1PA(std::function<double(double,double)>& eta_func);
   void SetOnly2bEta(bool tf){only_2b_eta = tf;};
@@ -88,6 +91,14 @@ class Generator
   double Get2bDenominator(int ch, int ibra, int iket) { return Get2bDenominator(ch,ch,ibra,iket);};
   double Get2bDenominator(int ch_bra, int ch_ket, int ibra, int iket);
   double Get2bDenominator_Jdep(int ch, int ibra, int iket);
+  double Get1bDenominatorWhiteNCSM(int i, int j);
+  double Get2bDenominatorWhiteNCSM(int ch, int ibra, int iket);
+ private:
+  double Get1bDenominatorWhiteNCSMCached(
+      int i, int j, const arma::mat* monopole_cache);
+  double Get2bDenominatorWhiteNCSMCached(
+      int ch, int ibra, int iket, const arma::mat* monopole_cache);
+ public:
   double Get3bDenominator(int i, int j, int k, int l, int m, int n);
 
   Operator GetHod_SingleRef( Operator& H );

@@ -207,6 +207,34 @@ target_link_libraries(
 )
 
 add_library(
+    MRReference  OBJECT
+    MRReference.hh MRReference.cc
+)
+target_link_libraries(
+    MRReference
+    PUBLIC
+    Operator
+    TwoBodyME
+    ModelSpace
+)
+
+add_library(
+    MRCommutator  OBJECT
+    MRCommutator.hh MRCommutator.cc
+)
+target_link_libraries(
+    MRCommutator
+    PUBLIC
+    MRReference
+    Operator
+    ModelSpace
+    PRIVATE
+    Commutator
+    AngMom
+    OpenMP::OpenMP_CXX
+)
+
+add_library(
     Version  OBJECT
     version.hh
     ${CMAKE_CURRENT_BINARY_DIR}/version.cc
@@ -251,6 +279,8 @@ target_link_libraries(
     Operator
     PRIVATE
     Commutator
+    MRCommutator
+    MRReference
     OpenMP::OpenMP_CXX
 )
 
@@ -269,6 +299,8 @@ target_link_libraries(
     PRIVATE
     BCH
     Commutator
+    MRCommutator
+    MRReference
     Boost::boost
 )
 
@@ -508,6 +540,8 @@ target_link_libraries(
     ThreeBodyME
     ThreeLegME
     Operator
+    MRReference
+    MRCommutator
     HartreeFock
     Commutator
     BCH
@@ -543,6 +577,17 @@ target_link_libraries(
     Parameters
     PhysicalConstants
     Version
+    OpenMP::OpenMP_CXX
+)
+
+add_executable(
+    imsrg_operator_validate
+    imsrg_operator_validate.cc
+)
+target_link_libraries(
+    imsrg_operator_validate
+    PRIVATE
+    IMSRG
     OpenMP::OpenMP_CXX
 )
 
@@ -596,3 +641,61 @@ add_test(NAME Factorized COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/Uni
 add_test(NAME Triples COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestTriples.py)
 add_test(NAME Tensor COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestTensor.py)
 add_test(NAME NormalOrdering COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestNormalOrdering.py)
+add_test(NAME MRReference COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRReference.py)
+add_test(NAME MRDriver COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRDriver.py
+                               --imsrg-executable $<TARGET_FILE:imsrg++>)
+add_test(NAME MRSRDriver COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRSRDriver.py
+                                 $<TARGET_FILE:imsrg++>)
+add_test(NAME MRCorrelatedDriver
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRCorrelatedDriver.py
+                 $<TARGET_FILE:imsrg++>)
+add_test(NAME MRDenominators
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRDenominators.py)
+add_test(NAME MRMagnus
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRMagnus.py)
+add_test(NAME MRJobGenerator
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRJobGenerator.py
+                 $<TARGET_FILE:imsrg++>)
+add_test(NAME MRTailDiagnostic
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRTailDiagnostic.py)
+add_test(NAME MRDownstreamWindow
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRDownstreamWindow.py)
+add_test(NAME MRMagnusGate
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRMagnusGate.py)
+
+# Python itself is not built with the sanitizers.  When an instrumented C++
+# extension is loaded later, ASan cannot install its __cxa_throw interceptor
+# unless libstdc++ is already present.  Keep libasan first, preload libstdc++ as
+# well.  LeakSanitizer is disabled for these Python-hosted tests because the
+# non-instrumented CPython interpreter retains process-global allocations;
+# address/undefined-behaviour checks remain fatal.  Explicitly
+# point every MR Python test at the module from this build tree so a sanitizer
+# build cannot silently import the normal Release module.
+set(MR_PYTHON_TESTS
+    MRReference MRDriver MRSRDriver MRCorrelatedDriver MRDenominators MRMagnus
+    MRJobGenerator MRTailDiagnostic MRDownstreamWindow MRMagnusGate)
+set(MR_PYTHON_TEST_ENVIRONMENT
+    "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{PYTHONPATH}"
+    "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{LD_LIBRARY_PATH}")
+string(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_UPPER)
+set(MR_EFFECTIVE_CXX_FLAGS
+    "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE_UPPER}}")
+if(MR_EFFECTIVE_CXX_FLAGS MATCHES "-fsanitize=[^ ]*address")
+  execute_process(
+      COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libasan.so
+      OUTPUT_VARIABLE MR_ASAN_RUNTIME
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+      COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libstdc++.so.6
+      OUTPUT_VARIABLE MR_LIBSTDCXX_RUNTIME
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT EXISTS "${MR_ASAN_RUNTIME}" OR NOT EXISTS "${MR_LIBSTDCXX_RUNTIME}")
+    message(FATAL_ERROR "Cannot locate ASan/libstdc++ runtimes for MR Python tests")
+  endif()
+  list(APPEND MR_PYTHON_TEST_ENVIRONMENT
+       "LD_PRELOAD=${MR_ASAN_RUNTIME}:${MR_LIBSTDCXX_RUNTIME}"
+       "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:abort_on_error=1"
+       "UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1")
+endif()
+set_tests_properties(${MR_PYTHON_TESTS}
+                     PROPERTIES ENVIRONMENT "${MR_PYTHON_TEST_ENVIRONMENT}")
