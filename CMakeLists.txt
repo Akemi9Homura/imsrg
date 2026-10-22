@@ -33,11 +33,10 @@ if (NOT USE_ARMADILLO_EXTERN)
     find_package(Armadillo)
 endif()
 
-if(IMSRG_BUILD_PYTHON_BINDINGS)
-    # We only need this for the Python bindings.
-    # In principle, everything should be faster if we could avoid this.
-    set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-endif()
+# libIMSRG is always a SHARED library built from the OBJECT libraries, so
+# they must be position independent even without the Python bindings
+# (compilers that do not default to PIE fail to link libIMSRG.so otherwise).
+set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 add_subdirectory(src)
 if(IMSRG_BUILD_PYTHON_BINDINGS)
