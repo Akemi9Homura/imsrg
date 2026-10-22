@@ -642,6 +642,8 @@ add_test(NAME Triples COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTe
 add_test(NAME Tensor COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestTensor.py)
 add_test(NAME NormalOrdering COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestNormalOrdering.py)
 add_test(NAME MRReference COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRReference.py)
+add_test(NAME MRReferencePairOrder
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRReferencePairOrder.py)
 add_test(NAME MRDriver COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRDriver.py
                                --imsrg-executable $<TARGET_FILE:imsrg++>)
 add_test(NAME MRSRDriver COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRSRDriver.py
@@ -672,7 +674,7 @@ add_test(NAME MRMagnusGate
 # point every MR Python test at the module from this build tree so a sanitizer
 # build cannot silently import the normal Release module.
 set(MR_PYTHON_TESTS
-    MRReference MRDriver MRSRDriver MRCorrelatedDriver MRDenominators MRMagnus
+    MRReference MRReferencePairOrder MRDriver MRSRDriver MRCorrelatedDriver MRDenominators MRMagnus
     MRJobGenerator MRTailDiagnostic MRDownstreamWindow MRMagnusGate)
 set(MR_PYTHON_TEST_ENVIRONMENT
     "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{PYTHONPATH}"

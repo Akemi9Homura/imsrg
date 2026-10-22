@@ -172,6 +172,7 @@ MRReference MRReference::ReadBinary(ModelSpace &ms, const std::string &filename,
     if (npairs != channel.GetNumberKets())
       throw std::runtime_error("MR reference pair count does not match two-body channel");
     std::vector<size_t> file_to_local(npairs);
+    std::vector<int> file_pair_phase(npairs, 1);
     std::vector<bool> seen_pair(npairs, false);
     for (std::uint64_t i = 0; i < npairs; ++i)
     {
@@ -185,12 +186,20 @@ MRReference MRReference::ReadBinary(ModelSpace &ms, const std::string &filename,
       if (local >= npairs || seen_pair[local])
         throw std::runtime_error("MR reference pair table does not map one-to-one to channel");
       file_to_local[i] = local;
+      // The channel stores |ab;J> with a<b.  A file pair that maps to b<a is
+      // |ba;J> = (-1)^{j_a+j_b+J+1} |ab;J>, the same phase as Ket::Phase.
+      if (a > b)
+      {
+        const int jsum = (ms.GetOrbit(a).j2 + ms.GetOrbit(b).j2) / 2;
+        file_pair_phase[i] = ((jsum + J + 1) % 2 == 0) ? 1 : -1;
+      }
       seen_pair[local] = true;
     }
     arma::mat &matrix = result.Lambda2.GetMatrix(channel_index);
     for (std::uint64_t i = 0; i < npairs; ++i)
       for (std::uint64_t j = 0; j < npairs; ++j)
         matrix(file_to_local[i], file_to_local[j]) =
+            file_pair_phase[i] * file_pair_phase[j] *
             ReadScalar<double>(input, "lambda2 matrix element");
   }
   for (size_t ch = 0; ch < seen_channel.size(); ++ch)
