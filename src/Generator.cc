@@ -350,6 +350,7 @@ void Generator::ConstructGenerator_WhiteNCSM()
    const size_t norbits = modelspace.GetNumberOrbits();
    arma::mat monopole_cache(norbits, norbits, arma::fill::zeros);
    const double cache_start = omp_get_wtime();
+#pragma omp parallel for schedule(dynamic, 1)
    for (size_t i=0; i<norbits; ++i)
    {
       for (size_t j=0; j<norbits; ++j)
@@ -380,7 +381,10 @@ void Generator::ConstructGenerator_WhiteNCSM()
    }
    if (only_1b_eta) return;
 
+   // Channels are independent and each writes only its own Eta block, as in
+   // the other imsrg++ generators.
    const size_t nch = modelspace.GetNumberTwoBodyChannels();
+#pragma omp parallel for schedule(dynamic, 1)
    for (size_t ch=0; ch<nch; ++ch)
    {
       TwoBodyChannel& channel = modelspace.GetTwoBodyChannel(ch);
