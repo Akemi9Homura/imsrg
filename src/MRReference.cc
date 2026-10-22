@@ -487,6 +487,17 @@ void MRReference::Validate(double tolerance) const
     throw std::runtime_error("MRReference oscillator frequency does not match ModelSpace");
   if (!OccupationsMatchModelSpace(tolerance))
     throw std::runtime_error("MRReference occupations do not match ModelSpace occupations");
+  // ModelSpace classifies an orbit as empty when occ < OCC_CUT, so the SR
+  // contractions would treat such an occupation as exactly zero (pp kets get
+  // no occupation weights) while the generator and lambda2 keep it.  Refuse
+  // instead of mixing the two conventions.  Near-one occupations are not
+  // rounded (hh/ph kets keep the exact 1-occ).  Values below 1e-12 are
+  // numerical zeros (e.g. 1e-25 for He4 Nrefmax=2 0d orbits, which vanish by
+  // symmetry) and rounding them changes results only at that level.
+  for (double occupation : occupations)
+    if (occupation >= 1e-12 && occupation < ModelSpace::OCC_CUT)
+      throw std::runtime_error(
+          "MRReference has an occupation in [1e-12, OCC_CUT), which ModelSpace would round to zero");
 
   const size_t norbits = modelspace->GetNumberOrbits();
   if (NaturalOrbitTransformation.n_rows != norbits ||

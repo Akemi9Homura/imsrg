@@ -259,7 +259,16 @@ namespace BCH
         if (i == warn_iter)
           std::cout << "Warning: BCH_Transform not converged after " << warn_iter << " nested commutators" << std::endl;
         else if (i == max_iter)
+        {
+          // The SR path keeps its historical warning; an MR flow must not
+          // silently continue with an unconverged Hamiltonian.  A zero
+          // threshold requests a fixed-order expansion (the oracle tests use
+          // it), so only a positive threshold makes this an error.
+          if (mr_reference != nullptr && bch_transform_threshold > 0.0)
+            throw std::runtime_error("MR BCH_Transform did not converge after " +
+                                     std::to_string(max_iter) + " nested commutators");
           std::cout << "Warning: BCH_Transform didn't coverge after " << max_iter << " nested commutators" << std::endl;
+        }
       }
     }
     //   std::cout << "Done with BCH_Transform, 3-body norm of OpOut = " << OpOut.ThreeBodyNorm() << std::endl;

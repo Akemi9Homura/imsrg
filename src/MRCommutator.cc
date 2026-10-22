@@ -903,6 +903,13 @@ namespace MRCommutator
   Operator Commutator(const Operator &X, const Operator &Y,
                       const MRReference &reference)
   {
+    // The lambda2 addons implement MR-IMSRG(2) only.  With a three-body input
+    // or the global IMSRG(3) switch, the SR commutator would return 3B parts
+    // without their MR terms, so refuse instead of mixing truncations.
+    if (X.GetParticleRank() > 2 || Y.GetParticleRank() > 2 ||
+        ::Commutator::use_imsrg3)
+      throw std::invalid_argument(
+          "MR commutator supports MR-IMSRG(2) only: 3B operators and IMSRG(3) are not implemented");
     Operator result = ::Commutator::Commutator(X, Y);
     // This exact branch is the SR-degeneration gate: no duplicated SR formula
     // and no floating-point add/subtract of nominally zero MR corrections.

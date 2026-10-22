@@ -65,6 +65,74 @@ struct OpFromFile {
    int j,p,t,r; // J rank, parity, dTz, particle rank
 };
 
+namespace
+{
+  std::string JsonString(const std::string &value)
+  {
+    std::string out = "\"";
+    for (char c : value)
+    {
+      if (c == '"' || c == '\\')
+        out += '\\';
+      out += c;
+    }
+    return out + "\"";
+  }
+
+  /// The jcoupled64/no2bpack payloads are fixed binary layouts read by
+  /// downstream codes, so the MR approximations and provenance go to a
+  /// sidecar "<output>.mrmeta.json" next to each exported Hamiltonian.
+  bool WriteMRExportMetadata(const std::string &output_file,
+                             const std::string &format,
+                             const MRReference &reference,
+                             const std::string &reference_file,
+                             const std::string &method,
+                             const std::string &generator,
+                             const std::string &denominator_partitioning,
+                             double s_final, double smax, double ds_0,
+                             double dsmax, double ode_tolerance,
+                             double eta_criterion)
+  {
+    const std::string path = output_file + ".mrmeta.json";
+    std::ofstream out(path);
+    if (!out.good())
+    {
+      std::cerr << "cannot write MR export metadata " << path << std::endl;
+      return false;
+    }
+    out << std::setprecision(17)
+        << "{\n"
+        << "  \"schema\": \"imsrg_mr_export_v1\",\n"
+        << "  \"output_file\": " << JsonString(output_file) << ",\n"
+        << "  \"output_format\": " << JsonString(format) << ",\n"
+        << "  \"imsrg_build_version\": " << JsonString(version::BuildVersion()) << ",\n"
+        << "  \"truncation\": \"MR-IMSRG(2), normal-ordered two-body\",\n"
+        << "  \"lambda3\": 0,\n"
+        << "  \"generator\": " << JsonString(generator) << ",\n"
+        << "  \"generator_numerator_lambda\": \"none (White-NCSM drops all lambda terms)\",\n"
+        << "  \"denominator_partitioning\": " << JsonString(denominator_partitioning) << ",\n"
+        << "  \"decoupling_mask\": \"1p1h and 2p2h with Delta e != 0, e=2n+l labels inherited by natural orbits\",\n"
+        << "  \"output_basis\": \"original HO basis, vacuum normal order (natural-orbit transformation undone)\",\n"
+        << "  \"method\": " << JsonString(method) << ",\n"
+        << "  \"s_final\": " << s_final << ",\n"
+        << "  \"smax\": " << smax << ",\n"
+        << "  \"ds_0\": " << ds_0 << ",\n"
+        << "  \"dsmax\": " << dsmax << ",\n"
+        << "  \"ode_tolerance\": " << ode_tolerance << ",\n"
+        << "  \"eta_criterion\": " << eta_criterion << ",\n"
+        << "  \"reference_file\": " << JsonString(reference_file) << ",\n"
+        << "  \"reference\": {\"A\": " << reference.A << ", \"Z\": " << reference.Z
+        << ", \"Nrefmax\": " << reference.Nrefmax << ", \"J2\": " << reference.J2
+        << ", \"parity\": " << reference.parity << ", \"emax\": " << reference.emax
+        << ", \"e2max\": " << reference.e2max << ", \"hw\": " << reference.hw << "},\n"
+        << "  \"interaction_sha256\": " << JsonString(reference.interaction_sha256) << ",\n"
+        << "  \"rdm_sha256\": " << JsonString(reference.rdm_sha256) << ",\n"
+        << "  \"wavefunction_sha256\": " << JsonString(reference.wavefunction_sha256) << "\n"
+        << "}\n";
+    return out.good();
+  }
+}
+
 int main(int argc, char** argv)
 {
   // Default parameters, and everything passed by command line args.
@@ -1381,6 +1449,21 @@ int main(int argc, char** argv)
     if (write_H_no2bpack != "none")
       rw.Write_no2bpack(write_H_no2bpack, Hvac);
     if (not rw.goodstate) return EXIT_FAILURE;
+    if (use_mr_reference)
+    {
+      for (const auto &export_file : {std::make_pair(write_H_jcoupled64, std::string("jcoupled64")),
+                                      std::make_pair(write_H_no2bpack, std::string("no2bpack"))})
+      {
+        if (export_file.first == "none")
+          continue;
+        if (!WriteMRExportMetadata(export_file.first, export_file.second,
+                                   *mr_reference_context, mr_reference_file,
+                                   method, core_generator, denominator_partitioning,
+                                   imsrgsolver.GetS(), smax, ds_0, dsmax,
+                                   ode_tolerance, eta_criterion))
+          return EXIT_FAILURE;
+      }
+    }
   }
 
 
