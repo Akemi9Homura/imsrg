@@ -229,7 +229,7 @@ namespace
     std::vector<arma::mat> X_active_columns;
     std::vector<arma::mat> Y_active_columns;
     std::vector<std::vector<int>> pair_to_active_row;
-    std::vector<bool> full_active;
+    std::vector<char> full_active;
     size_t dense_ly_lx_bytes = 0;
     size_t dense_xly_ylx_bytes = 0;
 
@@ -321,15 +321,20 @@ namespace
     products.X_active_columns.resize(nch);
     products.Y_active_columns.resize(nch);
     products.pair_to_active_row.resize(nch);
-    products.full_active.assign(nch, false);
+    products.full_active.assign(nch, 0);
+    std::vector<size_t> dense_ly_lx_bytes(nch, 0);
+    std::vector<size_t> dense_xly_ylx_bytes(nch, 0);
+    // Channels are independent and each iteration writes only its own slots,
+    // as in the imsrg++ per-channel commutator loops.
+#pragma omp parallel for schedule(dynamic, 1)
     for (size_t ch = 0; ch < nch; ++ch)
     {
       const arma::mat &x = X.TwoBody.GetMatrix(ch);
       const arma::mat &y = Y.TwoBody.GetMatrix(ch);
       const arma::mat &lambda = reference.Lambda2.GetMatrix(ch);
-      products.dense_ly_lx_bytes +=
+      dense_ly_lx_bytes[ch] =
           2 * sizeof(double) * lambda.n_rows * lambda.n_cols;
-      products.dense_xly_ylx_bytes +=
+      dense_xly_ylx_bytes[ch] =
           sizeof(double) *
           (x.n_rows * y.n_cols + y.n_rows * x.n_cols);
       std::vector<bool> pair_is_active(lambda.n_rows, false);
@@ -373,7 +378,7 @@ namespace
 
       if (active_count == lambda.n_rows)
       {
-        products.full_active[ch] = true;
+        products.full_active[ch] = 1;
         products.LY_active_rows[ch] = lambda * y;
         products.LX_active_rows[ch] = lambda * x;
         products.XLY[ch] = x * products.LY_active_rows[ch];
@@ -392,6 +397,11 @@ namespace
       // the original complete matrix products.
       products.X_active_columns[ch] = x.cols(active);
       products.Y_active_columns[ch] = y.cols(active);
+    }
+    for (size_t ch = 0; ch < nch; ++ch)
+    {
+      products.dense_ly_lx_bytes += dense_ly_lx_bytes[ch];
+      products.dense_xly_ylx_bytes += dense_xly_ylx_bytes[ch];
     }
     return products;
   }
@@ -656,22 +666,34 @@ namespace MRCommutator
         static_cast<int>((avoided_dense_iv_output_bytes + 1023) / 1024));
     X.profiler.timer["MR comm221 lambda2 setup"] += omp_get_wtime() - section_start;
 
+    // The loops below follow the imsrg++ commutator pattern: independent
+    // outer iterations under "omp parallel for schedule(dynamic)", each
+    // writing only its own output slots.  IV and VI parallelize over the
+    // first one-body index, so every raw(one,two,.) element is accumulated by
+    // one thread in the original term order and the result does not depend on
+    // the thread count.
+    const std::vector<index_t> orbit_list(modelspace.all_orbits.begin(),
+                                          modelspace.all_orbits.end());
+    const int norbit_list = static_cast<int>(orbit_list.size());
+
     // IV: ordinary pair-coupled X lambda Y products.
     section_start = omp_get_wtime();
     const size_t nch = modelspace.GetNumberTwoBodyChannels();
-    for (size_t ch = 0; ch < nch; ++ch)
+#pragma omp parallel for schedule(dynamic, 1)
+    for (int io = 0; io < norbit_list; ++io)
     {
-      if (!products.full_active[ch] &&
-          products.X_active_columns[ch].n_cols == 0)
-        continue;
-      const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
-      const double angular_weight = 2 * channel.J + 1.0;
-      for (index_t one : modelspace.all_orbits)
+      const index_t one = orbit_list[io];
+      const Orbit &o1 = modelspace.GetOrbit(one);
+      for (size_t ch = 0; ch < nch; ++ch)
       {
-        const Orbit &o1 = modelspace.GetOrbit(one);
+        if (!products.full_active[ch] &&
+            products.X_active_columns[ch].n_cols == 0)
+          continue;
+        const TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
+        const double angular_weight = 2 * channel.J + 1.0;
         for (index_t two : X.GetOneBodyChannel(o1.l, o1.j2, o1.tz2))
         {
-          for (index_t t : modelspace.all_orbits)
+          for (index_t t : orbit_list)
           {
             double xly = 0.0;
             double ylx = 0.0;
@@ -692,83 +714,103 @@ namespace MRCommutator
     X.profiler.timer["MR comm221 lambda2 IV"] += omp_get_wtime() - section_start;
 
     // V: full ordered particle-hole pairs keep the sign of tz_a-tz_b.
+    // Blocks (J, parity, delta_tz) are independent, like the cross-coupled
+    // channels of comm222_phss.  Each block's partial trace goes to its own
+    // buffer; the buffers are then added in fixed block order, so the result
+    // is independent of the thread count.  The V sub-timers report summed
+    // thread time.
     section_start = omp_get_wtime();
     const std::vector<bool> lambda_active_orbits =
         FindLambdaActiveOrbits(reference);
-    double v_build_seconds = 0.0;
-    double v_blas_seconds = 0.0;
-    double v_trace_seconds = 0.0;
+    std::vector<std::array<int, 3>> block_keys;
     for (int J = 0; J <= max_J; ++J)
       for (int parity = 0; parity <= 1; ++parity)
         for (int delta_tz = -1; delta_tz <= 1; ++delta_tz)
+          block_keys.push_back({J, parity, delta_tz});
+    const int nblocks = static_cast<int>(block_keys.size());
+    std::vector<arma::mat> v_block_trace(nblocks);
+    double v_build_seconds = 0.0;
+    double v_blas_seconds = 0.0;
+    double v_trace_seconds = 0.0;
+    int v_avoided_kib = 0;
+#pragma omp parallel for schedule(dynamic, 1) \
+    reduction(+ : v_build_seconds, v_blas_seconds, v_trace_seconds) \
+    reduction(max : v_avoided_kib)
+    for (int ib = 0; ib < nblocks; ++ib)
+    {
+      double v_part_start = omp_get_wtime();
+      const OrderedCrossBlock block = BuildOrderedCrossBlock(
+          X, Y, reference, lambda_active_orbits,
+          block_keys[ib][0], block_keys[ib][1], block_keys[ib][2]);
+      v_build_seconds += omp_get_wtime() - v_part_start;
+      if (block.pairs.empty() || block.active_pair_indices.empty())
+        continue;
+      v_part_start = omp_get_wtime();
+      // Lambda has exact support only on pairs whose two orbits occur in
+      // at least one nonzero standard-coupled lambda2 element.  Restricting
+      // the intermediate index to that principal submatrix therefore
+      // preserves X*Lambda*Y exactly while bounding the correlated-reference
+      // work by its active space instead of the full single-particle space.
+      arma::mat xly;
+      arma::mat ylx;
+      arma::mat xlambda;
+      arma::mat ylambda;
+      if (block.full_active)
+      {
+        xly = (block.X * block.Lambda) * block.Y;
+        ylx = (block.Y * block.Lambda) * block.X;
+      }
+      else
+      {
+        // The one-body partial trace below reads only entries whose two
+        // ordered pairs share the spectator orbit t.  Retain the skinny
+        // left factors and evaluate exactly those dots instead of forming
+        // two mostly unused dimension-by-dimension output matrices.
+        xlambda = block.X_active_columns * block.Lambda;
+        ylambda = block.Y_active_columns * block.Lambda;
+        const size_t avoided_bytes =
+            2 * sizeof(double) * block.pairs.size() * block.pairs.size();
+        v_avoided_kib = std::max(
+            v_avoided_kib, static_cast<int>((avoided_bytes + 1023) / 1024));
+      }
+      v_blas_seconds += omp_get_wtime() - v_part_start;
+      const double angular_weight = 2 * block.J + 1.0;
+      v_part_start = omp_get_wtime();
+      arma::mat trace(norbits, norbits, arma::fill::zeros);
+      for (index_t one : orbit_list)
+      {
+        const Orbit &o1 = modelspace.GetOrbit(one);
+        for (index_t two : X.GetOneBodyChannel(o1.l, o1.j2, o1.tz2))
         {
-          double v_part_start = omp_get_wtime();
-          const OrderedCrossBlock block = BuildOrderedCrossBlock(
-              X, Y, reference, lambda_active_orbits,
-              J, parity, delta_tz);
-          v_build_seconds += omp_get_wtime() - v_part_start;
-          if (block.pairs.empty() || block.active_pair_indices.empty())
-            continue;
-          v_part_start = omp_get_wtime();
-          // Lambda has exact support only on pairs whose two orbits occur in
-          // at least one nonzero standard-coupled lambda2 element.  Restricting
-          // the intermediate index to that principal submatrix therefore
-          // preserves X*Lambda*Y exactly while bounding the correlated-reference
-          // work by its active space instead of the full single-particle space.
-          arma::mat xly;
-          arma::mat ylx;
-          arma::mat xlambda;
-          arma::mat ylambda;
-          if (block.full_active)
+          for (index_t t : orbit_list)
           {
-            xly = (block.X * block.Lambda) * block.Y;
-            ylx = (block.Y * block.Lambda) * block.X;
+            const int ibra = block.Find(one, t);
+            const int iket = block.Find(two, t);
+            if (ibra < 0 || iket < 0)
+              continue;
+            const double xly_value = block.full_active
+                                         ? xly(ibra, iket)
+                                         : arma::dot(
+                                               xlambda.row(ibra),
+                                               block.Y_active_rows.col(iket));
+            const double ylx_value = block.full_active
+                                         ? ylx(ibra, iket)
+                                         : arma::dot(
+                                               ylambda.row(ibra),
+                                               block.X_active_rows.col(iket));
+            trace(one, two) += 0.5 * angular_weight / (o1.j2 + 1.0) *
+                               (xly_value - ylx_value);
           }
-          else
-          {
-            // The one-body partial trace below reads only entries whose two
-            // ordered pairs share the spectator orbit t.  Retain the skinny
-            // left factors and evaluate exactly those dots instead of forming
-            // two mostly unused dimension-by-dimension output matrices.
-            xlambda = block.X_active_columns * block.Lambda;
-            ylambda = block.Y_active_columns * block.Lambda;
-            const size_t avoided_bytes =
-                2 * sizeof(double) * block.pairs.size() * block.pairs.size();
-            X.profiler.counter["MR V dense output avoided KiB"] = std::max(
-                X.profiler.counter["MR V dense output avoided KiB"],
-                static_cast<int>((avoided_bytes + 1023) / 1024));
-          }
-          v_blas_seconds += omp_get_wtime() - v_part_start;
-          const double angular_weight = 2 * block.J + 1.0;
-          v_part_start = omp_get_wtime();
-          for (index_t one : modelspace.all_orbits)
-          {
-            const Orbit &o1 = modelspace.GetOrbit(one);
-            for (index_t two : X.GetOneBodyChannel(o1.l, o1.j2, o1.tz2))
-            {
-              for (index_t t : modelspace.all_orbits)
-              {
-                const int ibra = block.Find(one, t);
-                const int iket = block.Find(two, t);
-                if (ibra < 0 || iket < 0)
-                  continue;
-                const double xly_value = block.full_active
-                                             ? xly(ibra, iket)
-                                             : arma::dot(
-                                                   xlambda.row(ibra),
-                                                   block.Y_active_rows.col(iket));
-                const double ylx_value = block.full_active
-                                             ? ylx(ibra, iket)
-                                             : arma::dot(
-                                                   ylambda.row(ibra),
-                                                   block.X_active_rows.col(iket));
-                raw(one, two, 1) += 0.5 * angular_weight / (o1.j2 + 1.0) *
-                                    (xly_value - ylx_value);
-              }
-            }
-          }
-          v_trace_seconds += omp_get_wtime() - v_part_start;
         }
+      }
+      v_block_trace[ib] = std::move(trace);
+      v_trace_seconds += omp_get_wtime() - v_part_start;
+    }
+    for (int ib = 0; ib < nblocks; ++ib)
+      if (!v_block_trace[ib].is_empty())
+        raw.slice(1) += v_block_trace[ib];
+    X.profiler.counter["MR V dense output avoided KiB"] = std::max(
+        X.profiler.counter["MR V dense output avoided KiB"], v_avoided_kib);
     X.profiler.timer["MR comm221 lambda2 V build"] += v_build_seconds;
     X.profiler.timer["MR comm221 lambda2 V BLAS"] += v_blas_seconds;
     X.profiler.timer["MR comm221 lambda2 V partial trace"] += v_trace_seconds;
@@ -781,15 +823,18 @@ namespace MRCommutator
     const double trace_start = section_start;
     arma::mat ly_trace(norbits, norbits, arma::fill::zeros);
     arma::mat lx_trace(norbits, norbits, arma::fill::zeros);
-    for (index_t t : modelspace.all_orbits)
-      for (index_t s : modelspace.all_orbits)
+#pragma omp parallel for schedule(dynamic, 1)
+    for (int it = 0; it < norbit_list; ++it)
+    {
+      const index_t t = orbit_list[it];
+      const Orbit &ot = modelspace.GetOrbit(t);
+      for (index_t s : orbit_list)
       {
-        const Orbit &ot = modelspace.GetOrbit(t);
         const Orbit &os = modelspace.GetOrbit(s);
         if (ot.j2 != os.j2)
           continue;
         for (int J2 = 0; J2 <= max_J; ++J2)
-          for (index_t w : modelspace.all_orbits)
+          for (index_t w : orbit_list)
           {
             const Orbit &ow = modelspace.GetOrbit(w);
             if ((os.l + ow.l) % 2 != (ot.l + ow.l) % 2 ||
@@ -811,22 +856,25 @@ namespace MRCommutator
             lx_trace(s, t) += weight * lx;
           }
       }
+    }
     X.profiler.timer["MR comm221 lambda2 VI trace"] +=
         omp_get_wtime() - trace_start;
 
-    for (index_t one : modelspace.all_orbits)
+#pragma omp parallel for schedule(dynamic, 1)
+    for (int io = 0; io < norbit_list; ++io)
     {
+      const index_t one = orbit_list[io];
       const Orbit &o1 = modelspace.GetOrbit(one);
       for (index_t two : X.GetOneBodyChannel(o1.l, o1.j2, o1.tz2))
       {
         for (int J1 = 0; J1 <= max_J; ++J1)
-          for (index_t t : modelspace.all_orbits)
+          for (index_t t : orbit_list)
           {
             const Orbit &ot = modelspace.GetOrbit(t);
             if (2 * J1 < std::abs(o1.j2 - ot.j2) ||
                 2 * J1 > o1.j2 + ot.j2)
               continue;
-            for (index_t s : modelspace.all_orbits)
+            for (index_t s : orbit_list)
             {
               if (ot.j2 != modelspace.GetOrbit(s).j2)
                 continue;
