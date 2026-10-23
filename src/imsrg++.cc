@@ -932,7 +932,8 @@ int main(int argc, char** argv)
 
 
   HNO -= BetaCM * 1.5*hwBetaCM; // This is just the zero-body piece. The other stuff was added earlier.
-  std::cout << "Hbare 0b = " << std::setprecision(8) << HNO.ZeroBody << std::endl;
+  if (!use_mr_reference) // MR already printed E, ||f||, ||Gamma|| after normal ordering
+    std::cout << "Hbare 0b = " << std::setprecision(8) << HNO.ZeroBody << std::endl;
 
   if (method != "HF" && !use_mr_reference)
   {
@@ -1634,7 +1635,12 @@ int main(int argc, char** argv)
   }
   else // single ref. just print the zero body pieces out. (maybe check if its magnus?)
   {
-    std::cout << "Core Energy = " << std::setprecision(6) << imsrgsolver.GetH_s().ZeroBody << std::endl;
+    if (use_mr_reference)
+      std::cout << "MR reference energy <Phi|H(s)|Phi> = " << std::setprecision(10)
+                << imsrgsolver.GetH_s().ZeroBody
+                << "  (not the IM-NCSM energy: diagonalize the exported H)" << std::endl;
+    else
+      std::cout << "Core Energy = " << std::setprecision(6) << imsrgsolver.GetH_s().ZeroBody << std::endl;
     if ( method != "magnus")
     {
       for (index_t i=0;i<ops.size();++i)

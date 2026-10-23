@@ -883,9 +883,12 @@ void IMSRGSolver::Solve_ode_adaptive()
   ode_mode = "H";
   if (method == "restore_4th_order")
     ode_mode = "Restored";
-  WriteFlowStatusHeader(std::cout);
+  // Solve() already printed the header; the MR log keeps a single table.
+  if (mr_reference == nullptr)
+    WriteFlowStatusHeader(std::cout);
   WriteFlowStatus(flowfile);
-  std::cout << "done writing header and status" << std::endl;
+  if (mr_reference == nullptr)
+    std::cout << "done writing header and status" << std::endl;
   //   using namespace boost::numeric::odeint;
   namespace odeint = boost::numeric::odeint;
   auto system = *this;
@@ -895,7 +898,10 @@ void IMSRGSolver::Solve_ode_adaptive()
   auto monitor = ode_monitor;
   //   size_t steps = integrate_adaptive(make_controlled<stepper>(ode_e_abs,ode_e_rel), system, FlowingOps, s, smax, ds, monitor);
   odeint::integrate_adaptive(odeint::make_controlled<stepper>(ode_e_abs, ode_e_rel), system, FlowingOps, s, smax, ds, monitor);
-  monitor.report();
+  // The monitor reads this solver's Eta, which odeint never updates (it
+  // advances a copy), so its eta columns are zeros; the MR log omits it.
+  if (mr_reference == nullptr)
+    monitor.report();
 }
 
 // Evaluate dx/dt for boost ode
@@ -1502,6 +1508,23 @@ double IMSRGSolver::CalculatePerturbativeTriples(Operator &Op_0)
   return pert_triples;
 }
 
+// Each status point is written twice (flow file and stdout), so the slope is
+// updated only when the point changes.  Rows at the same s (repeated
+// evaluations in the adaptive ODE path) or going backwards give NaN.
+double IMSRGSolver::FlowStatusEnergySlope()
+{
+  const double E0_now = FlowingOps[0].ZeroBody;
+  if (status_has_row && s == status_s && E0_now == status_E0)
+    return status_dE0_ds;
+  status_dE0_ds = (status_has_row && s > status_s)
+                      ? (E0_now - status_E0) / (s - status_s)
+                      : std::numeric_limits<double>::quiet_NaN();
+  status_s = s;
+  status_E0 = E0_now;
+  status_has_row = true;
+  return status_dE0_ds;
+}
+
 void IMSRGSolver::WriteFlowStatus(std::string fname)
 {
   if (fname != "")
@@ -1530,7 +1553,8 @@ void IMSRGSolver::WriteFlowStatus(std::ostream &f)
       << std::setw(fwidth) << std::setprecision(fprecision) << Eta.TwoBodyNorm()
       << std::setw(fwidth) << std::setprecision(fprecision) << Eta.ThreeBodyNorm()
       << std::setw(7) << std::setprecision(0) << profiler.counter["N_ScalarCommutators"] + profiler.counter["N_TensorCommutators"]
-      << std::setw(fwidth) << std::setprecision(fprecision) << H_s.GetMP2_Energy()
+      << std::setw(fwidth) << std::setprecision(fprecision)
+      << (mr_reference == nullptr ? H_s.GetMP2_Energy() : FlowStatusEnergySlope())
       << std::setw(7) << std::setprecision(0) << profiler.counter["N_Operators"]
       << std::setprecision(fprecision)
       << std::setw(12) << std::setprecision(3) << profiler.GetTimes()["real"]
@@ -1555,7 +1579,8 @@ void IMSRGSolver::WriteFlowStatusHeader(std::ostream &f)
     f.setf(std::ios::fixed);
     f << std::fixed << std::setw(5) << "i"
       << std::setw(12) << std::setprecision(5) << "s"
-      << std::setw(fwidth) << std::setprecision(fprecision) << "E0"
+      << std::setw(fwidth) << std::setprecision(fprecision)
+      << (mr_reference == nullptr ? "E0" : "<Phi|H(s)|Phi>")
       //        << std::setw(fwidth) << std::setprecision(fprecision) << "||H_1||"
       //        << std::setw(fwidth) << std::setprecision(fprecision) << "||H_2||"
       << std::setw(fwidth) << std::setprecision(fprecision) << "||H||"
@@ -1568,7 +1593,8 @@ void IMSRGSolver::WriteFlowStatusHeader(std::ostream &f)
       << std::setw(fwidth) << std::setprecision(fprecision) << "||Eta_2||"
       << std::setw(fwidth) << std::setprecision(fprecision) << "||Eta_3||"
       << std::setw(7) << std::setprecision(fprecision) << "Ncomm"
-      << std::setw(16) << std::setprecision(fprecision) << "E(MP2)"
+      << std::setw(16) << std::setprecision(fprecision)
+      << (mr_reference == nullptr ? "E(MP2)" : "dE0/ds")
       << std::setw(7) << std::setprecision(fprecision) << "N_Ops"
       << std::setw(16) << std::setprecision(fprecision) << "Walltime (s)"
       << std::setw(19) << std::setprecision(fprecision) << "Memory (MB)"

@@ -67,6 +67,13 @@ class IMSRGSolver
   const MRReference* mr_reference = nullptr;
   std::size_t magnus_series_step_rejections = 0;
   std::size_t magnus_series_segment_restarts = 0;
+  // MR flow table: the SR MP2 column is undefined for a correlated reference,
+  // so it shows the backward difference dE0/ds between consecutive status rows.
+  double status_s = 0.0;
+  double status_E0 = 0.0;
+  double status_dE0_ds = 0.0;
+  bool status_has_row = false;
+  double FlowStatusEnergySlope();
 
   double Elast;
   double cumulative_error;
