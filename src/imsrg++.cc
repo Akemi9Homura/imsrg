@@ -1452,6 +1452,11 @@ int main(int argc, char** argv)
     if (not rw.goodstate) return EXIT_FAILURE;
     if (use_mr_reference)
     {
+      // The adaptive ODE path advances a copy of the solver, so GetS() stays
+      // at 0 there (the SR two-step flow relies on that); integrate_adaptive
+      // always stops exactly at smax.
+      const double s_final = (method == "flow" || method == "flow_adaptive")
+                                 ? smax : imsrgsolver.GetS();
       for (const auto &export_file : {std::make_pair(write_H_jcoupled64, std::string("jcoupled64")),
                                       std::make_pair(write_H_no2bpack, std::string("no2bpack"))})
       {
@@ -1460,7 +1465,7 @@ int main(int argc, char** argv)
         if (!WriteMRExportMetadata(export_file.first, export_file.second,
                                    *mr_reference_context, mr_reference_file,
                                    method, core_generator, denominator_partitioning,
-                                   imsrgsolver.GetS(), smax, ds_0, dsmax,
+                                   s_final, smax, ds_0, dsmax,
                                    ode_tolerance, eta_criterion))
           return EXIT_FAILURE;
       }

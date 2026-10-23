@@ -1,5 +1,8 @@
 # This is adapted from https://www.mattkeeter.com/blog/2018-01-06-versioning/.
+# Run git in the source checkout (this script's directory), not in the build
+# tree, which may sit inside another repository.
 execute_process(COMMAND git log --pretty=format:'%h' -n 1
+                WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
                 OUTPUT_VARIABLE GIT_REV
                 ERROR_QUIET)
 
@@ -14,12 +17,15 @@ if ("${GIT_REV}" STREQUAL "")
 else()
     execute_process(
         COMMAND bash -c "git diff --quiet --exit-code || echo +"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         OUTPUT_VARIABLE GIT_DIFF)
     execute_process(
         COMMAND git describe --exact-match --tags
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         OUTPUT_VARIABLE GIT_TAG ERROR_QUIET)
     execute_process(
         COMMAND git rev-parse --abbrev-ref HEAD
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         OUTPUT_VARIABLE GIT_BRANCH)
 
     string(STRIP "${GIT_REV}" GIT_REV)
