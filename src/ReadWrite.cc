@@ -6123,15 +6123,9 @@ void ReadWrite::WriteTokyo(Operator& op, std::string filename, std::string mode)
          int d_ind = orb2kshell[d];
 
          double tbme = op.TwoBody.GetTBME_norm(ch,a,b,c,d);
-         if (oa.tz2!=ob.tz2 and mode=="op")
-         {
-           int aa = a - oa.tz2;
-           int bb = b - ob.tz2;
-           int cc = c - oc.tz2;
-           int dd = d - od.tz2;
-           tbme += op.TwoBody.GetTBME_norm(ch,aa,bb,cc,dd); // looks like some isospin averaging for an operator file?
-           tbme /= 2;
-         }
+         // Proton-neutron matrix elements are written as they are, for operators as for the Hamiltonian.
+         // They used to be averaged with the proton<->neutron mirror element when mode=="op", which is
+         // only harmless for charge-symmetric operators; it corrupts Rp2 (and the evolved HCM) for N!=Z.
 //         if (std::abs(tbme) < op.TwoBodyNorm() * 1e-7 or op.TwoBodyNorm() == 0)
          if (std::abs(tbme) < norm2b * 1e-7 or norm2b<1e-7)
            continue;
