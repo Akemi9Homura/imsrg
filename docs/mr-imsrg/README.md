@@ -71,7 +71,7 @@ H(s)、O(s)：jcoupled64 / no2bpack / opbin + .mrmeta.json
 
    得到 `H.jcoupled64`、`H.no2bpack`、`H_Rp2.jcoupled64`、`H_Rp2.no2bpack`、`H_E2.opbin` 及各自的 `.mrmeta.json`。
    日志里 `MR initial natural-basis Hamiltonian: E=` 应等于参考态 NCSM 能量（这里 −17.01349 MeV）。
-   严格解耦按 ‖η‖/‖η(0)‖ < 1e-6 停（`eta_criterion` 是绝对值，取 1e-6 × 初始 ‖η‖；He4 这里 ‖η(0)‖ = 1.0785）。He4 Nrefmax=2 emax2 要约 8×10^5 步、
+   `eta_criterion` 与 imsrg++ 一样是 ‖η‖ 的绝对值。He4 Nrefmax=2 emax2 验收时用的是 7e-7（‖η(0)‖ = 0.7036 的相对 1e-6），要约 8×10^5 步、
    s ≈ 4×10^5、53 段 Ω、单线程 44 h（慢尾，见 生成元.md）；试跑可先用 `smax=0.5`。
 
 4. 下游读回：`mrimsrg_validate --no2bpack H.no2bpack --Z 2 --N 2 --nmax 10 --states 3`（见 驱动参数与输出.md）。
