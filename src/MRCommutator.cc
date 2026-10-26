@@ -1396,6 +1396,226 @@ namespace
   }
 }
 
+/// T(X,Y) = 1/4 sum_J (2J+1) sum_{s,s'} O^J(s,s') Lambda^J(s,s') with the
+/// bra s = ((kl)J13, b), the ket s' = ((cd)J12, m) and
+///   O^J(s,s') = sum_a Y^{J13}_{(kl),(am)} U X^{J12}_{(ab),(cd)},
+///   U = (-1)^{jb+jm+J12+J13} J12^ J13^ {jb ja J12; jm J J13},
+/// i.e. X takes particles (1,2) from (c,d) to (a,b), ((ab)J12, m) is
+/// recoupled to ((am)J13, b), and Y takes (a,m) to (k,l).  X^J and Y^J are
+/// the unnormalized TwoBodyME::GetTBME_J elements, the plain-CG convention
+/// of lambda3; the unrestricted (kl), (cd) sums are folded onto a <= b with
+/// weight 2 for a < b.  States are grouped by (spectator, pair J), so per
+/// call only the Y block (group, m) and the X block (group, b) are fetched.
+struct Lambda3CommutatorPlan
+{
+  struct Group
+  {
+    int spectator;
+    int J;
+    std::vector<size_t> states;
+    std::vector<std::pair<index_t, index_t>> pairs;  // (a, b) of each state, a <= b
+  };
+  struct Block  // Y: rows = group states, columns = orbits; X: rows = orbits, columns = group states
+  {
+    size_t group;
+    int other;  // m for a Y block, b for an X block
+    std::vector<index_t> orbits;
+  };
+  struct Term
+  {
+    size_t y_column;
+    size_t x_row;
+    double recoupling;
+  };
+  struct Pair
+  {
+    size_t y_block;
+    size_t x_block;
+    arma::mat weighted;  // w_bra w_ket Lambda on (bra group, ket group)
+    std::vector<Term> terms;
+  };
+  struct Channel
+  {
+    int twoJ;
+    std::vector<Group> groups;
+    std::vector<Block> y_blocks;
+    std::vector<Block> x_blocks;
+    std::vector<Pair> pairs;
+  };
+  std::vector<Channel> channels;
+};
+
+namespace
+{
+  std::shared_ptr<const Lambda3CommutatorPlan> BuildLambda3Plan(const MRReference &reference)
+  {
+    ModelSpace &ms = *reference.modelspace;
+    auto plan = std::make_shared<Lambda3CommutatorPlan>();
+    for (const Lambda3Channel &source : reference.Lambda3)
+    {
+      if (source.states.empty())
+        continue;
+      Lambda3CommutatorPlan::Channel channel;
+      channel.twoJ = source.twoJ;
+      std::map<std::pair<int, int>, size_t> group_index;
+      for (size_t i = 0; i < source.states.size(); ++i)
+      {
+        const std::pair<int, int> key = {source.states[i][2], source.states[i][3]};
+        auto found = group_index.find(key);
+        if (found == group_index.end())
+        {
+          found = group_index.emplace(key, channel.groups.size()).first;
+          channel.groups.push_back({key.first, key.second, {}, {}});
+        }
+        channel.groups[found->second].states.push_back(i);
+        channel.groups[found->second].pairs.push_back(
+            {static_cast<index_t>(source.states[i][0]), static_cast<index_t>(source.states[i][1])});
+      }
+      auto weight = [&](size_t i)
+      { return (source.states[i][0] == source.states[i][1]) ? 1.0 : 2.0; };
+      std::map<std::pair<size_t, int>, size_t> y_index, x_index;
+      for (size_t g = 0; g < channel.groups.size(); ++g)
+      {
+        const int b = channel.groups[g].spectator;
+        const int J13 = channel.groups[g].J;
+        const Orbit &ob = ms.GetOrbit(b);
+        for (size_t h = 0; h < channel.groups.size(); ++h)
+        {
+          const int m = channel.groups[h].spectator;
+          const int J12 = channel.groups[h].J;
+          const Orbit &om = ms.GetOrbit(m);
+          // The intermediate orbit a is fixed in charge and parity by the channel.
+          const int tz2_a = source.twoTz - ob.tz2 - om.tz2;
+          const int parity_a = ((source.parity - ob.l - om.l) % 2 + 2) % 2;
+          auto y_found = y_index.find({g, m});
+          if (y_found == y_index.end())
+          {
+            Lambda3CommutatorPlan::Block block{g, m, {}};
+            for (index_t a : ms.all_orbits)
+            {
+              const Orbit &oa = ms.GetOrbit(a);
+              if (oa.tz2 == tz2_a && oa.l % 2 == parity_a && AngMom::Triangle(oa.j2, om.j2, 2 * J13))
+                block.orbits.push_back(a);
+            }
+            y_found = y_index.emplace(std::make_pair(g, m), channel.y_blocks.size()).first;
+            channel.y_blocks.push_back(std::move(block));
+          }
+          auto x_found = x_index.find({h, b});
+          if (x_found == x_index.end())
+          {
+            Lambda3CommutatorPlan::Block block{h, b, {}};
+            for (index_t a : ms.all_orbits)
+            {
+              const Orbit &oa = ms.GetOrbit(a);
+              if (oa.tz2 == tz2_a && oa.l % 2 == parity_a && AngMom::Triangle(oa.j2, ob.j2, 2 * J12))
+                block.orbits.push_back(a);
+            }
+            x_found = x_index.emplace(std::make_pair(h, b), channel.x_blocks.size()).first;
+            channel.x_blocks.push_back(std::move(block));
+          }
+          const auto &y_orbits = channel.y_blocks[y_found->second].orbits;
+          const auto &x_orbits = channel.x_blocks[x_found->second].orbits;
+          Lambda3CommutatorPlan::Pair pair;
+          pair.y_block = y_found->second;
+          pair.x_block = x_found->second;
+          for (size_t iy = 0; iy < y_orbits.size(); ++iy)
+          {
+            const auto ix = std::find(x_orbits.begin(), x_orbits.end(), y_orbits[iy]);
+            if (ix == x_orbits.end())
+              continue;
+            const Orbit &oa = ms.GetOrbit(y_orbits[iy]);
+            const double sixj = AngMom::SixJ(0.5 * ob.j2, 0.5 * oa.j2, J12,
+                                             0.5 * om.j2, 0.5 * source.twoJ, J13);
+            if (sixj == 0.0)
+              continue;
+            const int phase_exponent = (ob.j2 + om.j2) / 2 + J12 + J13;
+            pair.terms.push_back({iy, static_cast<size_t>(ix - x_orbits.begin()),
+                                  (phase_exponent % 2 ? -1.0 : 1.0) *
+                                      std::sqrt((2 * J12 + 1.0) * (2 * J13 + 1.0)) * sixj});
+          }
+          if (pair.terms.empty())
+            continue;
+          const auto &bra_states = channel.groups[g].states;
+          const auto &ket_states = channel.groups[h].states;
+          pair.weighted.set_size(bra_states.size(), ket_states.size());
+          for (size_t i = 0; i < bra_states.size(); ++i)
+            for (size_t j = 0; j < ket_states.size(); ++j)
+              pair.weighted(i, j) = weight(bra_states[i]) * weight(ket_states[j]) *
+                                    source.matrix(bra_states[i], ket_states[j]);
+          channel.pairs.push_back(std::move(pair));
+        }
+      }
+      plan->channels.push_back(std::move(channel));
+    }
+    return plan;
+  }
+
+  std::mutex lambda3_plan_mutex;
+
+  const Lambda3CommutatorPlan &GetLambda3Plan(const MRReference &reference)
+  {
+    std::lock_guard<std::mutex> lock(lambda3_plan_mutex);
+    if (!reference.lambda3_commutator_plan)
+      reference.lambda3_commutator_plan = BuildLambda3Plan(reference);
+    return *reference.lambda3_commutator_plan;
+  }
+
+  /// T(X,Y) of the plan above.  Channels run in parallel into separate slots
+  /// that are added in channel order, so the result does not depend on the
+  /// number of threads.
+  double Lambda3ZeroBodyTerm(const Operator &X, const Operator &Y,
+                             const MRReference &reference)
+  {
+    const Lambda3CommutatorPlan &plan = GetLambda3Plan(reference);
+    std::vector<double> channel_sums(plan.channels.size(), 0.0);
+#pragma omp parallel for schedule(dynamic, 1)
+    for (size_t c = 0; c < plan.channels.size(); ++c)
+    {
+      const Lambda3CommutatorPlan::Channel &channel = plan.channels[c];
+      // Y^{J13}_{(kl),(am)}: rows = bra-group pairs, columns = a.
+      std::vector<arma::mat> y_values(channel.y_blocks.size());
+      for (size_t k = 0; k < channel.y_blocks.size(); ++k)
+      {
+        const auto &block = channel.y_blocks[k];
+        const auto &group = channel.groups[block.group];
+        arma::mat &values = y_values[k];
+        values.set_size(group.pairs.size(), block.orbits.size());
+        for (size_t a = 0; a < block.orbits.size(); ++a)
+          for (size_t i = 0; i < group.pairs.size(); ++i)
+            values(i, a) = Y.TwoBody.GetTBME_J(group.J, group.J, group.pairs[i].first,
+                                               group.pairs[i].second, block.orbits[a], block.other);
+      }
+      // X^{J12}_{(ab),(cd)}: rows = a, columns = ket-group pairs.
+      std::vector<arma::mat> x_values(channel.x_blocks.size());
+      for (size_t k = 0; k < channel.x_blocks.size(); ++k)
+      {
+        const auto &block = channel.x_blocks[k];
+        const auto &group = channel.groups[block.group];
+        arma::mat &values = x_values[k];
+        values.set_size(block.orbits.size(), group.pairs.size());
+        for (size_t j = 0; j < group.pairs.size(); ++j)
+          for (size_t a = 0; a < block.orbits.size(); ++a)
+            values(a, j) = X.TwoBody.GetTBME_J(group.J, group.J, block.orbits[a], block.other,
+                                               group.pairs[j].first, group.pairs[j].second);
+      }
+      double sum = 0.0;
+      for (const auto &pair : channel.pairs)
+      {
+        // (Y^T W)(a, j) = sum_i Y(i, a) W(i, j); a term is U * sum_j (Y^T W)(a_y, j) X(a_x, j).
+        const arma::mat yw = y_values[pair.y_block].t() * pair.weighted;
+        const arma::mat &x = x_values[pair.x_block];
+        for (const auto &term : pair.terms)
+          sum += term.recoupling * arma::dot(yw.row(term.y_column), x.row(term.x_row));
+      }
+      channel_sums[c] = 0.25 * (channel.twoJ + 1.0) * sum;
+    }
+    double total = 0.0;
+    for (double value : channel_sums)
+      total += value;
+    return total;
+  }
+}
+
 namespace MRCommutator
 {
   MR1BResult comm221_lambda2_reference(const Operator &X, const Operator &Y,
@@ -1780,6 +2000,17 @@ namespace MRCommutator
     return result;
   }
 
+  double comm220_lambda3(const Operator &X, const Operator &Y,
+                         const MRReference &reference)
+  {
+    if (!reference.has_lambda3 || reference.Lambda3.empty())
+      return 0.0;
+    if (X.GetJRank() != 0 || Y.GetJRank() != 0 || X.GetTRank() != 0 ||
+        Y.GetTRank() != 0 || X.GetParity() != 0 || Y.GetParity() != 0)
+      return 0.0;  // the zero-body part of a tensor vanishes for J_ref = 0
+    return Lambda3ZeroBodyTerm(X, Y, reference) - Lambda3ZeroBodyTerm(Y, X, reference);
+  }
+
   Operator Commutator(const Operator &X, const Operator &Y,
                       const MRReference &reference)
   {
@@ -1793,7 +2024,8 @@ namespace MRCommutator
     Operator result = ::Commutator::Commutator(X, Y);
     // This exact branch is the SR-degeneration gate: no duplicated SR formula
     // and no floating-point add/subtract of nominally zero MR corrections.
-    if (reference.Lambda2.Norm() == 0.0)
+    const bool has_lambda3_terms = reference.has_lambda3 && reference.Lambda3Norm() != 0.0;
+    if (reference.Lambda2.Norm() == 0.0 && !has_lambda3_terms)
       return result;
 
     const double addon_start = omp_get_wtime();
@@ -1812,6 +2044,12 @@ namespace MRCommutator
     // Hergert Eq. (49): contract lambda2 with the completed 2B commutator,
     // including 1B--2B as well as both 2B--2B topologies.
     result.ZeroBody += reference.ContractLambda2(result.TwoBody);
+    if (has_lambda3_terms)
+    {
+      const double lambda3_start = omp_get_wtime();
+      result.ZeroBody += comm220_lambda3(X, Y, reference);
+      X.profiler.timer["MR comm220 lambda3"] += omp_get_wtime() - lambda3_start;
+    }
     X.profiler.timer["MR lambda2 commutator addons"] +=
         omp_get_wtime() - addon_start;
     return result;

@@ -32,8 +32,14 @@ namespace MRCommutator
   /// isospin-conserving tensor of rank L > 0 (either order).
   arma::mat comm221_lambda2_tensor(const Operator &X, const Operator &Y,
                                    const MRReference &reference);
-  /// Full MR-IMSRG(2) commutator for J_ref=0 and lambda3=0.
-  /// Lambda2=0 returns the existing scalar IMSRG(2) commutator directly.
+  /// Zero-body lambda3 term of [X,Y] for scalar two-body X, Y (Hergert 2017,
+  /// Eq. 49): 1/4 sum (X^{ab}_{cd} Y^{kl}_{am} - Y^{ab}_{cd} X^{kl}_{am}) lambda^{bkl}_{cdm}.
+  /// Zero when the reference carries no lambda3.
+  double comm220_lambda3(const Operator &X, const Operator &Y,
+                         const MRReference &reference);
+  /// Full MR-IMSRG(2) commutator for J_ref=0: lambda2 terms always, and the
+  /// zero-body lambda3 term when the reference carries lambda3.
+  /// Lambda2=0 (and no lambda3) returns the existing scalar IMSRG(2) commutator directly.
   Operator Commutator(const Operator &X, const Operator &Y,
                       const MRReference &reference);
 }

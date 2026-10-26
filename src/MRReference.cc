@@ -5,7 +5,9 @@
 #include <cmath>
 #include <cstdint>
 #include <fstream>
+#include <cstring>
 #include <map>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
@@ -45,6 +47,19 @@ void ValidateDigest(const std::string &value, const char *description)
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
       }))
     throw std::runtime_error(std::string("invalid lowercase SHA-256 in ") + description);
+}
+
+constexpr size_t kEnergyLabelBytes = 64;
+
+/// Bring a lambda3 state to the stored a <= b order; returns the phase of
+/// |(ba)J12 c> = (-1)^{ja+jb-J12+1} |(ab)J12 c>.
+int CanonicalLambda3State(const ModelSpace &ms, std::array<int, 4> &state)
+{
+  if (state[0] <= state[1])
+    return 1;
+  const int jsum = (ms.GetOrbit(state[0]).j2 + ms.GetOrbit(state[1]).j2) / 2;
+  std::swap(state[0], state[1]);
+  return ((jsum - state[3] + 1) % 2 == 0) ? 1 : -1;
 }
 
 std::string ReadDigest(std::istream &input, const char *description)
@@ -90,7 +105,8 @@ MRReference MRReference::ReadBinary(ModelSpace &ms, const std::string &filename,
     throw std::runtime_error("unsupported MR reference magic in " + filename);
   if (ReadScalar<std::uint32_t>(input, "endian marker") != kEndianMarker)
     throw std::runtime_error("MR reference has unsupported byte order");
-  if (ReadScalar<std::uint32_t>(input, "schema version") != 1u)
+  const std::uint32_t version = ReadScalar<std::uint32_t>(input, "schema version");
+  if (version != 1u && version != 2u)
     throw std::runtime_error("unsupported MR reference schema version");
 
   const int A = ReadScalar<std::int32_t>(input, "A");
@@ -205,6 +221,51 @@ MRReference MRReference::ReadBinary(ModelSpace &ms, const std::string &filename,
   for (size_t ch = 0; ch < seen_channel.size(); ++ch)
     if (ms.GetTwoBodyChannel(ch).GetNumberKets() > 0 && !seen_channel[ch])
       throw std::runtime_error("MR reference omits a nonempty two-body channel");
+  if (version == 2u)
+  {
+    result.has_reference_energy = ReadScalar<std::uint32_t>(input, "reference energy flag") != 0u;
+    result.reference_energy = ReadScalar<double>(input, "reference energy");
+    std::array<char, kEnergyLabelBytes> label{};
+    input.read(label.data(), label.size());
+    if (!input)
+      throw std::runtime_error("truncated MR reference while reading the reference energy label");
+    result.reference_energy_label = std::string(label.data(), strnlen(label.data(), label.size()));
+    result.has_lambda3 = ReadScalar<std::uint32_t>(input, "lambda3 flag") != 0u;
+    const std::uint64_t nlambda3 = ReadScalar<std::uint64_t>(input, "lambda3 channel count");
+    if (!result.has_lambda3 && nlambda3 != 0)
+      throw std::runtime_error("MR reference lists lambda3 channels without the lambda3 flag");
+    for (std::uint64_t ich = 0; ich < nlambda3; ++ich)
+    {
+      Lambda3Channel channel;
+      channel.twoJ = ReadScalar<std::int32_t>(input, "lambda3 channel 2J");
+      channel.parity = ReadScalar<std::int32_t>(input, "lambda3 channel parity");
+      channel.twoTz = ReadScalar<std::int32_t>(input, "lambda3 channel 2Tz");
+      (void)ReadScalar<std::uint32_t>(input, "lambda3 channel reserved field");
+      const std::uint64_t nstates = ReadScalar<std::uint64_t>(input, "lambda3 state count");
+      std::vector<int> phase(nstates, 1);
+      channel.states.resize(nstates);
+      for (std::uint64_t i = 0; i < nstates; ++i)
+      {
+        std::array<std::uint32_t, 3> file_orbits{};
+        for (auto &orbit : file_orbits)
+        {
+          orbit = ReadScalar<std::uint32_t>(input, "lambda3 state orbit");
+          if (orbit >= norbits)
+            throw std::runtime_error("MR reference lambda3 state uses an invalid orbit index");
+        }
+        const int J12 = ReadScalar<std::int32_t>(input, "lambda3 state J12");
+        channel.states[i] = {static_cast<int>(file_to_model[file_orbits[0]]),
+                             static_cast<int>(file_to_model[file_orbits[1]]),
+                             static_cast<int>(file_to_model[file_orbits[2]]), J12};
+        phase[i] = CanonicalLambda3State(ms, channel.states[i]);
+      }
+      channel.matrix.set_size(nstates, nstates);
+      for (std::uint64_t i = 0; i < nstates; ++i)
+        for (std::uint64_t j = 0; j < nstates; ++j)
+          channel.matrix(i, j) = phase[i] * phase[j] * ReadScalar<double>(input, "lambda3 matrix element");
+      result.Lambda3.push_back(std::move(channel));
+    }
+  }
   if (input.peek() != std::char_traits<char>::eof())
     throw std::runtime_error("MR reference has trailing bytes");
   result.Validate(validation_tolerance);
@@ -226,9 +287,10 @@ void MRReference::WriteBinary(const std::string &filename) const
   if (!output)
     throw std::runtime_error("cannot create MR reference file: " + filename);
 
+  const std::uint32_t version = (has_lambda3 || has_reference_energy) ? 2u : 1u;
   output.write(kReferenceMagic.data(), kReferenceMagic.size());
   WriteScalar<std::uint32_t>(output, kEndianMarker, "endian marker");
-  WriteScalar<std::uint32_t>(output, 1u, "schema version");
+  WriteScalar<std::uint32_t>(output, version, "schema version");
   WriteScalar<std::int32_t>(output, A, "A");
   WriteScalar<std::int32_t>(output, Z, "Z");
   WriteScalar<std::int32_t>(output, Nrefmax, "Nrefmax");
@@ -289,6 +351,34 @@ void MRReference::WriteBinary(const std::string &filename) const
       for (size_t j = 0; j < npairs; ++j)
         WriteScalar<double>(output, matrix(i, j), "lambda2 matrix element");
   }
+  if (version == 1u)
+    return;
+  if (reference_energy_label.size() > kEnergyLabelBytes)
+    throw std::runtime_error("MR reference energy label is longer than 64 bytes");
+  WriteScalar<std::uint32_t>(output, has_reference_energy ? 1u : 0u, "reference energy flag");
+  WriteScalar<double>(output, has_reference_energy ? reference_energy : 0.0, "reference energy");
+  std::array<char, kEnergyLabelBytes> label{};
+  std::copy(reference_energy_label.begin(), reference_energy_label.end(), label.begin());
+  output.write(label.data(), label.size());
+  WriteScalar<std::uint32_t>(output, has_lambda3 ? 1u : 0u, "lambda3 flag");
+  WriteScalar<std::uint64_t>(output, Lambda3.size(), "lambda3 channel count");
+  for (const Lambda3Channel &channel : Lambda3)
+  {
+    WriteScalar<std::int32_t>(output, channel.twoJ, "lambda3 channel 2J");
+    WriteScalar<std::int32_t>(output, channel.parity, "lambda3 channel parity");
+    WriteScalar<std::int32_t>(output, channel.twoTz, "lambda3 channel 2Tz");
+    WriteScalar<std::uint32_t>(output, 0u, "lambda3 channel reserved field");
+    WriteScalar<std::uint64_t>(output, channel.states.size(), "lambda3 state count");
+    for (const auto &state : channel.states)
+    {
+      for (int k = 0; k < 3; ++k)
+        WriteScalar<std::uint32_t>(output, static_cast<std::uint32_t>(state[k]), "lambda3 state orbit");
+      WriteScalar<std::int32_t>(output, state[3], "lambda3 state J12");
+    }
+    for (size_t i = 0; i < channel.states.size(); ++i)
+      for (size_t j = 0; j < channel.states.size(); ++j)
+        WriteScalar<double>(output, channel.matrix(i, j), "lambda3 matrix element");
+  }
 }
 
 MRReference MRReference::EmbedInModelSpace(
@@ -340,6 +430,25 @@ MRReference MRReference::EmbedInModelSpace(
   embedded.interaction_sha256 = target_interaction_sha256;
   embedded.rdm_sha256 = rdm_sha256;
   embedded.wavefunction_sha256 = wavefunction_sha256;
+  embedded.has_reference_energy = has_reference_energy;
+  embedded.reference_energy = reference_energy;
+  embedded.reference_energy_label = reference_energy_label;
+  embedded.has_lambda3 = has_lambda3;
+  for (const Lambda3Channel &channel : Lambda3)
+  {
+    Lambda3Channel target = channel;
+    std::vector<int> phase(channel.states.size(), 1);
+    for (size_t i = 0; i < channel.states.size(); ++i)
+    {
+      for (int k = 0; k < 3; ++k)
+        target.states[i][k] = static_cast<int>(source_to_target[channel.states[i][k]]);
+      phase[i] = CanonicalLambda3State(target_modelspace, target.states[i]);
+    }
+    for (size_t i = 0; i < channel.states.size(); ++i)
+      for (size_t j = 0; j < channel.states.size(); ++j)
+        target.matrix(i, j) *= phase[i] * phase[j];
+    embedded.Lambda3.push_back(std::move(target));
+  }
   embedded.NaturalOrbitTransformation.eye(target_modelspace.GetNumberOrbits(),
                                            target_modelspace.GetNumberOrbits());
   for (index_t p : modelspace->all_orbits)
@@ -378,9 +487,11 @@ std::map<index_t, double> MRReference::ReadOccupationMap(
   input.read(magic.data(), magic.size());
   if (!input || magic != kReferenceMagic)
     throw std::runtime_error("unsupported MR reference magic in " + filename);
-  if (ReadScalar<std::uint32_t>(input, "endian marker") != kEndianMarker ||
-      ReadScalar<std::uint32_t>(input, "schema version") != 1u)
-    throw std::runtime_error("unsupported MR reference byte order or schema");
+  if (ReadScalar<std::uint32_t>(input, "endian marker") != kEndianMarker)
+    throw std::runtime_error("unsupported MR reference byte order");
+  const std::uint32_t version = ReadScalar<std::uint32_t>(input, "schema version");
+  if (version != 1u && version != 2u)
+    throw std::runtime_error("unsupported MR reference schema version");
   for (int i = 0; i < 7; ++i)
     (void)ReadScalar<std::int32_t>(input, "reference metadata");
   (void)ReadScalar<double>(input, "hw");
@@ -551,6 +662,64 @@ void MRReference::Validate(double tolerance) const
             << contraction_violation;
     throw std::runtime_error(message.str());
   }
+
+  if (!has_lambda3 && !Lambda3.empty())
+    throw std::runtime_error("MRReference stores lambda3 blocks without has_lambda3");
+  if (has_reference_energy && !std::isfinite(reference_energy))
+    throw std::runtime_error("MRReference reference energy is not finite");
+  std::set<std::array<int, 3>> seen_channels;
+  for (const Lambda3Channel &channel : Lambda3)
+  {
+    if (!seen_channels.insert({channel.twoJ, channel.parity, channel.twoTz}).second)
+      throw std::runtime_error("MRReference lambda3 has a duplicate channel");
+    if (channel.matrix.n_rows != channel.states.size() ||
+        channel.matrix.n_cols != channel.states.size() || !channel.matrix.is_finite())
+      throw std::runtime_error("MRReference lambda3 block has the wrong size or non-finite values");
+    std::set<std::array<int, 4>> seen_states;
+    for (const auto &state : channel.states)
+    {
+      for (int k = 0; k < 3; ++k)
+        if (state[k] < 0 || state[k] >= static_cast<int>(norbits))
+          throw std::runtime_error("MRReference lambda3 state uses an invalid orbit");
+      const Orbit &oa = modelspace->GetOrbit(state[0]);
+      const Orbit &ob = modelspace->GetOrbit(state[1]);
+      const Orbit &oc = modelspace->GetOrbit(state[2]);
+      const int J12 = state[3];
+      const bool valid =
+          state[0] <= state[1] && 2 * J12 >= std::abs(oa.j2 - ob.j2) && 2 * J12 <= oa.j2 + ob.j2 &&
+          !(state[0] == state[1] && J12 % 2 != 0) &&
+          channel.twoJ >= std::abs(2 * J12 - oc.j2) && channel.twoJ <= 2 * J12 + oc.j2 &&
+          channel.parity == (oa.l + ob.l + oc.l) % 2 && channel.twoTz == oa.tz2 + ob.tz2 + oc.tz2;
+      if (!valid)
+        throw std::runtime_error("MRReference lambda3 state is inconsistent with its channel");
+      if (!seen_states.insert(state).second)
+        throw std::runtime_error("MRReference lambda3 has a duplicate state");
+    }
+  }
+  const double lambda3_asymmetry = MaximumLambda3Asymmetry();
+  if (lambda3_asymmetry > tolerance)
+  {
+    std::ostringstream message;
+    message << "MRReference lambda3 is not Hermitian; max violation=" << lambda3_asymmetry;
+    throw std::runtime_error(message.str());
+  }
+}
+
+double MRReference::MaximumLambda3Asymmetry() const
+{
+  double maximum = 0.0;
+  for (const Lambda3Channel &channel : Lambda3)
+    if (channel.matrix.n_elem > 0)
+      maximum = std::max(maximum, arma::abs(channel.matrix - channel.matrix.t()).max());
+  return maximum;
+}
+
+double MRReference::Lambda3Norm() const
+{
+  double sum = 0.0;
+  for (const Lambda3Channel &channel : Lambda3)
+    sum += arma::accu(arma::square(channel.matrix));
+  return std::sqrt(sum);
 }
 
 double MRReference::ContractLambda2(const TwoBodyME &two_body) const
@@ -578,8 +747,12 @@ double MRReference::ContractLambda2(const TwoBodyME &two_body) const
 
 size_t MRReference::DataSize() const
 {
+  size_t lambda3_bytes = 0;
+  for (const Lambda3Channel &channel : Lambda3)
+    lambda3_bytes += channel.matrix.n_elem * sizeof(double) +
+                     channel.states.size() * sizeof(channel.states[0]);
   return occupations.size() * sizeof(double) +
-         NaturalOrbitTransformation.n_elem * sizeof(double) + Lambda2.size();
+         NaturalOrbitTransformation.n_elem * sizeof(double) + Lambda2.size() + lambda3_bytes;
 }
 
 void MRReference::CheckCompatibleOperator(const Operator &op) const

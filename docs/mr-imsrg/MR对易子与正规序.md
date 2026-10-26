@@ -13,16 +13,19 @@ result = Commutator::Commutator(X, Y)        // imsrg++ 原有 SR 对易子，�
 if ‖λ2‖ == 0: return result                   // SR 退化：逐位等于 SR
 标量：result.OneBody  += IV + V + VI          // comm221_lambda2
       result.ZeroBody += ¼ Σ (2J+1) tr(C2^J λ2^J)，C2 为完整的两体结果
+      result.ZeroBody += comm220_lambda3        // 参考态带 λ3 时
 张量：result.OneBody  += comm221_lambda2_tensor
 ```
 
 理由：
 
 - SR 部分的大量对易子（含 imsrg++ 的全部优化、并行、张量项）直接复用，不复制公式；MR 只维护 λ2 增量；
-- λ2 = 0 时直接返回 SR 结果，不做“加零”运算，SR 退化是逐位相同而不是近似相同（`MRSRDriver` 依赖这一点）；
+- λ2 = 0 且无 λ3 时直接返回 SR 结果，不做“加零”运算，SR 退化是逐位相同而不是近似相同（`MRSRDriver` 依赖这一点）；
 - 两体输出不含 λ2（λ3 = 0 时 Hergert 式 (51) 无 λ2 项），所以 MR 只改一体、零体。
 
-λ3 = 0：三体累积量不存、不用。生成元分子不含 λ（见 生成元.md）。
+λ3：参考态文件带 λ3 时加零体项 ¼ Σ (X^{ab}_{cd} Y^{kl}_{am} − Y^{ab}_{cd} X^{kl}_{am}) λ^{bkl}_{cdm}（Hergert 式 49），
+加上后标量 [X, Y] 的零体等于 ⟨Ψ|[X,Y]|Ψ⟩（λ2 二次项与 λ4 项相消）；一体、两体不含 λ3。J 耦合形式与实现见 三体力与λ3.md。
+生成元分子不含 λ（见 生成元.md）。
 
 ## 2. 标量的 λ2 项
 
@@ -70,6 +73,9 @@ Z = PT(XλY − YλX) + C(X, PT(Yλ − λY)) − D(Y, PT(Xλ − λX)) + R(X, Y
 
 ## 4. MR 正规序
 
+两体算符的 MR 正规序只需 γ1、λ2；3N 的 MR-NO2B（含 λ3 零体项）在 `MRThreeBody` 里，见 三体力与λ3.md。
+
+
 `MRReference::NormalOrder(vacuum_op)`：输入必须已在自然轨道基（驱动先做 `TransformOneAndTwoBody(NaturalOrbitTransformation)`）。
 
 - 先做分数占据的 SR 正规序 `DoNormalOrdering2(+1, all_orbits)`：E += Σ n_a h_aa + ½ Σ n_a n_b V_abab，f_pq = h_pq + Σ_a n_a V_paqa，Γ = V；
@@ -91,7 +97,7 @@ Z = PT(XλY − YλX) + C(X, PT(Yλ − λY)) − D(Y, PT(Xλ − λX)) + R(X, Y
 
 | 情形 | 行为 | 原因 |
 |---|---|---|
-| 三体算符或全局 `use_imsrg3` | `MRCommutator::Commutator` 抛异常 | MR 增量只有 MR-IMSRG(2) 版本，SR 会返回缺 MR 项的三体部分 |
+| 三体算符或全局 `use_imsrg3` | `MRCommutator::Commutator` 抛异常 | MR 增量只有 MR-IMSRG(2) 版本，SR 会返回缺 MR 项的三体部分（3N 输入在流前就折成两体） |
 | BCH 在 40 层嵌套内不收敛 | 抛异常（阈值为 0 的固定阶模式除外） | SR 只警告；MR 下发散的变换不应写出 |
 | goose-tank、factorized、Brueckner BCH | 抛异常 | 没有 MR 版本 |
 | `MagnusDerivative` 级数不收敛 | 抛 `MagnusSeriesError`，ODE 拒步 | 见 驱动参数与输出.md 1.2 |
@@ -102,7 +108,8 @@ Z = PT(XλY − YλX) + C(X, PT(Yλ − λY)) − D(Y, PT(Xλ − λX)) + R(X, Y
 ## 6. Python 接口
 
 pyIMSRG 暴露了 `MRReference`（`ReadOccupationMap`、`ReadBinary`、`WriteBinary`、`EmbedInModelSpace`、`NormalOrder`、`UndoNormalOrder`、
-`Validate`、`Lambda2`）和三个函数 `MR_Commutator`、`MR_comm221_lambda2`、`MR_comm221_lambda2_reference`（返回 IV、V、VI 分量），测试与诊断脚本都用它：
+`Validate`、`Lambda2`、`has_lambda3`、`Lambda3Blocks`、`reference_energy`）和函数 `MR_Commutator`、`MR_comm221_lambda2`、
+`MR_comm221_lambda2_reference`（返回 IV、V、VI 分量）、`MR_comm220_lambda3`、`MR_NormalOrderThreeBody`（返回 (算符, 报告)），测试与诊断脚本都用它：
 
 ```python
 ms = pyIMSRG.ModelSpace(2, "He4", "He4")

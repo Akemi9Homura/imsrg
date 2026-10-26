@@ -278,6 +278,27 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def_readonly("interaction_sha256", &MRReference::interaction_sha256)
           .def_readonly("rdm_sha256", &MRReference::rdm_sha256)
           .def_readonly("wavefunction_sha256", &MRReference::wavefunction_sha256)
+          .def_readonly("has_lambda3", &MRReference::has_lambda3)
+          .def_readonly("has_reference_energy", &MRReference::has_reference_energy)
+          .def_readonly("reference_energy", &MRReference::reference_energy)
+          .def_readonly("reference_energy_label", &MRReference::reference_energy_label)
+          .def("Lambda3Norm", &MRReference::Lambda3Norm)
+          .def("MaximumLambda3Asymmetry", &MRReference::MaximumLambda3Asymmetry)
+          .def("Lambda3Blocks", [](const MRReference &self)
+               {
+                 // (2J, parity, 2Tz, states (a, b, c, J12), row-major matrix rows)
+                 std::vector<std::tuple<int, int, int, std::vector<std::array<int, 4>>,
+                                        std::vector<std::vector<double>>>> blocks;
+                 for (const Lambda3Channel &channel : self.Lambda3)
+                 {
+                   std::vector<std::vector<double>> rows(channel.matrix.n_rows);
+                   for (size_t i = 0; i < channel.matrix.n_rows; ++i)
+                     for (size_t j = 0; j < channel.matrix.n_cols; ++j)
+                       rows[i].push_back(channel.matrix(i, j));
+                   blocks.emplace_back(channel.twoJ, channel.parity, channel.twoTz, channel.states, rows);
+                 }
+                 return blocks;
+               })
           .def_static("ReadBinary", &MRReference::ReadBinary,
                       py::arg("modelspace"), py::arg("filename"),
                       py::arg("validation_tolerance") = 1e-10,
@@ -313,6 +334,26 @@ PYBIND11_MODULE(pyIMSRG, m)
             py::arg("X"), py::arg("Y"), py::arg("reference"));
       m.def("MR_Commutator", &MRCommutator::Commutator,
             py::arg("X"), py::arg("Y"), py::arg("reference"));
+      m.def("MR_comm220_lambda3", &MRCommutator::comm220_lambda3,
+            py::arg("X"), py::arg("Y"), py::arg("reference"));
+
+      py::class_<MRThreeBodyReport>(m, "MRThreeBodyReport")
+          .def(py::init<>())
+          .def_readonly("storage", &MRThreeBodyReport::storage)
+          .def_readonly("lambda3_in_reference", &MRThreeBodyReport::lambda3_in_reference)
+          .def_readonly("lambda3_term_included", &MRThreeBodyReport::lambda3_term_included)
+          .def_readonly("lambda3_reason", &MRThreeBodyReport::lambda3_reason)
+          .def_readonly("e3_gamma1_cubed", &MRThreeBodyReport::e3_gamma1_cubed)
+          .def_readonly("e3_gamma1_lambda2", &MRThreeBodyReport::e3_gamma1_lambda2)
+          .def_readonly("e3_lambda3", &MRThreeBodyReport::e3_lambda3);
+      m.def("MR_NormalOrderThreeBody",
+            [](const Operator &hbare, const MRReference &reference, double tolerance)
+            {
+              MRThreeBodyReport report;
+              Operator result = MRNormalOrderThreeBody(hbare, reference, report, tolerance);
+              return std::make_pair(result, report);
+            },
+            py::arg("hbare"), py::arg("reference"), py::arg("tolerance") = 1e-10);
 
       py::class_<arma::mat>(m, "ArmaMat")
           .def(py::init<>())

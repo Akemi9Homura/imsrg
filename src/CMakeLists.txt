@@ -218,6 +218,22 @@ target_link_libraries(
 )
 
 add_library(
+    MRThreeBody  OBJECT
+    MRThreeBody.hh MRThreeBody.cc
+)
+target_link_libraries(
+    MRThreeBody
+    PUBLIC
+    MRReference
+    Operator
+    ModelSpace
+    ThreeBodyME
+    PRIVATE
+    PhysicalConstants
+    OpenMP::OpenMP_CXX
+)
+
+add_library(
     MRCommutator  OBJECT
     MRCommutator.hh MRCommutator.cc
 )
@@ -540,6 +556,7 @@ target_link_libraries(
     ThreeLegME
     Operator
     MRReference
+    MRThreeBody
     MRCommutator
     HartreeFock
     Commutator
@@ -647,6 +664,9 @@ add_test(NAME MRTensor
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRTensor.py)
 add_test(NAME MRBigstickReference
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRBigstickReference.py)
+add_test(NAME MRThreeBody
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRThreeBody.py
+                 $<TARGET_FILE:imsrg++>)
 add_test(NAME MRReferencePairOrder
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRReferencePairOrder.py)
 add_test(NAME MRDriver COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../test/UnitTestMRDriver.py
@@ -679,7 +699,7 @@ add_test(NAME MRMagnusGate
 # point every MR Python test at the module from this build tree so a sanitizer
 # build cannot silently import the normal Release module.
 set(MR_PYTHON_TESTS
-    MRReference MRReferencePairOrder MRGuards MRTensor MRBigstickReference MRDriver MRSRDriver MRCorrelatedDriver MRDenominators MRMagnus
+    MRReference MRReferencePairOrder MRGuards MRTensor MRBigstickReference MRThreeBody MRDriver MRSRDriver MRCorrelatedDriver MRDenominators MRMagnus
     MRJobGenerator MRTailDiagnostic MRDownstreamWindow MRMagnusGate)
 set(MR_PYTHON_TEST_ENVIRONMENT
     "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}:$ENV{PYTHONPATH}"

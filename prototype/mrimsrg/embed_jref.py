@@ -11,10 +11,10 @@ from pathlib import Path
 import struct
 
 try:
-    from .jref_format import ENDIAN_MARKER, MAGIC, SCHEMA_VERSION
+    from .jref_format import ENDIAN_MARKER, MAGIC, SUPPORTED_SCHEMA_VERSIONS
     from .pyimsrg_utils import import_pyimsrg
 except ImportError:
-    from jref_format import ENDIAN_MARKER, MAGIC, SCHEMA_VERSION
+    from jref_format import ENDIAN_MARKER, MAGIC, SUPPORTED_SCHEMA_VERSIONS
     from pyimsrg_utils import import_pyimsrg
 
 
@@ -50,7 +50,7 @@ def _read_jref_metadata(path: Path) -> dict[str, int | float]:
         norbits,
         nchannels,
     ) = _JREF_HEADER.unpack(payload)
-    if magic != MAGIC or endian != ENDIAN_MARKER or version != SCHEMA_VERSION:
+    if magic != MAGIC or endian != ENDIAN_MARKER or version not in SUPPORTED_SCHEMA_VERSIONS:
         raise ValueError(f"unsupported MR reference header: {path}")
     return {
         "A": mass,

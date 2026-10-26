@@ -92,7 +92,11 @@ namespace
                              const std::string &denominator_partitioning,
                              double s_final, double smax, double ds_0,
                              double dsmax, double ode_tolerance,
-                             double eta_criterion)
+                             double eta_criterion,
+                             const std::string &three_body_input,
+                             const std::string &three_body_file,
+                             const MRThreeBodyReport &three_body,
+                             bool lambda3_commutator)
   {
     const std::string path = output_file + ".mrmeta.json";
     std::ofstream out(path);
@@ -103,13 +107,26 @@ namespace
     }
     out << std::setprecision(17)
         << "{\n"
-        << "  \"schema\": \"imsrg_mr_export_v1\",\n"
+        << "  \"schema\": \"imsrg_mr_export_v2\",\n"
         << "  \"output_file\": " << JsonString(output_file) << ",\n"
         << "  \"output_format\": " << JsonString(format) << ",\n"
         << "  \"operator\": " << JsonString(operator_name) << ",\n"
         << "  \"imsrg_build_version\": " << JsonString(version::BuildVersion()) << ",\n"
         << "  \"truncation\": \"MR-IMSRG(2), normal-ordered two-body\",\n"
-        << "  \"lambda3\": 0,\n"
+        << "  \"lambda3\": {\"in_reference\": " << (reference.has_lambda3 ? "true" : "false")
+        << ", \"commutator_zero_body_term\": " << (lambda3_commutator ? "true" : "false") << "},\n"
+        << "  \"three_body\": {\"input\": " << JsonString(three_body_input)
+        << ", \"file\": " << JsonString(three_body_file);
+    if (three_body_input != "none")
+      out << ", \"normal_ordering\": \"MR-NO2B with gamma1, lambda2"
+          << (three_body.lambda3_term_included ? ", lambda3" : "") << "; residual 3B discarded\""
+          << ", \"lambda3_zero_body_term\": "
+          << JsonString(three_body.lambda3_term_included ? "included"
+                                                          : "omitted: " + three_body.lambda3_reason)
+          << ", \"e3_gamma1_cubed\": " << three_body.e3_gamma1_cubed
+          << ", \"e3_gamma1_lambda2\": " << three_body.e3_gamma1_lambda2
+          << ", \"e3_lambda3\": " << three_body.e3_lambda3;
+    out << "},\n"
         << "  \"generator\": " << JsonString(generator) << ",\n"
         << "  \"generator_numerator_lambda\": \"none (White-NCSM drops all lambda terms)\",\n"
         << "  \"denominator_partitioning\": " << JsonString(denominator_partitioning) << ",\n"
@@ -126,7 +143,13 @@ namespace
         << "  \"reference\": {\"A\": " << reference.A << ", \"Z\": " << reference.Z
         << ", \"Nrefmax\": " << reference.Nrefmax << ", \"J2\": " << reference.J2
         << ", \"parity\": " << reference.parity << ", \"emax\": " << reference.emax
-        << ", \"e2max\": " << reference.e2max << ", \"hw\": " << reference.hw << "},\n"
+        << ", \"e2max\": " << reference.e2max << ", \"hw\": " << reference.hw
+        << ", \"reference_energy\": ";
+    if (reference.has_reference_energy)
+      out << reference.reference_energy;
+    else
+      out << "null";
+    out << ", \"reference_energy_label\": " << JsonString(reference.reference_energy_label) << "},\n"
         << "  \"interaction_sha256\": " << JsonString(reference.interaction_sha256) << ",\n"
         << "  \"rdm_sha256\": " << JsonString(reference.rdm_sha256) << ",\n"
         << "  \"wavefunction_sha256\": " << JsonString(reference.wavefunction_sha256) << "\n"
@@ -483,6 +506,8 @@ int main(int argc, char** argv)
      modelspace.SetLmax3(lmax3);
 
   std::unique_ptr<MRReference> mr_reference_context;
+  MRThreeBodyReport mr_three_body_report;
+  std::string mr_three_body_input = "none";
   if (use_mr_reference)
   {
     const int requested_target_mass = modelspace.GetTargetMass();
@@ -491,8 +516,15 @@ int main(int argc, char** argv)
                                   method == "flow_euler" || method == "flow_RK4" ||
                                   method == "magnus" || method == "magnus_euler" ||
                                   method == "magnus_adaptive";
+    if (input3bme != "none" && input3bme_type != "full" && input3bme_type != "no2b")
+    {
+      std::cerr << "Explicit MR-IMSRG reads 3N matrix elements only as 3bme_type=full or no2b "
+                << "(MR-NO2B needs the pair-coupled elements; mono files only hold the HF "
+                << "monopole part); got 3bme_type=" << input3bme_type << std::endl;
+      return EXIT_FAILURE;
+    }
     if (physical_system != "nuclear" || basis != "oscillator" ||
-        !supported_method || nsteps != 1 || input3bme != "none" || IMSRG3 ||
+        !supported_method || nsteps != 1 || IMSRG3 ||
         imsrg3_at_end ||
         perturbative_triples || goose_tank || use_brueckner_bch ||
         std::abs(BetaCM) > 1e-12 ||
@@ -504,7 +536,7 @@ int main(int argc, char** argv)
         write_HO_ops || write_HF_ops)
     {
       std::cerr << "Explicit MR-IMSRG currently requires nuclear basis=oscillator, "
-                << "a one-step direct flow or production Magnus flow, 3bme=none, "
+                << "a one-step direct flow or production Magnus flow, "
                 << "IMSRG(2), BetaCM=0, "
                 << "core_generator=white-ncsm, no secondary IMSRG-space "
                 << "truncation, no valence space, and extra operators only with "
@@ -549,7 +581,8 @@ int main(int argc, char** argv)
               << mr_reference_file << " A=" << mr_reference_context->A
               << " Z=" << mr_reference_context->Z
               << " Nrefmax=" << mr_reference_context->Nrefmax
-              << " lambda3=0 interaction_sha256="
+              << " lambda3=" << (mr_reference_context->has_lambda3 ? "present" : "absent")
+              << " interaction_sha256="
               << mr_reference_context->interaction_sha256 << std::endl;
   }
 
@@ -876,18 +909,47 @@ int main(int argc, char** argv)
   Operator& HNO = Hbare; // The reference & means we overwrite Hbare and save some memory
   if (use_mr_reference)
   {
-    if (hno_particle_rank != 2 || Hbare.GetParticleRank() != 2)
+    if (hno_particle_rank != 2)
     {
-      std::cerr << "Explicit MR-IMSRG currently supports NN/NO2B operators only."
+      std::cerr << "Explicit MR-IMSRG keeps the normal-ordered two-body truncation (MR-NO2B)."
                 << std::endl;
       return EXIT_FAILURE;
     }
+    const MRReference &mr = *mr_reference_context;
+    const bool lambda3_commutator = mr.has_lambda3 && mr.Lambda3Norm() != 0.0;
+    std::cout << "MR reference lambda3: " << (mr.has_lambda3 ? "present" : "absent")
+              << "; zero-body lambda3 term of the commutators: "
+              << (lambda3_commutator ? "on" : "off") << std::endl;
     try
     {
+      // 3N: MR-NO2B with the reference densities, contracted in the
+      // oscillator basis, then the 3N storage is released before the flow.
+      Operator three_body_no2b;
+      const bool have_three_body = Hbare.GetParticleRank() > 2;
+      if (have_three_body)
+      {
+        three_body_no2b = MRNormalOrderThreeBody(Hbare, mr, mr_three_body_report,
+                                                 mr_validation_tolerance);
+        mr_three_body_input = mr_three_body_report.storage;
+        Hbare.ThreeBody.Deallocate();
+        Hbare.SetParticleRank(2);
+        std::cout << std::setprecision(12)
+                  << "MR-NO2B 3N (" << mr_three_body_report.storage << " " << input3bme << "):"
+                  << " E3 = A(g1g1g1) " << mr_three_body_report.e3_gamma1_cubed
+                  << " + A(g1 lambda2) " << mr_three_body_report.e3_gamma1_lambda2
+                  << " + lambda3 " << mr_three_body_report.e3_lambda3 << std::endl;
+        if (mr_three_body_report.lambda3_term_included)
+          std::cout << "MR-NO2B 3N: lambda3 x V3 zero-body term included" << std::endl;
+        else
+          std::cout << "MR-NO2B 3N: lambda3 x V3 zero-body term omitted ("
+                    << mr_three_body_report.lambda3_reason
+                    << "); it only shifts the zero-body part" << std::endl;
+      }
       Operator Hvac_nat = Hbare.TransformOneAndTwoBody(
-          mr_reference_context->NaturalOrbitTransformation,
-          mr_validation_tolerance);
-      HNO = mr_reference_context->NormalOrder(Hvac_nat);
+          mr.NaturalOrbitTransformation, mr_validation_tolerance);
+      HNO = mr.NormalOrder(Hvac_nat);
+      if (have_three_body)
+        HNO += three_body_no2b;
     }
     catch (const std::exception& error)
     {
@@ -899,6 +961,11 @@ int main(int argc, char** argv)
               << "MR initial natural-basis Hamiltonian: E=" << HNO.ZeroBody
               << " ||f||=" << HNO.OneBodyNorm()
               << " ||Gamma||=" << HNO.TwoBodyNorm() << std::endl;
+    if (mr_reference_context->has_reference_energy)
+      std::cout << std::setprecision(12) << "MR reference energy from the reference file ("
+                << mr_reference_context->reference_energy_label << "): "
+                << mr_reference_context->reference_energy << "  initial E - E_ref = "
+                << HNO.ZeroBody - mr_reference_context->reference_energy << std::endl;
   }
   else if (basis == "HF" and method !="HF")
   {
@@ -1461,7 +1528,10 @@ int main(int argc, char** argv)
                                    *mr_reference_context, mr_reference_file,
                                    method, core_generator, denominator_partitioning,
                                    s_final, smax, ds_0, dsmax,
-                                   ode_tolerance, eta_criterion);
+                                   ode_tolerance, eta_criterion,
+                                   mr_three_body_input, input3bme, mr_three_body_report,
+                                   mr_reference_context->has_lambda3 &&
+                                       mr_reference_context->Lambda3Norm() != 0.0);
     };
     if (vacuum.GetJRank() != 0 || vacuum.GetTRank() != 0 || vacuum.GetParity() != 0)
     {

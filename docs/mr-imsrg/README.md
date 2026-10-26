@@ -12,7 +12,8 @@
 IM-NCSM 式的 MR-IMSRG(2)：参考态是 Nmax_ref 截断空间里的 NCSM 本征态（J = 0），以它的一体、两体密度做多参考正规序，
 在 J-scheme 下流动 Hamiltonian（及任意标量、张量算符），把 Nmax_ref 盒子与外部脱耦，导出真空正规序、HO 基的 H(s) 给下游 NCSM/FCIQMC。
 
-- 截断：MR-IMSRG(2)，λ3 = 0（λ2 在对易子里保留，生成元分子里不含）；
+- 截断：MR-IMSRG(2)；λ2 在对易子里保留，λ3 在参考态文件提供时进入零体项，生成元分子不含 λ；
+- 三体力：MR-NO2B（相对相关参考态正规序后保留零、一、两体），接受 full 与 no2b 格式；
 - 参考态：总 J = 0、正宇称，只用秩 0（标量）密度；
 - 生成元：White-NCSM（Δe ≠ 0 掩码、Epstein–Nesbet 分母）；
 - 求解：生产用 `magnus_adaptive`（完整 Bernoulli Magnus ODE + Dormand–Prince 5(4)），算符经同一个 Ω 变换。
@@ -23,10 +24,10 @@ IM-NCSM 式的 MR-IMSRG(2)：参考态是 Nmax_ref 截断空间里的 NCSM 本�
 参考态 NCSM（simpleFCI 原型 / BIGSTICK；以后 FCIQMC）
         │  密度：γ1、γ2 的秩 0 部分
         ▼
-jref 文件（自然轨道占据、HO→NAT 变换、λ2）          ← 参考态输入.md
+jref 文件（自然轨道占据、HO→NAT 变换、λ2，可选 λ3、E_ref） ← 参考态输入.md
         │  可选：嵌入更大 emax
         ▼
-imsrg++ 驱动：HO→NAT、MR 正规序、White-NCSM 流、       ← 驱动参数与输出.md
+imsrg++ 驱动：HO→NAT、MR 正规序（3N：MR-NO2B）、White-NCSM 流、 ← 驱动参数与输出.md、三体力与λ3.md
              Magnus Ω 变换算符、撤销正规序、NAT→HO          生成元.md / 算符演化.md
         │                                                    MR对易子与正规序.md
         ▼
@@ -83,12 +84,13 @@ H(s)、O(s)：jcoupled64 / no2bpack / opbin + .mrmeta.json
 | 内容 | 位置 |
 |---|---|
 | 参考态类、读入与校验、MR 正规序 | `src/MRReference.{hh,cc}` |
-| MR 对易子（标量与张量 λ2 项） | `src/MRCommutator.{hh,cc}` |
+| 3N 的 MR-NO2B | `src/MRThreeBody.{hh,cc}` |
+| MR 对易子（标量与张量 λ2 项、λ3 零体项） | `src/MRCommutator.{hh,cc}` |
 | BCH/Magnus 的 MR 分派与防护 | `src/BCH.{hh,cc}`、`src/IMSRGSolver.cc`（`Solve_ode_magnus`） |
 | White-NCSM 生成元 | `src/Generator.cc`（`ConstructGenerator_WhiteNCSM`） |
 | 驱动（参数检查、正规序、导出、算符） | `src/imsrg++.cc` |
 | SR 张量对易子（MR 复用并做了提速） | `src/Commutator/TensorCommutators.cc` |
-| jref 生成：simpleFCI 原型 / BIGSTICK / 嵌入 | `prototype/mrimsrg/export_jref.py`、`bigstick_jref.py`、`embed_jref.py` |
+| jref 生成：simpleFCI 原型 / BIGSTICK / 嵌入；λ3 | `prototype/mrimsrg/export_jref.py`、`bigstick_jref.py`、`embed_jref.py`；`lambda3.py` |
 | 集群作业生成 | `gen_job.py`（`--mr-jscheme`、`--mr-prepare-jscheme`、`--mr-ncsm-readback`） |
 | 测试 | `test/UnitTestMR*.py`（见 测试.md） |
 
@@ -97,6 +99,7 @@ H(s)、O(s)：jcoupled64 / no2bpack / opbin + .mrmeta.json
 - [参考态输入](参考态输入.md)：jref 格式与约定、三种生成方式、读入校验；
 - [驱动参数与输出](驱动参数与输出.md)：MR 模式的参数、限制、日志、导出文件、下游与集群作业；
 - [MR 对易子与正规序](MR对易子与正规序.md)：标量、张量的 λ2 项，MR 正规序，BCH/Magnus 中的 MR 处理与防护；
+- [三体力与 λ3](三体力与λ3.md)：MR-NO2B、λ3 的两处用法与"有就用"规则、no2b 文件的限制、验收；
 - [生成元](生成元.md)：White-NCSM 的定义、已知的慢尾问题；
 - [算符演化](算符演化.md)：标量、张量算符经 Magnus Ω 的变换与导出；
 - [性能与并行](性能与并行.md)：并行方式、缓存与环境变量、可复现性、内存；

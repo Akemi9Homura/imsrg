@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BIGSTICK NCSM reference -> mrimsrg_jref_v1 (MR-IMSRG reference input).
+"""BIGSTICK NCSM reference -> mrimsrg_jref (MR-IMSRG reference input).
 
 BIGSTICK's own two-body densities (menu '2d') fail in Nmax-truncated spaces
 ("Problem cannot find sector jumps PP"; they work without truncation), so the
@@ -16,9 +16,14 @@ rotated in the pair basis, lambda2 = gamma2 - gamma1^gamma1 (= n_a n_b on the
 pair diagonal in natural orbits), and the file is written with the same
 writer as export_jref.py.  No m-scheme two-body array is formed.
 
+By default the three-body cumulant lambda3 (lambda3.py, from the
+three-annihilation amplitudes on the fractionally occupied orbits) and the
+BIGSTICK eigenvalue are added (jref version 2); --no-lambda3 writes the
+version-1 file.
+
 Usage:
   bigstick_jref.py --bas X.bas --wfn X.wfn --interaction H.MFDn \
-      --nrefmax 2 --hw 20 [--e2max E] [--state 1] --output X.jref
+      --nrefmax 2 --hw 20 [--e2max E] [--state 1] [--no-lambda3] --output X.jref
 """
 
 from __future__ import annotations
@@ -36,9 +41,11 @@ from scipy import sparse
 try:
     from .export_jref import write_jref
     from .jcoupling import _cg
+    from .lambda3 import annihilation_matrix, coupled_lambda3
 except ImportError:
     from export_jref import write_jref
     from jcoupling import _cg
+    from lambda3 import annihilation_matrix, coupled_lambda3
 
 
 # ----------------------------------------------------------------------------
@@ -199,31 +206,6 @@ def configurations(basis: BigstickBasis):
 # ----------------------------------------------------------------------------
 # Scalar densities
 
-def _annihilation_matrix(occupation, coefficients, columns):
-    """Rows: reduced determinants; columns: tuples of m-states (a_q ... a_p |D>)."""
-    below = np.cumsum(occupation, axis=1, dtype=np.int32) - occupation
-    packed = np.packbits(occupation, axis=1)
-    keys, cols, values = [], [], []
-    for column, orbit_tuple in enumerate(columns):
-        mask = np.all(occupation[:, list(orbit_tuple)] == 1, axis=1)
-        rows = np.flatnonzero(mask)
-        if rows.size == 0:
-            continue
-        reduced = packed[rows].copy()
-        exponent = np.zeros(rows.size, dtype=np.int64)
-        for k, p in enumerate(orbit_tuple):
-            reduced[:, p // 8] &= np.uint8(0xFF ^ (0x80 >> (p % 8)))
-            exponent += below[rows, p] - k  # earlier-removed orbits lie below p
-        keys.append(reduced)
-        cols.append(np.full(rows.size, column))
-        values.append(coefficients[rows] * np.where(exponent % 2, -1.0, 1.0))
-    keys = np.concatenate(keys)
-    view = np.ascontiguousarray(keys).view(np.dtype((np.void, keys.shape[1]))).ravel()
-    _, row_index = np.unique(view, return_inverse=True)
-    return sparse.csr_matrix((np.concatenate(values), (row_index.ravel(), np.concatenate(cols))),
-                             shape=(row_index.max() + 1, len(columns)))
-
-
 def scalar_densities(orbits, mstates, occupation, coefficients):
     """gamma1[a, b] (orbit level) and gamma2^J blocks for normalized pairs."""
     norbits = len(orbits)
@@ -231,7 +213,7 @@ def scalar_densities(orbits, mstates, occupation, coefficients):
     for k, (orbit, m2) in enumerate(mstates):
         by_orbit[orbit][m2] = k
 
-    A1 = _annihilation_matrix(occupation, coefficients, [(k,) for k in range(len(mstates))])
+    A1 = annihilation_matrix(occupation, coefficients, [(k,) for k in range(len(mstates))])
     g1m = (A1.T @ A1).toarray()
     gamma1 = np.zeros((norbits, norbits))
     for a in range(norbits):
@@ -245,7 +227,7 @@ def scalar_densities(orbits, mstates, occupation, coefficients):
     # (all M), so the contraction identities with gamma1 hold exactly.
     pairs = [(p, q) for p in range(len(mstates)) for q in range(p + 1, len(mstates))]
     pair_index = {pq: k for k, pq in enumerate(pairs)}
-    A2 = _annihilation_matrix(occupation, coefficients, pairs)
+    A2 = annihilation_matrix(occupation, coefficients, pairs)
 
     channels = {}
     for a in range(norbits):
@@ -350,7 +332,7 @@ def sha256_files(*paths):
 
 
 def convert(bas_path, wfn_path, interaction_path, output, *, nrefmax, hw, e2max=None,
-            state=1, tolerance=1e-10):
+            state=1, tolerance=1e-10, lambda3=True):
     basis = BigstickBasis(Path(bas_path))
     energy, xj, amplitudes, precision = read_bigstick_wfn(Path(wfn_path), basis, state)
     mstates, occupation, sign = configurations(basis)
@@ -386,6 +368,14 @@ def convert(bas_path, wfn_path, interaction_path, output, *, nrefmax, hw, e2max=
         disconnected = np.diag([occupations[a] * occupations[b] for a, b in pair_list])
         lambda_blocks.append((J, parity, Tz, pair_list, natural - disconnected))
 
+    lambda3_blocks = None
+    reference_energy = None
+    lambda3_report = {}
+    if lambda3:
+        lambda3_blocks, lambda3_report = coupled_lambda3(
+            orbits, mstates, occupation, coefficients, C, occupations)
+        reference_energy = (energy, f"BIGSTICK eigenvalue (float32), state {state}")
+
     emax = max(2 * n + l for n, l, _, _ in orbits)
     rdm_digest = hashlib.sha256(np.asarray(gamma1, dtype="<f8").tobytes())
     for _, _, _, _, matrix in lambda_blocks:
@@ -399,8 +389,10 @@ def convert(bas_path, wfn_path, interaction_path, output, *, nrefmax, hw, e2max=
         lambda_blocks=lambda_blocks,
         digests=(sha256_files(interaction_path), rdm_digest.hexdigest(),
                  sha256_files(bas_path, wfn_path)),
+        lambda3_blocks=lambda3_blocks,
+        reference_energy=reference_energy,
     )
-    return {"energy": energy, "2J": 2 * xj, "precision": f"real{precision}", "dimension": basis.dimension,
+    return {**lambda3_report, "energy": energy, "2J": 2 * xj, "precision": f"real{precision}", "dimension": basis.dimension,
             "A": A, "Z": Z, "Nrefmax": nrefmax, "emax": emax, **checks,
             "min occupation > 0": float(min(o for o in occupations if o > 0))}
 
@@ -415,10 +407,12 @@ def main() -> None:
     parser.add_argument("--hw", required=True, type=float)
     parser.add_argument("--e2max", type=int)
     parser.add_argument("--state", type=int, default=1)
+    parser.add_argument("--no-lambda3", action="store_true",
+                        help="skip lambda3 and the reference energy (write jref version 1)")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     summary = convert(args.bas, args.wfn, args.interaction, args.output, nrefmax=args.nrefmax,
-                      hw=args.hw, e2max=args.e2max, state=args.state)
+                      hw=args.hw, e2max=args.e2max, state=args.state, lambda3=not args.no_lambda3)
     for key, value in summary.items():
         print(f"{key}: {value}")
 

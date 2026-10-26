@@ -1461,3 +1461,20 @@ MR 程序只读 jref；不同来源的参考态在外部转成 jref（来源适�
   ```
   更大的 emax 再用 `embed_jref.py` 或 `MRReference.EmbedInModelSpace` 嵌入。
 - 规模：A1、A2 为稀疏矩阵，耦合按通道用稀疏乘积；纯 Python 的组态读入与对投影循环适合中等维数，参考态维数很大时再换 C++。
+
+## 12. 三体力 MR-NO2B 与 λ3（生成元不变）
+
+使用说明见 [docs/mr-imsrg/三体力与λ3.md](mr-imsrg/三体力与λ3.md)。决定与要点：
+
+- 3N 只在流前进入：相对相关参考态的 MR-NO2B（Hergert 2017 式 41–43），E3 含 γ1γ1γ1、γ1λ2、λ3 三项，f3 含 γ1γ1 与 λ2 项，Γ3 = Σ V3 γ1；
+  在 HO 基里收缩（γ1、λ2、λ3 用自然轨道变换转回），不变换 3N；算完即释放 3N 存储。
+- 规则"有就用"：不加输入参数。no2b 文件（与参考态无关的 J 求和矩阵元，第三粒子未求和）足够算除 λ3·V3 外的全部项；
+  λ3·V3 只在 full 文件且 jref 带 λ3 时计入，否则日志与 `.mrmeta.json` 写明原因；mono 文件启动时拒绝。
+- 对易子零体加 λ3 项（Hergert 式 49 最后一项），只依赖两体 X、Y，纯 NN 也生效；与算符无关的部分按参考态缓存，按通道并行、固定顺序求和。
+- jref v2：可选参考能量（含标签）与 λ3 块（自然基、部分占据轨道、秩 0，`GetME_pn` 同约定，a ≤ b）；无二者时仍写 v1，旧文件逐字节不变。
+  λ3 由 `lambda3.py` 从三湮灭振幅计算；`bigstick_jref.py` 默认写 λ3 与 BIGSTICK 本征值，`export_jref.py --lambda3` 作 m-scheme 对照。
+- 验收（`MRThreeBody`，He4 Nrefmax=2，全部对着 m-scheme 波函数）：随机反对称三体的 E3（含 λ3 项）、f3、Γ3 差 3e-12；
+  对易子零体对 ⟨Ψ|[X,Y]|Ψ⟩ 差 1e-11（不加 λ3 项差 0.546）；N3LO lnl 3N 的 no2b 与 full 差 1e-7（单精度），full 的 E3 对 ⟨Ψ|V3|Ψ⟩ 差 2e-9
+  （Darmstadt 格式过完备、单精度）；BIGSTICK 与 simpleFCI 的 λ3 差 3.7e-9。实现中发现 pn 存储在并行区内取 6j 需要预先填表，
+  MR-NO2B 入口调用 `PreCalculateSixJ`。
+- 待做：用能生成的力（NuHamil）估计 λ3·V3 项的实际大小；与 3NF400（Gebrerufael 设定）做文献对照；FCIQMC 3-RDM 接入。

@@ -5,8 +5,9 @@
 The He4 Nrefmax=2 ground state from BIGSTICK (test/data/bigstick_He4_Nrefmax2,
 single-precision Lanczos vectors) is converted by bigstick_jref.py and read by
 the C++ MRReference reader with the production validation tolerance.  Natural
-occupations, the natural-orbit transformation and lambda2 must match the jref
-built from the double-precision simpleFCI fixture to the BIGSTICK precision.
+occupations, the natural-orbit transformation, lambda2 and lambda3 must match
+the jref built from the double-precision simpleFCI fixture to the BIGSTICK
+precision; the BIGSTICK eigenvalue is stored as the reference energy.
 """
 
 from pathlib import Path
@@ -53,7 +54,7 @@ with tempfile.TemporaryDirectory() as tmp:
     simplefci = root / "simplefci.jref"
     summary = convert(FIXTURE / "he4_nref2.bas", FIXTURE / "he4_nref2.wfn", FIXTURE / "he4_nref2.wfn",
                       bigstick, nrefmax=2, hw=20.0)
-    export_reference(REPOSITORY / "prototype/mrimsrg/data/He4_Nrefmax2", simplefci)
+    export_reference(REPOSITORY / "prototype/mrimsrg/data/He4_Nrefmax2", simplefci, lambda3=True)
     assert abs(summary["energy"] + 17.0134908) < 1e-6, summary
     assert abs(summary["pairs"] - 6.0) < 1e-12, summary
 
@@ -77,6 +78,23 @@ with tempfile.TemporaryDirectory() as tmp:
                         lambda_error = max(lambda_error, abs(ref_b.Lambda2.GetTBME_J(J, J, a, b, c, d)
                                                              - ref_s.Lambda2.GetTBME_J(J, J, a, b, c, d)))
 
+    def lambda3_elements(reference):
+        elements = {}
+        for twoJ, parity, twoTz, states, rows in reference.Lambda3Blocks():
+            for i, bra in enumerate(states):
+                for j, ket in enumerate(states):
+                    elements[(twoJ, parity, twoTz, tuple(bra), tuple(ket))] = rows[i][j]
+        return elements
+
+    assert ref_b.has_lambda3 and ref_s.has_lambda3
+    l3_b, l3_s = lambda3_elements(ref_b), lambda3_elements(ref_s)
+    lambda3_error = max(abs(l3_b.get(key, 0.0) - l3_s.get(key, 0.0)) for key in set(l3_b) | set(l3_s))
+    lambda3_scale = max(abs(value) for value in l3_s.values())
+    energy_error = abs(ref_b.reference_energy - ref_s.reference_energy)
+    assert ref_b.has_reference_energy and "BIGSTICK" in ref_b.reference_energy_label
+
 print(f"BIGSTICK vs simpleFCI jref: occupations {occupation_error:.1e}, "
-      f"natural orbits {transformation_error:.1e}, lambda2 {lambda_error:.1e}")
+      f"natural orbits {transformation_error:.1e}, lambda2 {lambda_error:.1e}, "
+      f"lambda3 {lambda3_error:.1e} (max |lambda3| {lambda3_scale:.1e}), reference energy {energy_error:.1e}")
 assert occupation_error < 1e-7 and transformation_error < 1e-7 and lambda_error < 5e-7
+assert lambda3_error < 5e-7 and energy_error < 1e-5
