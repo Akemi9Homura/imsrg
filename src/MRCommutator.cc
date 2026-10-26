@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -1017,12 +1018,14 @@ namespace
     return (Hermiticity(op) * modelspace.phase(bra.J - ket.J)) * it->second.t();
   }
 
-  // Partial trace sum_c W_{ci,cj} over blocks given for (bra, ket) channel
-  // pairs; rank L > 0 gives reduced elements (Trace coefficient), L = 0 the
-  // ordinary ones.  Each bra channel accumulates into its own buffer.
+  // Partial trace sum_c W_{ci,cj} over blocks produced for (bra, ket) channel
+  // pairs by block(p), built inside the task and dropped after use, so no
+  // intermediate operator is ever stored; rank L > 0 gives reduced elements
+  // (Trace coefficient), L = 0 the ordinary ones.  Each bra channel
+  // accumulates into its own buffer.
   arma::mat PartialTrace(const TensorContext &ctx,
                          const std::vector<std::pair<size_t, size_t>> &channel_pairs,
-                         const std::vector<arma::mat> &blocks, int L)
+                         const std::function<arma::mat(size_t)> &block, int L)
   {
     ModelSpace &modelspace = ctx.modelspace;
     const size_t nchannels = modelspace.GetNumberTwoBodyChannels();
@@ -1042,7 +1045,7 @@ namespace
       {
         const size_t ch_ket = channel_pairs[p].second;
         const int J2 = modelspace.GetTwoBodyChannel(ch_ket).J;
-        const arma::mat &W = blocks[p];
+        const arma::mat W = block(p);
         for (index_t c : ctx.orbits)
         {
           const auto &bra_kets = ctx.kets_by_orbit[ch_bra][c];
@@ -1708,53 +1711,58 @@ namespace MRCommutator
     ModelSpace &modelspace = ctx.modelspace;
     const int L = ctx.L;
 
-    // Products with lambda2 over active kets only: P = X l Y and W2 = Y l - l Y
-    // for every tensor channel order, W3 = X l - l X per scalar channel.
+    // Products with lambda2 over active kets only, built block by block inside
+    // the partial traces: P = X l Y and W2 = Y l - l Y for every tensor channel
+    // order, W3 = X l - l X per scalar channel.
     double section_start = omp_get_wtime();
     const auto channel_pairs = TensorChannelPairs(Y);
-    std::vector<arma::mat> P(channel_pairs.size()), W2(channel_pairs.size());
-#pragma omp parallel for schedule(dynamic, 1)
-    for (size_t p = 0; p < channel_pairs.size(); ++p)
+    auto P = [&](size_t p)
+    {
+      const size_t ch_bra = channel_pairs[p].first, ch_ket = channel_pairs[p].second;
+      const arma::uvec &bra_active = ctx.active_kets[ch_bra];
+      if (bra_active.empty())
+        return arma::mat(modelspace.GetTwoBodyChannel(ch_bra).GetNumberKets(),
+                         modelspace.GetTwoBodyChannel(ch_ket).GetNumberKets(), arma::fill::zeros);
+      const arma::mat y = StoredBlock(Y, ch_bra, ch_ket);
+      return arma::mat(X.TwoBody.GetMatrix(ch_bra, ch_bra).cols(bra_active) *
+                       (reference.Lambda2.GetMatrix(ch_bra, ch_bra)(bra_active, bra_active) *
+                        y.rows(bra_active)));
+    };
+    auto W2 = [&](size_t p)
     {
       const size_t ch_bra = channel_pairs[p].first, ch_ket = channel_pairs[p].second;
       const arma::uvec &bra_active = ctx.active_kets[ch_bra];
       const arma::uvec &ket_active = ctx.active_kets[ch_ket];
       const arma::mat y = StoredBlock(Y, ch_bra, ch_ket);
-      P[p].zeros(y.n_rows, y.n_cols);
-      W2[p].zeros(y.n_rows, y.n_cols);
+      arma::mat w(y.n_rows, y.n_cols, arma::fill::zeros);
       if (!bra_active.empty())
-      {
-        const arma::mat ly = reference.Lambda2.GetMatrix(ch_bra, ch_bra)(bra_active, bra_active) *
-                             y.rows(bra_active);
-        P[p] = X.TwoBody.GetMatrix(ch_bra, ch_bra).cols(bra_active) * ly;
-        W2[p].rows(bra_active) -= ly;
-      }
+        w.rows(bra_active) -= reference.Lambda2.GetMatrix(ch_bra, ch_bra)(bra_active, bra_active) *
+                              y.rows(bra_active);
       if (!ket_active.empty())
-        W2[p].cols(ket_active) +=
+        w.cols(ket_active) +=
             y.cols(ket_active) * reference.Lambda2.GetMatrix(ch_ket, ch_ket)(ket_active, ket_active);
-    }
+      return w;
+    };
     std::vector<std::pair<size_t, size_t>> scalar_pairs;
-    std::vector<arma::mat> W3;
     for (size_t ch = 0; ch < modelspace.GetNumberTwoBodyChannels(); ++ch)
+      if (!ctx.active_kets[ch].empty())
+        scalar_pairs.emplace_back(ch, ch);
+    auto W3 = [&](size_t p)
     {
+      const size_t ch = scalar_pairs[p].first;
       const arma::uvec &active = ctx.active_kets[ch];
-      if (active.empty())
-        continue;
       const arma::mat &x = X.TwoBody.GetMatrix(ch, ch);
       const arma::mat &l = reference.Lambda2.GetMatrix(ch, ch);
       arma::mat w(x.n_rows, x.n_cols, arma::fill::zeros);
       w.cols(active) += x.cols(active) * l(active, active);
       w.rows(active) -= l(active, active) * x.rows(active);
-      scalar_pairs.emplace_back(ch, ch);
-      W3.push_back(std::move(w));
-    }
-    X.profiler.timer["MR comm221 lambda2 tensor products"] += omp_get_wtime() - section_start;
+      return w;
+    };
 
-    section_start = omp_get_wtime();
     arma::mat result = ContractScalarTwoTensorOne(ctx, PartialTrace(ctx, channel_pairs, W2, L));
     result -= ContractTensorTwoScalarOne(ctx, PartialTrace(ctx, scalar_pairs, W3, 0));
     arma::mat first = PartialTrace(ctx, channel_pairs, P, L);
-    X.profiler.timer["MR comm221 lambda2 tensor traces"] += omp_get_wtime() - section_start;
+    X.profiler.timer["MR comm221 lambda2 tensor products and traces"] += omp_get_wtime() - section_start;
 
     section_start = omp_get_wtime();
     first += RingTerm(ctx);
