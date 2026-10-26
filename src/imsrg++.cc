@@ -96,7 +96,8 @@ namespace
                              const std::string &three_body_input,
                              const std::string &three_body_file,
                              const MRThreeBodyReport &three_body,
-                             bool lambda3_commutator)
+                             bool lambda3_commutator,
+                             bool export_natural)
   {
     const std::string path = output_file + ".mrmeta.json";
     std::ofstream out(path);
@@ -131,7 +132,9 @@ namespace
         << "  \"generator_numerator_lambda\": \"none (White-NCSM drops all lambda terms)\",\n"
         << "  \"denominator_partitioning\": " << JsonString(denominator_partitioning) << ",\n"
         << "  \"decoupling_mask\": \"1p1h and 2p2h with Delta e != 0, e=2n+l labels inherited by natural orbits\",\n"
-        << "  \"output_basis\": \"original HO basis, vacuum normal order (natural-orbit transformation undone)\",\n"
+        << "  \"output_basis\": "
+        << (export_natural ? "\"MR basis: reference natural orbits in the basis of the reference file, vacuum normal order\",\n"
+                           : "\"original HO basis, vacuum normal order (natural-orbit transformation undone)\",\n")
         << "  \"method\": " << JsonString(method) << ",\n"
         << "  \"s_final\": " << s_final << ",\n"
         << "  \"smax\": " << smax << ",\n"
@@ -194,6 +197,12 @@ int main(int argc, char** argv)
   std::string intfile = parameters.s("intfile");
   std::string write_H_no2bpack = parameters.s("write_H_no2bpack");
   std::string write_H_jcoupled64 = parameters.s("write_H_jcoupled64");
+  // MR export basis: "oscillator" rotates back to the HO basis of the input
+  // interaction; "natural" keeps the MR basis (reference natural orbits, after
+  // any HF/NAT basis carried by the reference file), where the Delta e
+  // decoupling is defined, for a post-diagonalization in that basis.
+  const std::string mr_export_basis = parameters.s("mr_export_basis");
+  const bool mr_export_natural = mr_export_basis == "natural";
   std::string mr_reference_file = parameters.s("mr_reference_file");
   std::string core_generator = parameters.s("core_generator");
   std::string valence_generator = parameters.s("valence_generator");
@@ -542,6 +551,11 @@ int main(int argc, char** argv)
                 << "truncation, no valence space, and extra operators only with "
                 << "a Magnus method (no PT1/RPA/TDA, write_HO_ops or write_HF_ops)."
                 << std::endl;
+      return EXIT_FAILURE;
+    }
+    if (mr_export_basis != "oscillator" && mr_export_basis != "natural")
+    {
+      std::cerr << "mr_export_basis must be oscillator or natural; got " << mr_export_basis << std::endl;
       return EXIT_FAILURE;
     }
     if (fmt2 == "jcoupled64" and nucleon_mass_correction)
@@ -1531,7 +1545,8 @@ int main(int argc, char** argv)
                                    ode_tolerance, eta_criterion,
                                    mr_three_body_input, input3bme, mr_three_body_report,
                                    mr_reference_context->has_lambda3 &&
-                                       mr_reference_context->Lambda3Norm() != 0.0);
+                                       mr_reference_context->Lambda3Norm() != 0.0,
+                                   mr_export_natural);
     };
     if (vacuum.GetJRank() != 0 || vacuum.GetTRank() != 0 || vacuum.GetParity() != 0)
     {
@@ -1601,9 +1616,11 @@ int main(int argc, char** argv)
       Operator Hvac_nat = mr_reference_context->UndoNormalOrder(
           imsrgsolver.GetH_s());
       reference_energy = mr_reference_context->NormalOrder(Hvac_nat).ZeroBody;
-      Hvac = Hvac_nat.TransformOneAndTwoBody(
-          mr_reference_context->NaturalOrbitTransformation.t(),
-          mr_validation_tolerance);
+      Hvac = mr_export_natural
+                 ? Hvac_nat
+                 : Hvac_nat.TransformOneAndTwoBody(
+                       mr_reference_context->NaturalOrbitTransformation.t(),
+                       mr_validation_tolerance);
     }
     else
     {
@@ -1977,8 +1994,11 @@ int main(int argc, char** argv)
         {
           Operator opvac_nat = mr_reference_context->UndoNormalOrder(op);
           reference_value = mr_reference_context->NormalOrder(opvac_nat).ZeroBody;
-          opvac = opvac_nat.TransformOneAndTwoBody(
-              mr_reference_context->NaturalOrbitTransformation.t(), mr_validation_tolerance);
+          opvac = mr_export_natural
+                      ? opvac_nat
+                      : opvac_nat.TransformOneAndTwoBody(
+                            mr_reference_context->NaturalOrbitTransformation.t(),
+                            mr_validation_tolerance);
         }
         else
         {

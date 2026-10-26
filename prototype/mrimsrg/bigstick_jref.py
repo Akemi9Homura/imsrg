@@ -16,6 +16,13 @@ rotated in the pair basis, lambda2 = gamma2 - gamma1^gamma1 (= n_a n_b on the
 pair diagonal in natural orbits), and the file is written with the same
 writer as export_jref.py.  No m-scheme two-body array is formed.
 
+With --basis-transformation the BIGSTICK run is taken to be in another
+single-particle basis (e.g. the imsrg++ HF basis, whose no2bpack was given to
+BIGSTICK's `no2` reader): C.mat is the imsrg++ HO -> basis matrix (written as
+<intfile>C.mat) and --basis-orbits a no2bpack whose header lists the imsrg++
+orbit order.  The jref then stores C_total = C_basis C_nat (HO -> reference
+natural orbits), so the MR driver keeps reading HO-basis interactions.
+
 By default the three-body cumulant lambda3 (lambda3.py, from the
 three-annihilation amplitudes on the fractionally occupied orbits) and the
 BIGSTICK eigenvalue are added (jref version 2); --no-lambda3 writes the
@@ -23,7 +30,8 @@ version-1 file.
 
 Usage:
   bigstick_jref.py --bas X.bas --wfn X.wfn --interaction H.MFDn \
-      --nrefmax 2 --hw 20 [--e2max E] [--state 1] [--no-lambda3] --output X.jref
+      --nrefmax 2 --hw 20 [--e2max E] [--state 1] [--no-lambda3] \
+      [--basis-transformation C.mat --basis-orbits H_basis.no2bpack] --output X.jref
 """
 
 from __future__ import annotations
@@ -324,6 +332,42 @@ def rotate_pairs(orbits, pair_list, J, C):
     return D
 
 
+def read_arma_binary(path: Path) -> np.ndarray:
+    """Armadillo arma_binary double matrix (Mat::save default)."""
+    data = Path(path).read_bytes()
+    first = data.index(b"\n")
+    second = data.index(b"\n", first + 1)
+    if data[:first] != b"ARMA_MAT_BIN_FN008":
+        raise ValueError(f"{path}: not an Armadillo binary double matrix")
+    rows, cols = (int(x) for x in data[first + 1:second].split())
+    values = np.frombuffer(data, dtype="<f8", count=rows * cols, offset=second + 1)
+    return values.reshape((cols, rows)).T.copy()
+
+
+def read_no2bpack_orbits(path: Path):
+    """Orbit labels (n, l, 2j, 2tz) in file order from a no2bpack header."""
+    with Path(path).open("rb") as stream:
+        _hw, _emax, norbits, _nobme, _ntbme = struct.unpack("<d4i", stream.read(24))
+        return [tuple(struct.unpack("<4i", stream.read(16))) for _ in range(norbits)]
+
+
+def basis_transformation_for(orbits, c_path: Path, labels_path: Path) -> np.ndarray:
+    """imsrg++ HO -> basis matrix reordered to the BIGSTICK orbit list."""
+    matrix = read_arma_binary(c_path)
+    labels = read_no2bpack_orbits(labels_path)
+    if matrix.shape != (len(labels), len(labels)):
+        raise ValueError("basis transformation and orbit table have different sizes")
+    if sorted(labels) != sorted(orbits):
+        raise ValueError("the BIGSTICK orbit space must equal the full imsrg++ orbit space "
+                         "(use auto with the emax of the basis Hamiltonian)")
+    index = {label: k for k, label in enumerate(labels)}
+    order = [index[label] for label in orbits]
+    reordered = matrix[np.ix_(order, order)]
+    if np.max(np.abs(reordered.T @ reordered - np.eye(len(orbits)))) > 1e-10:
+        raise ValueError("basis transformation is not orthogonal")
+    return reordered
+
+
 def sha256_files(*paths):
     digest = hashlib.sha256()
     for path in paths:
@@ -332,7 +376,7 @@ def sha256_files(*paths):
 
 
 def convert(bas_path, wfn_path, interaction_path, output, *, nrefmax, hw, e2max=None,
-            state=1, tolerance=1e-10, lambda3=True):
+            state=1, tolerance=1e-10, lambda3=True, basis_transformation=None, basis_orbits=None):
     basis = BigstickBasis(Path(bas_path))
     energy, xj, amplitudes, precision = read_bigstick_wfn(Path(wfn_path), basis, state)
     mstates, occupation, sign = configurations(basis)
@@ -376,6 +420,10 @@ def convert(bas_path, wfn_path, interaction_path, output, *, nrefmax, hw, e2max=
             orbits, mstates, occupation, coefficients, C, occupations)
         reference_energy = (energy, f"BIGSTICK eigenvalue (float32), state {state}")
 
+    transformation = C
+    if basis_transformation is not None:
+        transformation = basis_transformation_for(orbits, basis_transformation, basis_orbits) @ C
+
     emax = max(2 * n + l for n, l, _, _ in orbits)
     rdm_digest = hashlib.sha256(np.asarray(gamma1, dtype="<f8").tobytes())
     for _, _, _, _, matrix in lambda_blocks:
@@ -385,7 +433,7 @@ def convert(bas_path, wfn_path, interaction_path, output, *, nrefmax, hw, e2max=
         header=(A, Z, nrefmax, J2, 1, emax, e2max if e2max is not None else 2 * emax, hw),
         orbits=[(k, n, l, j2_, tz2) for k, (n, l, j2_, tz2) in enumerate(orbits)],
         occupations=occupations,
-        transformation=C,
+        transformation=transformation,
         lambda_blocks=lambda_blocks,
         digests=(sha256_files(interaction_path), rdm_digest.hexdigest(),
                  sha256_files(bas_path, wfn_path)),
@@ -409,10 +457,17 @@ def main() -> None:
     parser.add_argument("--state", type=int, default=1)
     parser.add_argument("--no-lambda3", action="store_true",
                         help="skip lambda3 and the reference energy (write jref version 1)")
+    parser.add_argument("--basis-transformation", type=Path,
+                        help="imsrg++ <intfile>C.mat: HO -> basis of the BIGSTICK Hamiltonian")
+    parser.add_argument("--basis-orbits", type=Path,
+                        help="no2bpack whose header gives the imsrg++ orbit order of C.mat")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
+    if (args.basis_transformation is None) != (args.basis_orbits is None):
+        parser.error("--basis-transformation and --basis-orbits go together")
     summary = convert(args.bas, args.wfn, args.interaction, args.output, nrefmax=args.nrefmax,
-                      hw=args.hw, e2max=args.e2max, state=args.state, lambda3=not args.no_lambda3)
+                      hw=args.hw, e2max=args.e2max, state=args.state, lambda3=not args.no_lambda3,
+                      basis_transformation=args.basis_transformation, basis_orbits=args.basis_orbits)
     for key, value in summary.items():
         print(f"{key}: {value}")
 

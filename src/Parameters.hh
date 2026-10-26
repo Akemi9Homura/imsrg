@@ -67,7 +67,8 @@ std::map<std::string,std::string> Parameters::string_par = {
   {"intfile",			"default"},	// name of output interaction fille
   {"write_H_no2bpack",		"none"},	// write final IMSRG(2) H(s), vacuum normal ordered in the active basis
   {"write_H_jcoupled64",		"none"},	// lossless float64 J-coupled final Hamiltonian for strict validation
-  {"mr_reference_file",		"none"},	// explicit mrimsrg_jref_v1 reference for direct J-scheme MR-IMSRG
+  {"mr_reference_file",		"none"},	// explicit mrimsrg_jref reference for direct J-scheme MR-IMSRG
+  {"mr_export_basis",		"oscillator"},	// MR export: oscillator (rotate back to HO) or natural (keep the MR basis)
   {"fmt2",			"me2j"},	// can also be navratil/Navratil, oslo, oakridge, takayuki, nushellx, no2bpack, jcoupled64
   {"fmt3",			"me3j"},	// can also be navratil or Navratil to read Petr's TBME format
   {"input_op_fmt",		"navratil"},	// navratil means read Petr Navratil's format for 2b currents. miyagi means Takayuki Miyagi's format.
