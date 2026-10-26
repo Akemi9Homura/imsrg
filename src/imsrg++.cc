@@ -84,6 +84,7 @@ namespace
   /// sidecar "<output>.mrmeta.json" next to each exported Hamiltonian.
   bool WriteMRExportMetadata(const std::string &output_file,
                              const std::string &format,
+                             const std::string &operator_name,
                              const MRReference &reference,
                              const std::string &reference_file,
                              const std::string &method,
@@ -105,6 +106,7 @@ namespace
         << "  \"schema\": \"imsrg_mr_export_v1\",\n"
         << "  \"output_file\": " << JsonString(output_file) << ",\n"
         << "  \"output_format\": " << JsonString(format) << ",\n"
+        << "  \"operator\": " << JsonString(operator_name) << ",\n"
         << "  \"imsrg_build_version\": " << JsonString(version::BuildVersion()) << ",\n"
         << "  \"truncation\": \"MR-IMSRG(2), normal-ordered two-body\",\n"
         << "  \"lambda3\": 0,\n"
@@ -131,6 +133,17 @@ namespace
         << "}\n";
     return out.good();
   }
+
+  /// Export path of an operator other than H: "_<name>" before the extension
+  /// of the corresponding write_H_* path.
+  std::string OperatorExportPath(const std::string &path, const std::string &operator_name)
+  {
+    const size_t slash = path.find_last_of('/');
+    const size_t dot = path.find_last_of('.');
+    if (dot == std::string::npos || (slash != std::string::npos && dot < slash))
+      return path + "_" + operator_name;
+    return path.substr(0, dot) + "_" + operator_name + path.substr(dot);
+  }
 }
 
 int main(int argc, char** argv)
@@ -150,6 +163,10 @@ int main(int argc, char** argv)
   std::string custom_valence_space = parameters.s("custom_valence_space");
   std::string basis = parameters.s("basis");
   std::string method = parameters.s("method");
+  // Magnus methods transform operators after the flow with the stored Omegas;
+  // the others evolve them alongside H.
+  const bool magnus_method = method == "magnus" || method == "magnus_euler" ||
+                             method == "magnus_adaptive";
   std::string flowfile = parameters.s("flowfile");
   std::string intfile = parameters.s("intfile");
   std::string write_H_no2bpack = parameters.s("write_H_no2bpack");
@@ -387,7 +404,7 @@ int main(int argc, char** argv)
   // Test whether the scratch directory exists and we can write to it.
   // This is necessary because otherwise you get garbage for transformed operators and it's
   // not obvious what went wrong.
-  if ( (method == "magnus") and  ( (opnames.size() + opsfromfile.size()) > 0 )  )
+  if ( magnus_method and  ( (opnames.size() + opsfromfile.size()) > 0 )  )
   {
     if ( scratch=="/dev/null" or scratch=="/dev/null/")
     {
@@ -482,14 +499,16 @@ int main(int argc, char** argv)
         core_generator != "white-ncsm" || !modelspace.valence.empty() ||
         eMax_imsrg != -1 || e2Max_imsrg != -1 || e3Max_imsrg != -1 ||
         eMax_3body_imsrg != -1 ||
-        !opnames.empty() || !opsfromfile.empty() || !opnamesPT1.empty() ||
-        !opnamesRPA.empty() || !opnamesTDA.empty())
+        (!magnus_method && (!opnames.empty() || !opsfromfile.empty())) ||
+        !opnamesPT1.empty() || !opnamesRPA.empty() || !opnamesTDA.empty() ||
+        write_HO_ops || write_HF_ops)
     {
       std::cerr << "Explicit MR-IMSRG currently requires nuclear basis=oscillator, "
                 << "a one-step direct flow or production Magnus flow, 3bme=none, "
                 << "IMSRG(2), BetaCM=0, "
                 << "core_generator=white-ncsm, no secondary IMSRG-space "
-                << "truncation, no valence space, and no flowing extra operators."
+                << "truncation, no valence space, and extra operators only with "
+                << "a Magnus method (no PT1/RPA/TDA, write_HO_ops or write_HF_ops)."
                 << std::endl;
       return EXIT_FAILURE;
     }
@@ -594,6 +613,32 @@ int main(int argc, char** argv)
     std::cout << std::endl;
   }
 
+
+  if (use_mr_reference)
+  {
+    // The MR lambda2 commutator terms and MR normal ordering exist for scalar
+    // operators only; refuse tensors here instead of after the flow.
+    for (const auto &opname : opnames)
+    {
+      const Operator op = imsrg_util::OperatorFromString(modelspace, opname);
+      if (op.GetJRank() != 0 || op.GetTRank() != 0 || op.GetParity() != 0 ||
+          op.GetNumberLegs() % 2 != 0)
+      {
+        std::cerr << "MR operator evolution supports scalar operators only; got "
+                  << opname << std::endl;
+        return EXIT_FAILURE;
+      }
+    }
+    for (const auto &opff : opsfromfile_unpacked)
+    {
+      if (opff.j != 0 || opff.t != 0 || opff.p != 0 || opff.r > 2)
+      {
+        std::cerr << "MR operator evolution supports scalar NN operators only; got "
+                  << opff.opname << std::endl;
+        return EXIT_FAILURE;
+      }
+    }
+  }
 
 //  std::cout << "Making the Hamiltonian..." << std::endl;
   int particle_rank = input3bme=="none" ? 2 : 3;
@@ -953,7 +998,7 @@ int main(int argc, char** argv)
 
   std::cout << "done with perterbative stuff, method = " << method << std::endl;
   // Calculate all the desired operators. If we're using magnus, we'll do this after the flow is over
-  if ( method != "magnus" )
+  if ( !magnus_method )
   {
 
     for (auto& opname : opnames)
@@ -1049,7 +1094,7 @@ int main(int argc, char** argv)
    }// for ops.size
 
 
-  }// if method != "magnus"
+  }// if !magnus_method
 
 
 
@@ -1396,6 +1441,41 @@ int main(int argc, char** argv)
 
   }
 
+  // Write a vacuum-form operator to the requested jcoupled64/no2bpack files
+  // (operators other than H get "_<name>" before the extension) and, with an
+  // MR reference, the provenance sidecar next to each file.
+  auto write_vacuum_exports = [&](Operator &vacuum, const std::string &operator_name) -> bool
+  {
+    // The adaptive ODE path advances a copy of the solver, so GetS() stays
+    // at 0 there (the SR two-step flow relies on that); integrate_adaptive
+    // always stops exactly at smax.
+    const double s_final = (method == "flow" || method == "flow_adaptive")
+                               ? smax : imsrgsolver.GetS();
+    for (const auto &export_file : {std::make_pair(write_H_jcoupled64, std::string("jcoupled64")),
+                                    std::make_pair(write_H_no2bpack, std::string("no2bpack"))})
+    {
+      if (export_file.first == "none")
+        continue;
+      const std::string path = operator_name == "H"
+                                   ? export_file.first
+                                   : OperatorExportPath(export_file.first, operator_name);
+      if (export_file.second == "jcoupled64")
+        rw.Write_jcoupled64(path, vacuum);
+      else
+        rw.Write_no2bpack(path, vacuum);
+      if (not rw.goodstate)
+        return false;
+      if (use_mr_reference &&
+          !WriteMRExportMetadata(path, export_file.second, operator_name,
+                                 *mr_reference_context, mr_reference_file,
+                                 method, core_generator, denominator_partitioning,
+                                 s_final, smax, ds_0, dsmax,
+                                 ode_tolerance, eta_criterion))
+        return false;
+    }
+    return true;
+  };
+
   // Materialize an ordinary vacuum 0B/1B/2B Hamiltonian.  SR keeps the active
   // HF basis; explicit MR first undoes correlated normal ordering in the
   // natural basis and then rotates the result back to the original HO basis.
@@ -1446,31 +1526,8 @@ int main(int argc, char** argv)
               << "IM-FCIQMC export check: H(s).ZeroBody = " << imsrg_energy
               << "  reference diagonal after UndoNormalOrdering = " << reference_energy
               << "  difference = " << reference_energy-imsrg_energy << std::endl;
-    if (write_H_jcoupled64 != "none")
-      rw.Write_jcoupled64(write_H_jcoupled64, Hvac);
-    if (write_H_no2bpack != "none")
-      rw.Write_no2bpack(write_H_no2bpack, Hvac);
-    if (not rw.goodstate) return EXIT_FAILURE;
-    if (use_mr_reference)
-    {
-      // The adaptive ODE path advances a copy of the solver, so GetS() stays
-      // at 0 there (the SR two-step flow relies on that); integrate_adaptive
-      // always stops exactly at smax.
-      const double s_final = (method == "flow" || method == "flow_adaptive")
-                                 ? smax : imsrgsolver.GetS();
-      for (const auto &export_file : {std::make_pair(write_H_jcoupled64, std::string("jcoupled64")),
-                                      std::make_pair(write_H_no2bpack, std::string("no2bpack"))})
-      {
-        if (export_file.first == "none")
-          continue;
-        if (!WriteMRExportMetadata(export_file.first, export_file.second,
-                                   *mr_reference_context, mr_reference_file,
-                                   method, core_generator, denominator_partitioning,
-                                   s_final, smax, ds_0, dsmax,
-                                   ode_tolerance, eta_criterion))
-          return EXIT_FAILURE;
-      }
-    }
+    if (!write_vacuum_exports(Hvac, "H"))
+      return EXIT_FAILURE;
   }
 
 
@@ -1641,7 +1698,7 @@ int main(int argc, char** argv)
                 << "  (not the IM-NCSM energy: diagonalize the exported H)" << std::endl;
     else
       std::cout << "Core Energy = " << std::setprecision(6) << imsrgsolver.GetH_s().ZeroBody << std::endl;
-    if ( method != "magnus")
+    if ( !magnus_method )
     {
       for (index_t i=0;i<ops.size();++i)
       {
@@ -1674,7 +1731,7 @@ int main(int argc, char** argv)
 
 
 
-  if (method == "magnus")
+  if (magnus_method)
   {
 
     /// if method is magnus, we didn't do this already. So we need to unpack any operators from file.
@@ -1754,6 +1811,15 @@ int main(int argc, char** argv)
         op.MakeNotReduced();
       }
 
+      if (use_mr_reference)
+      {
+        // Same path as the Hamiltonian: natural-orbit basis, then MR normal order.
+        op = mr_reference_context->NormalOrder(op.TransformOneAndTwoBody(
+            mr_reference_context->NaturalOrbitTransformation, mr_validation_tolerance));
+        std::cout << "   <Phi|O|Phi>: " << std::setprecision(10) << op.ZeroBody << std::endl;
+      }
+      else
+      {
       if ( basis == "oscillator" or opname=="OccRef")
       {
         op = op.DoNormalOrdering();
@@ -1769,6 +1835,7 @@ int main(int argc, char** argv)
 
       
       std::cout << "   HF: " << op.ZeroBody << std::endl;
+      }
 
       if ( (eMax_imsrg != -1) or (e2Max_imsrg != -1) or (e3Max_imsrg) != -1)
       {
@@ -1801,7 +1868,38 @@ int main(int argc, char** argv)
 
   
       op = imsrgsolver.Transform(op);
-      
+
+      // Vacuum export next to H, before any core re-normal-ordering; MR undoes
+      // its normal order in the natural basis and rotates back to HO, as for H.
+      if (use_mr_reference)
+        std::cout << "   <Phi|O(s)|Phi>: " << std::setprecision(10) << op.ZeroBody
+                  << "  (reference expectation value, not the IM-NCSM one)" << std::endl;
+      if (write_H_no2bpack != "none" || write_H_jcoupled64 != "none")
+      {
+        Operator opvac;
+        double reference_value = 0.0;
+        if (use_mr_reference)
+        {
+          Operator opvac_nat = mr_reference_context->UndoNormalOrder(op);
+          reference_value = mr_reference_context->NormalOrder(opvac_nat).ZeroBody;
+          opvac = opvac_nat.TransformOneAndTwoBody(
+              mr_reference_context->NaturalOrbitTransformation.t(), mr_validation_tolerance);
+        }
+        else
+        {
+          opvac = op.UndoNormalOrdering();
+          reference_value = opvac.DoNormalOrdering().ZeroBody;
+        }
+        std::cout << std::setprecision(12) << "IM-FCIQMC export check: " << opname
+                  << "(s).ZeroBody = " << op.ZeroBody
+                  << "  reference diagonal after UndoNormalOrdering = " << reference_value
+                  << "  difference = " << reference_value - op.ZeroBody << std::endl;
+        if (!write_vacuum_exports(opvac, opname))
+          return EXIT_FAILURE;
+      }
+      if (use_mr_reference)
+        continue; // no valence space: the shell-model writers below do not apply
+
       //      std::cout << "Before renormal ordering Op(5,4) is " << std::setprecision(10) << op.OneBody(5,4) << std::endl;
       if (renormal_order) 
       {
@@ -1857,7 +1955,7 @@ int main(int argc, char** argv)
 
     }// for opnames
 
-  }// if method == "magnus"
+  }// if magnus_method
 
 
 

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
-"""Real He4/O16 exact single-reference degeneration through both drivers."""
+"""Real He4/O16 exact single-reference degeneration through both drivers.
+
+With Lambda2 = 0 the MR driver must reproduce the SR driver for H and, with a
+Magnus method, for the scalar operators transformed with the same Omegas.
+"""
 
 import os
 from pathlib import Path
@@ -32,6 +36,7 @@ def run_driver(
     mr,
     step=1e-4,
     method="flow_RK4",
+    operators=(),
 ):
     label = (
         f"{nucleus}_{'mr' if mr else 'sr'}_{method}_"
@@ -65,6 +70,8 @@ def run_driver(
         scratch = root / ("scratch_" + label)
         scratch.mkdir()
         command.extend((f"scratch={scratch}", "write_omega=true"))
+    if operators:
+        command.append("Operators=" + ",".join(operators))
     if mr:
         command.append(f"mr_reference_file={reference_file}")
     environment = os.environ.copy()
@@ -129,6 +136,11 @@ def run_driver(
     return output
 
 
+def operator_output(output, name):
+    """Export path the driver derives from write_H_jcoupled64 for an operator."""
+    return output.with_name(f"{output.stem}_{name}{output.suffix}")
+
+
 def main():
     if len(sys.argv) != 2:
         raise SystemExit("usage: UnitTestMRSRDriver.py /path/to/imsrg++")
@@ -170,7 +182,9 @@ def main():
             assert reference.Lambda2.Norm() == 0.0
 
             for method in ("flow_RK4", "magnus", "magnus_adaptive"):
-                for smax in (0.0, 1e-4):
+                magnus = method.startswith("magnus")
+                operators = ("Rp2", "Rm2") if magnus else ()
+                for smax in (0.0, 1e-4, 1e-3) if magnus else (0.0, 1e-4):
                     mr_output = run_driver(
                         executable,
                         root,
@@ -181,6 +195,7 @@ def main():
                         smax,
                         True,
                         method=method,
+                        operators=operators,
                     )
                     sr_output = run_driver(
                         executable,
@@ -192,6 +207,7 @@ def main():
                         smax,
                         False,
                         method=method,
+                        operators=operators,
                     )
                     errors = payload_error(sr_output, mr_output)
                     print(
@@ -200,6 +216,17 @@ def main():
                         f"two={errors[2]:.3e}"
                     )
                     assert max(errors) < 1e-10
+                    for name in operators:
+                        errors = payload_error(
+                            operator_output(sr_output, name),
+                            operator_output(mr_output, name),
+                        )
+                        print(
+                            f"{nucleus} SR degeneration {method} {name} "
+                            f"s={smax:.1e}: zero={errors[0]:.3e} "
+                            f"one={errors[1]:.3e} two={errors[2]:.3e}"
+                        )
+                        assert max(errors) < 1e-10
 
 
 if __name__ == "__main__":

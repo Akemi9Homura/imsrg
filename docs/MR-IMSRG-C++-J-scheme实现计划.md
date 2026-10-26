@@ -1366,3 +1366,33 @@ White-NCSM 生成元（profiler 中的 `AddToEta`）随后也按 imsrg++ 其他�
   IM-NCSM 能量来自导出 H 的对角化。
 - 数据：He4 emax8 嵌入参考态的初始 E = −17.0135030，emax2 NCSM 参考能量 −17.0134908（emax2 输入下严格相等），差 1.2e-5 MeV，
   来自 emax8 相互作用文件，原因未查。
+
+## 10. 算符演化（Magnus Ω）
+
+做法沿用 imsrg++ 的算符流程，输入任意算符走同一路径；MR 只替换换基与正规序两步。IM-NCSM 的做法相同：Gebrerufael 2017 用直接演化、只有标量；
+Vobig 2020 实现 Magnus(2) 并推导任意张量秩的 J 耦合 MR 对易子（第 5 章），此后所有观测量用 Magnus；Mongelli 2022 沿用，并在观测量的 BCH 里加领头阶诱导三体修正。
+
+| 步骤 | SR（imsrg++ 原有） | MR |
+|---|---|---|
+| 构造 | `OperatorFromString` 或从文件读 | 同 |
+| 换基与正规序 | HF/NAT 换基，`DoNormalOrdering` | 参考态自然轨道换基，`MRReference::NormalOrder`（与 H 相同） |
+| 演化 | 流解完后 `IMSRGSolver::Transform`，逐段套用 Ω（含写入 scratch 的段） | 同（BCH 内部调用 MR 对易子） |
+| 导出 | `UndoNormalOrdering`，壳模型格式 | `MRReference::UndoNormalOrder`，转回 HO，与 H 相同的 jcoupled64/no2bpack |
+
+标量与张量只在对易子的 λ2 项、MR 正规序与写出格式处分开。
+
+### 10.1 标量（已实现）
+
+- 驱动：Magnus 族方法（`magnus`、`magnus_euler`、`magnus_adaptive`）统一走流后变换。上游原先只认 `magnus`，`magnus_euler`、`magnus_adaptive`
+  下算符既不随流演化也不变换，单参考输出分支还会越界读 `FlowingOps`；SR 一并修正。
+- MR 模式允许 `Operators=` 与从文件读入的算符，只限 Magnus；张量、改变同位旋或宇称的算符在流开始前拒绝；PT1/RPA/TDA、`write_HO_ops`、`write_HF_ops` 拒绝。
+- 导出：给了 `write_H_jcoupled64`/`write_H_no2bpack` 时，每个算符写到 H 路径扩展名前加 `_<名字>` 的文件（如 `H_Rp2.jcoupled64`），MR 另写 `.mrmeta.json`
+  （新增 `operator` 字段）；SR 同样导出真空形式，用于退化对照。日志打印 ⟨Φ|O|Φ⟩、⟨Φ|O(s)|Φ⟩ 与导出往返核对。
+- 验收（SR 退化）：λ2 = 0 的 He4、O16 emax2 参考，`magnus` 与 `magnus_adaptive`，s = 0、1e-4、1e-3（`MRSRDriver`）与 s = 0.5（10 步，一次性脚本），
+  MR 驱动导出的 Rp2、Rm2 与 SR 驱动逐元差 ≤ 3e-17 fm²（H ≤ 1.4e-14 MeV）。
+
+### 10.2 待做
+
+- 张量：张量版 λ2 一体项（Vobig 第 5 章、Mongelli 5.9 节），自然轨道基下张量 MR 正规序（分数占据的 SR 正规序，无 λ2 项），张量的自然轨道换基与全空间约化矩阵元写出；
+  m-scheme oracle 抽查 L = 1、2 分量，SR 退化对照。
+- 下游：NCSM 读回程序算导出算符的期望值与跃迁。
