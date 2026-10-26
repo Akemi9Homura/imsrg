@@ -616,25 +616,26 @@ int main(int argc, char** argv)
 
   if (use_mr_reference)
   {
-    // The MR lambda2 commutator terms and MR normal ordering exist for scalar
-    // operators only; refuse tensors here instead of after the flow.
+    // The MR lambda2 terms exist for scalars and for isospin-conserving
+    // tensors of rank L > 0; refuse other operators here instead of after the flow.
+    auto mr_supported = [](int j, int t, int p) { return t == 0 && (j > 0 || p == 0); };
     for (const auto &opname : opnames)
     {
       const Operator op = imsrg_util::OperatorFromString(modelspace, opname);
-      if (op.GetJRank() != 0 || op.GetTRank() != 0 || op.GetParity() != 0 ||
+      if (!mr_supported(op.GetJRank(), op.GetTRank(), op.GetParity()) ||
           op.GetNumberLegs() % 2 != 0)
       {
-        std::cerr << "MR operator evolution supports scalar operators only; got "
-                  << opname << std::endl;
+        std::cerr << "MR operator evolution supports scalars and isospin-conserving tensors "
+                  << "of rank > 0; got " << opname << std::endl;
         return EXIT_FAILURE;
       }
     }
     for (const auto &opff : opsfromfile_unpacked)
     {
-      if (opff.j != 0 || opff.t != 0 || opff.p != 0 || opff.r > 2)
+      if (!mr_supported(opff.j, opff.t, opff.p) || opff.r > 2)
       {
-        std::cerr << "MR operator evolution supports scalar NN operators only; got "
-                  << opff.opname << std::endl;
+        std::cerr << "MR operator evolution supports scalars and isospin-conserving NN tensors "
+                  << "of rank > 0; got " << opff.opname << std::endl;
         return EXIT_FAILURE;
       }
     }
@@ -1443,7 +1444,9 @@ int main(int argc, char** argv)
 
   // Write a vacuum-form operator to the requested jcoupled64/no2bpack files
   // (operators other than H get "_<name>" before the extension) and, with an
-  // MR reference, the provenance sidecar next to each file.
+  // MR reference, the provenance sidecar next to each file.  Those formats are
+  // scalar, so a tensor goes once to "<stem>_<name>.opbin", the lossless
+  // Operator::WriteBinary layout (ranks, 1B and 2B reduced matrix elements).
   auto write_vacuum_exports = [&](Operator &vacuum, const std::string &operator_name) -> bool
   {
     // The adaptive ODE path advances a copy of the solver, so GetS() stays
@@ -1451,6 +1454,34 @@ int main(int argc, char** argv)
     // always stops exactly at smax.
     const double s_final = (method == "flow" || method == "flow_adaptive")
                                ? smax : imsrgsolver.GetS();
+    auto write_metadata = [&](const std::string &path, const std::string &format)
+    {
+      return !use_mr_reference ||
+             WriteMRExportMetadata(path, format, operator_name,
+                                   *mr_reference_context, mr_reference_file,
+                                   method, core_generator, denominator_partitioning,
+                                   s_final, smax, ds_0, dsmax,
+                                   ode_tolerance, eta_criterion);
+    };
+    if (vacuum.GetJRank() != 0 || vacuum.GetTRank() != 0 || vacuum.GetParity() != 0)
+    {
+      const std::string base = write_H_jcoupled64 != "none" ? write_H_jcoupled64 : write_H_no2bpack;
+      const std::string with_name = OperatorExportPath(base, operator_name);
+      const size_t slash = with_name.find_last_of('/');
+      const size_t dot = with_name.find_last_of('.');
+      const std::string path =
+          (dot == std::string::npos || (slash != std::string::npos && dot < slash)
+               ? with_name : with_name.substr(0, dot)) + ".opbin";
+      std::ofstream out(path, std::ios::binary);
+      if (!out.good())
+      {
+        std::cerr << "cannot write " << path << std::endl;
+        return false;
+      }
+      vacuum.WriteBinary(out);
+      std::cout << "Wrote tensor operator " << operator_name << " to " << path << std::endl;
+      return out.good() && write_metadata(path, "imsrg_operator_binary");
+    }
     for (const auto &export_file : {std::make_pair(write_H_jcoupled64, std::string("jcoupled64")),
                                     std::make_pair(write_H_no2bpack, std::string("no2bpack"))})
     {
@@ -1463,14 +1494,7 @@ int main(int argc, char** argv)
         rw.Write_jcoupled64(path, vacuum);
       else
         rw.Write_no2bpack(path, vacuum);
-      if (not rw.goodstate)
-        return false;
-      if (use_mr_reference &&
-          !WriteMRExportMetadata(path, export_file.second, operator_name,
-                                 *mr_reference_context, mr_reference_file,
-                                 method, core_generator, denominator_partitioning,
-                                 s_final, smax, ds_0, dsmax,
-                                 ode_tolerance, eta_criterion))
+      if (not rw.goodstate || !write_metadata(path, export_file.second))
         return false;
     }
     return true;
@@ -1816,7 +1840,8 @@ int main(int argc, char** argv)
         // Same path as the Hamiltonian: natural-orbit basis, then MR normal order.
         op = mr_reference_context->NormalOrder(op.TransformOneAndTwoBody(
             mr_reference_context->NaturalOrbitTransformation, mr_validation_tolerance));
-        std::cout << "   <Phi|O|Phi>: " << std::setprecision(10) << op.ZeroBody << std::endl;
+        if (op.GetJRank() == 0)
+          std::cout << "   <Phi|O|Phi>: " << std::setprecision(10) << op.ZeroBody << std::endl;
       }
       else
       {
@@ -1871,7 +1896,7 @@ int main(int argc, char** argv)
 
       // Vacuum export next to H, before any core re-normal-ordering; MR undoes
       // its normal order in the natural basis and rotates back to HO, as for H.
-      if (use_mr_reference)
+      if (use_mr_reference && op.GetJRank() == 0)
         std::cout << "   <Phi|O(s)|Phi>: " << std::setprecision(10) << op.ZeroBody
                   << "  (reference expectation value, not the IM-NCSM one)" << std::endl;
       if (write_H_no2bpack != "none" || write_H_jcoupled64 != "none")
@@ -1890,10 +1915,11 @@ int main(int argc, char** argv)
           opvac = op.UndoNormalOrdering();
           reference_value = opvac.DoNormalOrdering().ZeroBody;
         }
-        std::cout << std::setprecision(12) << "IM-FCIQMC export check: " << opname
-                  << "(s).ZeroBody = " << op.ZeroBody
-                  << "  reference diagonal after UndoNormalOrdering = " << reference_value
-                  << "  difference = " << reference_value - op.ZeroBody << std::endl;
+        if (op.GetJRank() == 0)
+          std::cout << std::setprecision(12) << "IM-FCIQMC export check: " << opname
+                    << "(s).ZeroBody = " << op.ZeroBody
+                    << "  reference diagonal after UndoNormalOrdering = " << reference_value
+                    << "  difference = " << reference_value - op.ZeroBody << std::endl;
         if (!write_vacuum_exports(opvac, opname))
           return EXIT_FAILURE;
       }

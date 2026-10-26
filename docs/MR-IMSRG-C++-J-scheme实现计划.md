@@ -1385,14 +1385,36 @@ Vobig 2020 实现 Magnus(2) 并推导任意张量秩的 J 耦合 MR 对易子（
 
 - 驱动：Magnus 族方法（`magnus`、`magnus_euler`、`magnus_adaptive`）统一走流后变换。上游原先只认 `magnus`，`magnus_euler`、`magnus_adaptive`
   下算符既不随流演化也不变换，单参考输出分支还会越界读 `FlowingOps`；SR 一并修正。
-- MR 模式允许 `Operators=` 与从文件读入的算符，只限 Magnus；张量、改变同位旋或宇称的算符在流开始前拒绝；PT1/RPA/TDA、`write_HO_ops`、`write_HF_ops` 拒绝。
+- MR 模式允许 `Operators=` 与从文件读入的算符，只限 Magnus；改变同位旋的算符与宇称为奇的标量在流开始前拒绝（张量见 10.2）；PT1/RPA/TDA、`write_HO_ops`、`write_HF_ops` 拒绝。
 - 导出：给了 `write_H_jcoupled64`/`write_H_no2bpack` 时，每个算符写到 H 路径扩展名前加 `_<名字>` 的文件（如 `H_Rp2.jcoupled64`），MR 另写 `.mrmeta.json`
   （新增 `operator` 字段）；SR 同样导出真空形式，用于退化对照。日志打印 ⟨Φ|O|Φ⟩、⟨Φ|O(s)|Φ⟩ 与导出往返核对。
 - 验收（SR 退化）：λ2 = 0 的 He4、O16 emax2 参考，`magnus` 与 `magnus_adaptive`，s = 0、1e-4、1e-3（`MRSRDriver`）与 s = 0.5（10 步，一次性脚本），
   MR 驱动导出的 Rp2、Rm2 与 SR 驱动逐元差 ≤ 3e-17 fm²（H ≤ 1.4e-14 MeV）。
 
-### 10.2 待做
+### 10.2 张量（已实现）
 
-- 张量：张量版 λ2 一体项（Vobig 第 5 章、Mongelli 5.9 节），自然轨道基下张量 MR 正规序（分数占据的 SR 正规序，无 λ2 项），张量的自然轨道换基与全空间约化矩阵元写出；
-  m-scheme oracle 抽查 L = 1、2 分量，SR 退化对照。
-- 下游：NCSM 读回程序算导出算符的期望值与跃迁。
+适用于秩 L > 0、不改变同位旋的张量（E2、M1、E1 等）；改变同位旋的算符（GT、Fermi）与宇称为奇的标量在流前拒绝。
+
+- 对易子：SR 部分直接用 imsrg++ 的 `CommutatorScalarTensor`（分数占据）；λ2 只进一体项（零体项只对标量存在）。没有照抄论文公式，
+  而是从 m-scheme 式（Hergert 式 (50)，x = Ω、y = O）自行重排，每一块都对着暴力 m-scheme 求和逐项核过（L = 1、2、3，两种宇称，μ = 0、1）：
+
+  Z = PT(Ω λ O − O λ Ω) + C(Ω, PT(O λ − λ O)) − D(O, PT(Ω λ − λ Ω)) + R(Ω, O) − R(O, Ω)，
+
+  其中 PT_ij = Σ_c W_{ci,cj}（imsrg++ SR 221 的部分迹公式），C_ij = Σ_ab N_ab Ω_biaj、D_ij = Σ_ab S_ab O_biaj（comm121st 的两种 2B×1B 收缩），
+  R(x, y)_ij = Σ x_iabc y_bejd λ_aecd 为环形项，用交叉耦合矩阵 W̄_{(ab),(cd)} ↔ W_{adcb} 计算：
+  R = −Σ_t Σ_{JJ'} Ĵ Ĵ' {J J' L; j_j j_i j_t} (−1)^{j_i+j_t+J'+L} [x̄ λ̄ ȳ]^{JJ'}_{(it),(jt)}，
+  标量交叉耦合 X̄^J = Σ_{J3} (2J3+1) {j_a j_b J; j_c j_d J3} X^{J3}_{(ad),(cb)}，
+  张量交叉耦合 X̄^{JJ'} = Σ_{J3J4} Ĵ Ĵ' Ĵ3 Ĵ4 (−1)^{j_b+j_d+J'+J4} {j_a j_d J3; j_b j_c J4; J J' L} X^{J3J4}_{(ad),(cb)}。
+  λ 的指标只跑活跃轨道。约定为 imsrg++ 的 Edmonds Wigner–Eckart 与 `GetTBME_J` 归一化。
+- MR 正规序：自然轨道基下张量与分数占据的 SR 正规序相同（`DoNormalOrdering2`），不加 λ2 项。自然轨道换基 `TransformOneAndTwoBody` 本来就逐块处理张量。
+- 导出：标量格式（jcoupled64/no2bpack）不能装张量，张量写到 `<H 路径主名>_<名字>.opbin`（`Operator::WriteBinary`，含秩、1B 与 2B 约化矩阵元，无损），MR 另写 sidecar。
+- 验收：
+  - `MRTensor`：相关的 He4 Nrefmax=2 参考（λ2 一体项量级 1–2.5）下，C++ 的 [Ω, O]（E1、M1、E2）与稠密 m-scheme oracle 的一体、两体逐元差 ≤ 2e-14；张量的 MR 正规序与撤销 ≤ 1.3e-15。
+    这同时检验了 SR 张量项在分数占据下的正确性。
+  - `MRSRDriver`：λ2 = 0 的 He4、O16，`magnus` 与 `magnus_adaptive`，E2、M1、E1 的 MR 与 SR 导出差 ≤ 1.3e-19。
+- 代价：emax6 一次 [Ω, E2] 约 2.3 s（4 线程），其中 SR 张量部分（上游 `comm222_phst` 为主）与 MR 环形项各约一半；环形项目前串行（9j 缓存只在单线程写入），以后可并行。
+
+### 10.3 待做
+
+- 下游：NCSM 读回程序算导出算符的期望值与跃迁（标量 jcoupled64，张量 `.opbin`）。
+- 环形项并行化（emax ≥ 8 前）。

@@ -28,6 +28,10 @@ namespace MRCommutator
   MR1BResult comm221_lambda2(const Operator &X, const Operator &Y,
                              const MRReference &reference);
 
+  /// Reduced one-body lambda2 terms of [X,Y] for a scalar and an
+  /// isospin-conserving tensor of rank L > 0 (either order).
+  arma::mat comm221_lambda2_tensor(const Operator &X, const Operator &Y,
+                                   const MRReference &reference);
   /// Full MR-IMSRG(2) commutator for J_ref=0 and lambda3=0.
   /// Lambda2=0 returns the existing scalar IMSRG(2) commutator directly.
   Operator Commutator(const Operator &X, const Operator &Y,

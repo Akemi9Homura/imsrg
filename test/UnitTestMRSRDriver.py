@@ -3,7 +3,8 @@
 """Real He4/O16 exact single-reference degeneration through both drivers.
 
 With Lambda2 = 0 the MR driver must reproduce the SR driver for H and, with a
-Magnus method, for the scalar operators transformed with the same Omegas.
+Magnus method, for the scalar (Rp2, Rm2) and tensor (E2, M1, E1) operators
+transformed with the same Omegas.
 """
 
 import os
@@ -141,6 +142,21 @@ def operator_output(output, name):
     return output.with_name(f"{output.stem}_{name}{output.suffix}")
 
 
+TENSOR_RANKS = {"E2": (2, 0, 0), "M1": (1, 0, 0), "E1": (1, 0, 1)}
+
+
+def tensor_error(modelspace, name, first, second):
+    """Largest 1B/2B difference of two exported tensor operators (.opbin)."""
+    operators = []
+    for output in (first, second):
+        operator = pyIMSRG.Operator(modelspace, *TENSOR_RANKS[name], 2)
+        operator.ReadBinary(str(output.with_name(f"{output.stem}_{name}.opbin")))
+        operators.append(operator)
+    difference = operators[0] - operators[1]
+    assert operators[0].OneBody.Norm() > 0.0
+    return difference.OneBodyNorm(), difference.TwoBodyNorm()
+
+
 def main():
     if len(sys.argv) != 2:
         raise SystemExit("usage: UnitTestMRSRDriver.py /path/to/imsrg++")
@@ -183,7 +199,7 @@ def main():
 
             for method in ("flow_RK4", "magnus", "magnus_adaptive"):
                 magnus = method.startswith("magnus")
-                operators = ("Rp2", "Rm2") if magnus else ()
+                operators = ("Rp2", "Rm2", "E2", "M1", "E1") if magnus else ()
                 for smax in (0.0, 1e-4, 1e-3) if magnus else (0.0, 1e-4):
                     mr_output = run_driver(
                         executable,
@@ -217,6 +233,14 @@ def main():
                     )
                     assert max(errors) < 1e-10
                     for name in operators:
+                        if name in TENSOR_RANKS:
+                            errors = tensor_error(modelspace, name, sr_output, mr_output)
+                            print(
+                                f"{nucleus} SR degeneration {method} {name} "
+                                f"s={smax:.1e}: one={errors[0]:.3e} two={errors[1]:.3e}"
+                            )
+                            assert max(errors) < 1e-10
+                            continue
                         errors = payload_error(
                             operator_output(sr_output, name),
                             operator_output(mr_output, name),

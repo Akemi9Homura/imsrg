@@ -586,8 +586,9 @@ void MRReference::CheckCompatibleOperator(const Operator &op) const
 {
   if (op.modelspace != modelspace)
     throw std::invalid_argument("MRReference and Operator use different ModelSpace objects");
-  if (op.GetJRank() != 0 || op.GetTRank() != 0 || op.GetParity() != 0)
-    throw std::invalid_argument("MR normal ordering currently supports scalar operators only");
+  if (op.GetTRank() != 0 || (op.GetJRank() == 0 && op.GetParity() != 0))
+    throw std::invalid_argument(
+        "MR normal ordering supports scalars and isospin-conserving tensors of rank > 0");
   if (op.GetParticleRank() > 2)
     throw std::invalid_argument("MR normal ordering currently supports NN/NO2B operators only");
   if (!OccupationsMatchModelSpace())
@@ -598,7 +599,10 @@ Operator MRReference::NormalOrder(const Operator &vacuum_operator) const
 {
   CheckCompatibleOperator(vacuum_operator);
   Operator result = vacuum_operator.DoNormalOrdering2(+1, modelspace->all_orbits);
-  result.ZeroBody += ContractLambda2(vacuum_operator.TwoBody);
+  // In natural orbits a tensor of rank L > 0 normal-orders like an SR operator
+  // with fractional occupations; lambda2 enters only the scalar zero-body part.
+  if (vacuum_operator.GetJRank() == 0)
+    result.ZeroBody += ContractLambda2(vacuum_operator.TwoBody);
   return result;
 }
 
@@ -606,6 +610,7 @@ Operator MRReference::UndoNormalOrder(const Operator &mr_operator) const
 {
   CheckCompatibleOperator(mr_operator);
   Operator result = mr_operator.DoNormalOrdering2(-1, modelspace->all_orbits);
-  result.ZeroBody -= ContractLambda2(mr_operator.TwoBody);
+  if (mr_operator.GetJRank() == 0)
+    result.ZeroBody -= ContractLambda2(mr_operator.TwoBody);
   return result;
 }
