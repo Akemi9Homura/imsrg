@@ -1,5 +1,8 @@
 # Rapid MR-IMSRG prototype
 
+User guide for the production C++ MR-IMSRG path (jref inputs incl. BIGSTICK,
+driver, operators, tests): `docs/mr-imsrg/README.md`.
+
 This directory contains the deliberately small m-scheme prototype described in
 `docs/MR-IMSRG-快速结果计划.md`.  The C++ bridge does not implement another
 interaction reader or NCSM solver: it builds against the validated
