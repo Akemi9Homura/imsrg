@@ -1,11 +1,14 @@
 #include "MRCommutator.hh"
 #include "Commutator.hh"
 #include "PhysicalConstants.hh"
+#include "AngMom.hh"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 
@@ -614,68 +617,366 @@ namespace
   // with PT_ij = sum_c W_{ci,cj}, C_ij = sum_ab N_ab X_biaj,
   // D_ij = sum_ab S_ab Y_biaj and the ring R(x,y)_ij = sum x_iabc y_bejd l_aecd.
   // R uses cross-coupled matrices Wbar_{(ab),(cd)} <-> W_{adcb}, with b and d
-  // coupled as holes (j_b -m_b) times (-1)^(j_b - m_b).  Reduced matrix
-  // elements follow the imsrg++ (Edmonds) Wigner-Eckart convention and the
-  // TwoBodyME::GetTBME_J normalization; every coefficient below was checked
-  // against brute-force m-scheme sums for L = 1, 2, 3 and both parities.
+  // coupled as holes (j_b -m_b) times (-1)^(j_b - m_b):
+  //   R(x,y)_ij = -sum_t sum_{JJ'} Jhat J'hat {J J' L; j_j j_i j_t}
+  //               (-1)^(j_i+j_t+J'+L) [xbar lbar ybar]^{JJ'}_{(it),(jt)},
+  //   scalar  Xbar^J_{(ab),(cd)} = sum_J3 (2J3+1) {j_a j_b J; j_c j_d J3} X^J3_{(ad),(cb)},
+  //   tensor  Xbar^{JJ'}_{(ab),(cd)} = sum_{J3 J4} Jhat J'hat J3hat J4hat
+  //           (-1)^(j_b+j_d+J'+J4) {j_a j_d J3; j_b j_c J4; J J' L} X^{J3J4}_{(ad),(cb)}.
+  // Hermitian conjugation maps PT(Y l X) and R(Y,X) onto PT(X l Y) and R(X,Y):
+  // their sum enters as P_ij + h_Z (-1)^(j_i-j_j) P_ji.  Reduced matrix elements
+  // follow the imsrg++ (Edmonds) Wigner-Eckart convention and the
+  // TwoBodyME::GetTBME_J normalization; every coefficient was checked against
+  // brute-force m-scheme sums for L = 1, 2, 3 and both parities.
+  //
+  // Speed: matrix elements are read through PairTable/BlockAccess (channels and
+  // block pointers resolved once, instead of the std::map lookups inside
+  // GetTBME_J); 6j/9j coefficients are tabulated per tuple of j values and kept
+  // across calls; every product with lambda2 runs over active orbits only;
+  // parallel loops write disjoint rows or per-channel buffers that are summed
+  // in a fixed order, so the result does not depend on the thread count.
 
-  // Normalized pair blocks for any channel order, read back like GetTBME_J.
-  class PairBlocks
+  // Channel, local ket index and GetTBME_J factor (exchange phase, sqrt2 for
+  // a == b) of every ordered orbit pair |ab;J>.
+  class PairTable
   {
    public:
-    explicit PairBlocks(ModelSpace &space) : modelspace(&space) {}
-
-    arma::mat &Block(size_t ch_bra, size_t ch_ket) { return blocks[{ch_bra, ch_ket}]; }
-
-    double TBME_J(int J_bra, int J_ket, index_t a, index_t b, index_t c, index_t d) const
+    struct Entry
     {
-      const Orbit &oa = modelspace->GetOrbit(a);
-      const Orbit &ob = modelspace->GetOrbit(b);
-      const Orbit &oc = modelspace->GetOrbit(c);
-      const Orbit &od = modelspace->GetOrbit(d);
-      const auto it = blocks.find(
-          {modelspace->GetTwoBodyChannelIndex(J_bra, (oa.l + ob.l) % 2, (oa.tz2 + ob.tz2) / 2),
-           modelspace->GetTwoBodyChannelIndex(J_ket, (oc.l + od.l) % 2, (oc.tz2 + od.tz2) / 2)});
-      if (it == blocks.end())
+      int channel = -1;
+      int index = 0;
+      double factor = 0.0;
+    };
+
+    explicit PairTable(ModelSpace &space)
+        : modelspace(&space), norbits(space.GetNumberOrbits()), max_J(0)
+    {
+      for (index_t a = 0; a < norbits; ++a)
+        max_J = std::max(max_J, space.GetOrbit(a).j2);
+      entries.resize((max_J + 1) * norbits * norbits);
+      for (int J = 0; J <= max_J; ++J)
+        for (index_t a = 0; a < norbits; ++a)
+          for (index_t b = 0; b < norbits; ++b)
+          {
+            const Orbit &oa = space.GetOrbit(a);
+            const Orbit &ob = space.GetOrbit(b);
+            if (2 * J < std::abs(oa.j2 - ob.j2) || 2 * J > oa.j2 + ob.j2)
+              continue;
+            const int channel = space.GetTwoBodyChannelIndex(J, (oa.l + ob.l) % 2, (oa.tz2 + ob.tz2) / 2);
+            const TwoBodyChannel &tbc = space.GetTwoBodyChannel(channel);
+            const size_t index = tbc.GetLocalIndex(std::min(a, b), std::max(a, b));
+            if (index >= tbc.GetNumberKets())
+              continue;
+            Entry &entry = entries[Index(J, a, b)];
+            entry.channel = channel;
+            entry.index = index;
+            entry.factor = (a > b ? space.phase((oa.j2 + ob.j2) / 2 + J + 1) : 1) *
+                           (a == b ? PhysConst::SQRT2 : 1.0);
+          }
+    }
+
+    const Entry &operator()(int J, index_t a, index_t b) const { return entries[Index(J, a, b)]; }
+
+    ModelSpace *modelspace;
+    size_t norbits;
+    int max_J;
+
+   private:
+    size_t Index(int J, index_t a, index_t b) const { return (J * norbits + a) * norbits + b; }
+    std::vector<Entry> entries;
+  };
+
+  // Normalized two-body blocks for any channel order, read as <ab;J1|W|cd;J2>
+  // in the GetTBME_J convention.
+  class BlockAccess
+  {
+   public:
+    explicit BlockAccess(const PairTable &table)
+        : pairs(&table), nchannels(table.modelspace->GetNumberTwoBodyChannels()),
+          blocks(nchannels * nchannels) {}
+
+    // Stored blocks of an operator plus their Hermitian conjugates.
+    void SetOperator(const Operator &op) { SetTwoBody(op.TwoBody, Hermiticity(op)); }
+
+    void SetTwoBody(const TwoBodyME &two_body, int h)
+    {
+      ModelSpace &modelspace = *pairs->modelspace;
+      for (const auto &entry : two_body.MatEl)
+      {
+        const size_t bra = entry.first[0], ket = entry.first[1];
+        blocks[bra * nchannels + ket] = {&entry.second, false, 1.0};
+        if (bra != ket)
+          blocks[ket * nchannels + bra] = {
+              &entry.second, true,
+              double(h * modelspace.phase(modelspace.GetTwoBodyChannel(bra).J -
+                                          modelspace.GetTwoBodyChannel(ket).J))};
+      }
+    }
+
+    void SetBlock(size_t bra, size_t ket, const arma::mat *matrix)
+    {
+      blocks[bra * nchannels + ket] = {matrix, false, 1.0};
+    }
+
+    double operator()(int J1, int J2, index_t a, index_t b, index_t c, index_t d) const
+    {
+      const PairTable::Entry &bra = (*pairs)(J1, a, b);
+      if (bra.channel < 0)
         return 0.0;
-      const TwoBodyChannel &bra = modelspace->GetTwoBodyChannel(it->first.first);
-      const TwoBodyChannel &ket = modelspace->GetTwoBodyChannel(it->first.second);
-      const size_t ibra = bra.GetLocalIndex(std::min(a, b), std::max(a, b));
-      const size_t iket = ket.GetLocalIndex(std::min(c, d), std::max(c, d));
-      if (ibra >= bra.GetNumberKets() || iket >= ket.GetNumberKets())
+      const PairTable::Entry &ket = (*pairs)(J2, c, d);
+      if (ket.channel < 0)
         return 0.0;
-      double value = it->second(ibra, iket);
-      if (a > b)
-        value *= modelspace->phase((oa.j2 + ob.j2) / 2 + J_bra + 1);
-      if (c > d)
-        value *= modelspace->phase((oc.j2 + od.j2) / 2 + J_ket + 1);
-      if (a == b)
-        value *= PhysConst::SQRT2;
-      if (c == d)
-        value *= PhysConst::SQRT2;
-      return value;
+      const Block &block = blocks[bra.channel * nchannels + ket.channel];
+      if (block.matrix == nullptr)
+        return 0.0;
+      const double value = block.transposed ? (*block.matrix)(ket.index, bra.index)
+                                            : (*block.matrix)(bra.index, ket.index);
+      return block.sign * bra.factor * ket.factor * value;
     }
 
    private:
-    ModelSpace *modelspace;
-    std::map<std::pair<size_t, size_t>, arma::mat> blocks;
+    struct Block
+    {
+      const arma::mat *matrix = nullptr;
+      bool transposed = false;
+      double sign = 1.0;
+    };
+    const PairTable *pairs;
+    size_t nchannels;
+    std::vector<Block> blocks;
   };
 
-  // Stored normalized block of a scalar or tensor operator for either order.
-  arma::mat StoredBlock(const Operator &op, size_t ch_bra, size_t ch_ket)
+  // 6j/9j coefficients over tuples of single-particle j values (index
+  // (j2 - 1) / 2), built once per (largest j, L) and kept for later calls.
+  class AngularTables
   {
-    ModelSpace &modelspace = *op.modelspace;
-    const TwoBodyChannel &bra = modelspace.GetTwoBodyChannel(ch_bra);
-    const TwoBodyChannel &ket = modelspace.GetTwoBodyChannel(ch_ket);
-    const bool ordered = ch_bra <= ch_ket;
-    const auto it = op.TwoBody.MatEl.find(
-        {ordered ? ch_bra : ch_ket, ordered ? ch_ket : ch_bra});
-    if (it == op.TwoBody.MatEl.end())
-      return arma::mat(bra.GetNumberKets(), ket.GetNumberKets(), arma::fill::zeros);
-    if (ordered)
-      return it->second;
-    return (Hermiticity(op) * modelspace.phase(bra.J - ket.J)) * it->second.t();
+   public:
+    struct SixEntry
+    {
+      int J, J3;
+      double coefficient;
+    };
+    struct NineEntry
+    {
+      int J, Jp, J3, J4;
+      double coefficient;
+    };
+
+    static AngularTables &Get(ModelSpace &modelspace, int L)
+    {
+      static std::mutex mutex;
+      static std::map<std::pair<int, int>, std::unique_ptr<AngularTables>> cache;
+      int j2max = 1;
+      for (index_t a : modelspace.all_orbits)
+        j2max = std::max(j2max, modelspace.GetOrbit(a).j2);
+      std::lock_guard<std::mutex> lock(mutex);
+      auto &slot = cache[{j2max, L}];
+      if (!slot)
+        slot.reset(new AngularTables(modelspace, j2max, L));
+      return *slot;
+    }
+
+    // Jhat1 Jhat2 {J1 J2 L; j_b j_a j_c} (-1)^(j_b+j_c+J1+L): partial trace and D.
+    double Trace(int J1, int J2, int ja, int jb, int jc) const
+    {
+      return trace[(((J1 * (max_J + 1) + J2) * nj + ja) * nj + jb) * nj + jc];
+    }
+    // (2J+1) {j_a j_b L; j_c j_d J}: contraction C.
+    double Contract(int ja, int jb, int jc, int jd, int J) const
+    {
+      return contract[Quad(ja, jb, jc, jd) * (max_J + 1) + J];
+    }
+    // Jhat J'hat {J J' L; j_j j_i j_t} (-1)^(j_i+j_t+J'+L): ring trace.
+    double RingTrace(int J, int Jp, int ji, int jj, int jt) const
+    {
+      return ring_trace[(((J * (max_J + 1) + Jp) * nj + ji) * nj + jj) * nj + jt];
+    }
+    // scalar cross coupling for (j_a, j_b, j_c, j_d)
+    const std::vector<SixEntry> &Six(int ja, int jb, int jc, int jd) const
+    {
+      return six[Quad(ja, jb, jc, jd)];
+    }
+    // tensor cross coupling; Prepare() must have built the tuple
+    const std::vector<NineEntry> &Nine(int ja, int jb, int jc, int jd) const
+    {
+      return nine[Quad(ja, jb, jc, jd)];
+    }
+    // Build the 9j lists for the requested tuples (call outside parallel regions).
+    void PrepareNine(const std::vector<std::array<int, 4>> &tuples)
+    {
+      std::vector<size_t> missing;
+      for (const auto &t : tuples)
+      {
+        const size_t q = Quad(t[0], t[1], t[2], t[3]);
+        if (!nine_built[q])
+        {
+          nine_built[q] = 1;
+          missing.push_back(q);
+        }
+      }
+#pragma omp parallel for schedule(dynamic, 1)
+      for (size_t m = 0; m < missing.size(); ++m)
+      {
+        size_t q = missing[m];
+        const int jd = q % nj, jc = (q / nj) % nj, jb = (q / nj / nj) % nj, ja = q / nj / nj / nj;
+        const double a = ja + 0.5, b = jb + 0.5, c = jc + 0.5, d = jd + 0.5;
+        std::vector<NineEntry> &entries = nine[q];
+        for (int J = std::abs(ja - jb); J <= ja + jb + 1; ++J)
+          for (int Jp = std::max(std::abs(jc - jd), std::abs(J - L)); Jp <= std::min(jc + jd + 1, J + L); ++Jp)
+            for (int J3 = std::abs(ja - jd); J3 <= ja + jd + 1; ++J3)
+              for (int J4 = std::max(std::abs(jc - jb), std::abs(J3 - L)); J4 <= std::min(jc + jb + 1, J3 + L); ++J4)
+              {
+                const double ninej = AngMom::NineJ(a, d, J3, b, c, J4, J, Jp, L);
+                if (std::abs(ninej) < 1e-14)
+                  continue;
+                entries.push_back({J, Jp, J3, J4,
+                                   std::sqrt((2 * J + 1.0) * (2 * Jp + 1.0) * (2 * J3 + 1.0) * (2 * J4 + 1.0)) *
+                                       ((jb + jd + 1 + Jp + J4) % 2 == 0 ? 1.0 : -1.0) * ninej});
+              }
+      }
+    }
+
+    int nj, max_J, L;
+
+   private:
+    AngularTables(ModelSpace &modelspace, int j2max, int L_)
+        : nj((j2max + 1) / 2), max_J(j2max), L(L_)
+    {
+      modelspace.PreCalculateSixJ();
+      const int nJ = max_J + 1;
+      trace.assign(nJ * nJ * nj * nj * nj, 0.0);
+      ring_trace.assign(nJ * nJ * nj * nj * nj, 0.0);
+      contract.assign(nj * nj * nj * nj * nJ, 0.0);
+      six.resize(nj * nj * nj * nj);
+      nine.resize(nj * nj * nj * nj);
+      nine_built.assign(nj * nj * nj * nj, 0);
+      for (int J1 = 0; J1 < nJ; ++J1)
+        for (int J2 = std::max(0, J1 - L); J2 <= std::min(nJ - 1, J1 + L); ++J2)
+          for (int ja = 0; ja < nj; ++ja)
+            for (int jb = 0; jb < nj; ++jb)
+              for (int jc = 0; jc < nj; ++jc)
+              {
+                const size_t index = (((J1 * nJ + J2) * nj + ja) * nj + jb) * nj + jc;
+                const double hats = std::sqrt((2 * J1 + 1.0) * (2 * J2 + 1.0));
+                trace[index] = hats * modelspace.GetSixJ(J1, J2, L, jb + 0.5, ja + 0.5, jc + 0.5) *
+                               modelspace.phase(jb + jc + 1 + J1 + L);
+                // ring: (J, J', j_i = ja, j_j = jb, j_t = jc)
+                ring_trace[index] = hats * modelspace.GetSixJ(J1, J2, L, jb + 0.5, ja + 0.5, jc + 0.5) *
+                                    modelspace.phase(ja + jc + 1 + J2 + L);
+              }
+      for (int ja = 0; ja < nj; ++ja)
+        for (int jb = 0; jb < nj; ++jb)
+          for (int jc = 0; jc < nj; ++jc)
+            for (int jd = 0; jd < nj; ++jd)
+            {
+              const size_t q = Quad(ja, jb, jc, jd);
+              for (int J = 0; J < nJ; ++J)
+                contract[q * nJ + J] = (2 * J + 1.0) *
+                    modelspace.GetSixJ(ja + 0.5, jb + 0.5, L, jc + 0.5, jd + 0.5, J);
+              for (int J = std::abs(ja - jb); J <= ja + jb + 1; ++J)
+                for (int J3 = std::max(std::abs(ja - jd), std::abs(jc - jb)); J3 <= std::min(ja + jd, jc + jb) + 1; ++J3)
+                {
+                  const double sixj = modelspace.GetSixJ(ja + 0.5, jb + 0.5, J, jc + 0.5, jd + 0.5, J3);
+                  if (std::abs(sixj) > 1e-14)
+                    six[q].push_back({J, J3, (2 * J3 + 1.0) * sixj});
+                }
+            }
+    }
+
+    size_t Quad(int ja, int jb, int jc, int jd) const { return ((ja * nj + jb) * nj + jc) * nj + jd; }
+
+    std::vector<double> trace, ring_trace, contract;
+    std::vector<std::vector<SixEntry>> six;
+    std::vector<std::vector<NineEntry>> nine;
+    std::vector<char> nine_built;
+  };
+
+  int JIndex(const Orbit &orbit) { return (orbit.j2 - 1) / 2; }
+
+  // Kets of every two-body channel that contain a given orbit c, written as
+  // |c other; J> = factor * stored ket (factor: exchange phase, sqrt2 for c == other).
+  struct OrbitKet
+  {
+    arma::uword index;
+    index_t other;
+    double factor;
+  };
+  std::vector<std::vector<std::vector<OrbitKet>>> KetsByOrbit(ModelSpace &modelspace)
+  {
+    const size_t nchannels = modelspace.GetNumberTwoBodyChannels();
+    std::vector<std::vector<std::vector<OrbitKet>>> result(
+        nchannels, std::vector<std::vector<OrbitKet>>(modelspace.GetNumberOrbits()));
+    for (size_t ch = 0; ch < nchannels; ++ch)
+    {
+      TwoBodyChannel &channel = modelspace.GetTwoBodyChannel(ch);
+      for (size_t k = 0; k < channel.GetNumberKets(); ++k)
+      {
+        const Ket &ket = channel.GetKet(k);
+        if (ket.p == ket.q)
+        {
+          result[ch][ket.p].push_back({k, static_cast<index_t>(ket.q), PhysConst::SQRT2});
+          continue;
+        }
+        result[ch][ket.p].push_back({k, static_cast<index_t>(ket.q), 1.0});
+        const int jsum = (modelspace.GetOrbit(ket.p).j2 + modelspace.GetOrbit(ket.q).j2) / 2;
+        result[ch][ket.q].push_back({k, static_cast<index_t>(ket.p),
+                                     double(modelspace.phase(jsum + channel.J + 1))});
+      }
+    }
+    return result;
   }
+
+  arma::uvec ActiveKets(const TwoBodyChannel &channel, const std::vector<bool> &active)
+  {
+    std::vector<arma::uword> kets;
+    for (size_t k = 0; k < channel.GetNumberKets(); ++k)
+    {
+      const Ket &ket = channel.GetKet(k);
+      if (active[ket.p] && active[ket.q])
+        kets.push_back(k);
+    }
+    return arma::uvec(kets);
+  }
+
+  // Everything one tensor lambda2 evaluation shares.
+  struct TensorContext
+  {
+    TensorContext(const Operator &X_, const Operator &Y_, const MRReference &reference_)
+        : X(X_), Y(Y_), reference(reference_), modelspace(*X_.modelspace), L(Y_.GetJRank()),
+          norbits(modelspace.GetNumberOrbits()),
+          orbits(modelspace.all_orbits.begin(), modelspace.all_orbits.end()),
+          active(FindLambdaActiveOrbits(reference_)), pairs(modelspace),
+          x_access(pairs), y_access(pairs), lambda_access(pairs),
+          tables(AngularTables::Get(modelspace, L)), kets_by_orbit(KetsByOrbit(modelspace)),
+          allowed(norbits, std::vector<char>(norbits, 0))
+    {
+      x_access.SetOperator(X);
+      y_access.SetOperator(Y);
+      lambda_access.SetTwoBody(reference.Lambda2, +1);
+      for (index_t i : orbits)
+      {
+        const Orbit &oi = modelspace.GetOrbit(i);
+        for (index_t j : Y.GetOneBodyChannel(oi.l, oi.j2, oi.tz2))
+          allowed[i][j] = 1;
+      }
+      for (size_t ch = 0; ch < modelspace.GetNumberTwoBodyChannels(); ++ch)
+        active_kets.push_back(ActiveKets(modelspace.GetTwoBodyChannel(ch), active));
+    }
+
+    const Operator &X, &Y;
+    const MRReference &reference;
+    ModelSpace &modelspace;
+    int L;
+    size_t norbits;
+    std::vector<index_t> orbits;
+    std::vector<bool> active;
+    PairTable pairs;
+    BlockAccess x_access, y_access, lambda_access;
+    AngularTables &tables;
+    std::vector<std::vector<std::vector<OrbitKet>>> kets_by_orbit;
+    std::vector<std::vector<char>> allowed;
+    std::vector<arma::uvec> active_kets;
+  };
 
   std::vector<std::pair<size_t, size_t>> TensorChannelPairs(const Operator &Y)
   {
@@ -700,33 +1001,157 @@ namespace
     return pairs;
   }
 
-  // reduced sum_c W_{ci,cj} for a rank-L two-body W (L > 0).
-  arma::mat PartialTraceTensor(const PairBlocks &W, const Operator &shape, int L)
+  // Stored normalized block of a scalar or tensor operator for either order.
+  arma::mat StoredBlock(const Operator &op, size_t ch_bra, size_t ch_ket)
   {
-    ModelSpace &modelspace = *shape.modelspace;
-    const std::vector<index_t> orbits(modelspace.all_orbits.begin(), modelspace.all_orbits.end());
-    arma::mat result(modelspace.GetNumberOrbits(), modelspace.GetNumberOrbits(), arma::fill::zeros);
+    ModelSpace &modelspace = *op.modelspace;
+    const TwoBodyChannel &bra = modelspace.GetTwoBodyChannel(ch_bra);
+    const TwoBodyChannel &ket = modelspace.GetTwoBodyChannel(ch_ket);
+    const bool ordered = ch_bra <= ch_ket;
+    const auto it = op.TwoBody.MatEl.find(
+        {ordered ? ch_bra : ch_ket, ordered ? ch_ket : ch_bra});
+    if (it == op.TwoBody.MatEl.end())
+      return arma::mat(bra.GetNumberKets(), ket.GetNumberKets(), arma::fill::zeros);
+    if (ordered)
+      return it->second;
+    return (Hermiticity(op) * modelspace.phase(bra.J - ket.J)) * it->second.t();
+  }
+
+  // Partial trace sum_c W_{ci,cj} over blocks given for (bra, ket) channel
+  // pairs; rank L > 0 gives reduced elements (Trace coefficient), L = 0 the
+  // ordinary ones.  Each bra channel accumulates into its own buffer.
+  arma::mat PartialTrace(const TensorContext &ctx,
+                         const std::vector<std::pair<size_t, size_t>> &channel_pairs,
+                         const std::vector<arma::mat> &blocks, int L)
+  {
+    ModelSpace &modelspace = ctx.modelspace;
+    const size_t nchannels = modelspace.GetNumberTwoBodyChannels();
+    std::vector<std::vector<size_t>> by_bra(nchannels);
+    for (size_t p = 0; p < channel_pairs.size(); ++p)
+      by_bra[channel_pairs[p].first].push_back(p);
+    std::vector<arma::mat> buffers(nchannels);
 #pragma omp parallel for schedule(dynamic, 1)
-    for (size_t ii = 0; ii < orbits.size(); ++ii)
+    for (size_t ch_bra = 0; ch_bra < nchannels; ++ch_bra)
     {
-      const index_t i = orbits[ii];
-      const Orbit &oi = modelspace.GetOrbit(i);
-      for (index_t j : shape.GetOneBodyChannel(oi.l, oi.j2, oi.tz2))
+      if (by_bra[ch_bra].empty())
+        continue;
+      arma::mat &buffer = buffers[ch_bra];
+      buffer.zeros(ctx.norbits, ctx.norbits);
+      const int J1 = modelspace.GetTwoBodyChannel(ch_bra).J;
+      for (size_t p : by_bra[ch_bra])
       {
+        const size_t ch_ket = channel_pairs[p].second;
+        const int J2 = modelspace.GetTwoBodyChannel(ch_ket).J;
+        const arma::mat &W = blocks[p];
+        for (index_t c : ctx.orbits)
+        {
+          const auto &bra_kets = ctx.kets_by_orbit[ch_bra][c];
+          const auto &ket_kets = ctx.kets_by_orbit[ch_ket][c];
+          if (bra_kets.empty() || ket_kets.empty())
+            continue;
+          const int jc = JIndex(modelspace.GetOrbit(c));
+          for (const OrbitKet &bra : bra_kets)
+          {
+            const Orbit &oi = modelspace.GetOrbit(bra.other);
+            for (const OrbitKet &ket : ket_kets)
+            {
+              if (!ctx.allowed[bra.other][ket.other] && L > 0)
+                continue;
+              const Orbit &oj = modelspace.GetOrbit(ket.other);
+              double coefficient;
+              if (L > 0)
+                coefficient = ctx.tables.Trace(J1, J2, JIndex(oi), JIndex(oj), jc);
+              else if (oi.j2 == oj.j2 && oi.l == oj.l && oi.tz2 == oj.tz2)
+                coefficient = (2 * J1 + 1.0) / (oi.j2 + 1.0);
+              else
+                continue;
+              buffer(bra.other, ket.other) += coefficient * bra.factor * ket.factor * W(bra.index, ket.index);
+            }
+          }
+        }
+      }
+    }
+    arma::mat result(ctx.norbits, ctx.norbits, arma::fill::zeros);
+    for (const arma::mat &buffer : buffers)
+      if (!buffer.empty())
+        result += buffer;
+    return result;
+  }
+
+  // reduced sum_ab N_ab X_biaj: X scalar two-body, N rank-L one-body.
+  arma::mat ContractScalarTwoTensorOne(const TensorContext &ctx, const arma::mat &N)
+  {
+    ModelSpace &modelspace = ctx.modelspace;
+    struct Element { index_t a, b; double value; };
+    std::vector<Element> nonzero;
+    for (index_t a : ctx.orbits)
+      for (index_t b : ctx.orbits)
+        if (N(a, b) != 0.0)
+          nonzero.push_back({a, b, N(a, b)});
+    arma::mat result(ctx.norbits, ctx.norbits, arma::fill::zeros);
+#pragma omp parallel for schedule(dynamic, 1)
+    for (size_t ii = 0; ii < ctx.orbits.size(); ++ii)
+    {
+      const index_t i = ctx.orbits[ii];
+      const Orbit &oi = modelspace.GetOrbit(i);
+      for (index_t j : ctx.orbits)
+      {
+        if (!ctx.allowed[i][j])
+          continue;
         const Orbit &oj = modelspace.GetOrbit(j);
         double sum = 0.0;
-        for (index_t c : orbits)
+        for (const Element &e : nonzero)
         {
-          const Orbit &oc = modelspace.GetOrbit(c);
-          for (int J1 = std::abs(oc.j2 - oi.j2) / 2; J1 <= (oc.j2 + oi.j2) / 2; ++J1)
-            for (int J2 = std::max(std::abs(oc.j2 - oj.j2) / 2, std::abs(J1 - L));
-                 J2 <= std::min((oc.j2 + oj.j2) / 2, J1 + L); ++J2)
+          const Orbit &oa = modelspace.GetOrbit(e.a);
+          const Orbit &ob = modelspace.GetOrbit(e.b);
+          for (int J = std::max(std::abs(oi.j2 - ob.j2), std::abs(oa.j2 - oj.j2)) / 2;
+               J <= std::min(oi.j2 + ob.j2, oa.j2 + oj.j2) / 2; ++J)
+          {
+            const double x = ctx.x_access(J, J, i, e.b, e.a, j);
+            if (x != 0.0)
+              sum -= e.value * ctx.tables.Contract(JIndex(oi), JIndex(oj), JIndex(oa), JIndex(ob), J) * x;
+          }
+        }
+        result(i, j) = sum;
+      }
+    }
+    return result;
+  }
+
+  // reduced sum_ab S_ab Y_biaj: Y rank-L two-body, S scalar one-body.
+  arma::mat ContractTensorTwoScalarOne(const TensorContext &ctx, const arma::mat &S)
+  {
+    ModelSpace &modelspace = ctx.modelspace;
+    const int L = ctx.L;
+    struct Element { index_t a, b; double value; };
+    std::vector<Element> nonzero;
+    for (index_t a : ctx.orbits)
+      for (index_t b : ctx.orbits)
+        if (S(a, b) != 0.0)
+          nonzero.push_back({a, b, S(a, b)});
+    arma::mat result(ctx.norbits, ctx.norbits, arma::fill::zeros);
+#pragma omp parallel for schedule(dynamic, 1)
+    for (size_t ii = 0; ii < ctx.orbits.size(); ++ii)
+    {
+      const index_t i = ctx.orbits[ii];
+      const Orbit &oi = modelspace.GetOrbit(i);
+      for (index_t j : ctx.orbits)
+      {
+        if (!ctx.allowed[i][j])
+          continue;
+        const Orbit &oj = modelspace.GetOrbit(j);
+        double sum = 0.0;
+        for (const Element &e : nonzero)
+        {
+          const Orbit &oa = modelspace.GetOrbit(e.a);
+          const Orbit &ob = modelspace.GetOrbit(e.b);
+          for (int J1 = std::abs(ob.j2 - oi.j2) / 2; J1 <= (ob.j2 + oi.j2) / 2; ++J1)
+            for (int J2 = std::max(std::abs(oa.j2 - oj.j2) / 2, std::abs(J1 - L));
+                 J2 <= std::min((oa.j2 + oj.j2) / 2, J1 + L); ++J2)
             {
-              const double w = W.TBME_J(J1, J2, c, i, c, j);
-              if (w != 0.0)
-                sum += std::sqrt((2 * J1 + 1.0) * (2 * J2 + 1.0)) *
-                       modelspace.GetSixJ(J1, J2, L, 0.5 * oj.j2, 0.5 * oi.j2, 0.5 * oc.j2) *
-                       modelspace.phase((oj.j2 + oc.j2) / 2 + J1 + L) * w;
+              const double y = ctx.y_access(J1, J2, e.b, i, e.a, j);
+              if (y != 0.0)
+                sum += ctx.tables.Trace(J1, J2, JIndex(oi), JIndex(oj), JIndex(oa)) * e.value * y;
             }
         }
         result(i, j) = sum;
@@ -735,284 +1160,235 @@ namespace
     return result;
   }
 
-  // sum_c W_{ci,cj} for a scalar two-body W (ordinary matrix elements).
-  arma::mat PartialTraceScalar(const PairBlocks &W, const Operator &shape)
+  // Cross-coupled channels (J, parity, Tz difference) of all ordered orbit
+  // pairs, the active-active subset, and rows grouped by the second orbit.
+  struct CrossCoupledChannels
   {
-    ModelSpace &modelspace = *shape.modelspace;
-    const std::vector<index_t> orbits(modelspace.all_orbits.begin(), modelspace.all_orbits.end());
-    arma::mat result(modelspace.GetNumberOrbits(), modelspace.GetNumberOrbits(), arma::fill::zeros);
-#pragma omp parallel for schedule(dynamic, 1)
-    for (size_t ii = 0; ii < orbits.size(); ++ii)
+    struct Channel
     {
-      const index_t i = orbits[ii];
-      const Orbit &oi = modelspace.GetOrbit(i);
-      for (index_t j : shape.GetOneBodyChannel(oi.l, oi.j2, oi.tz2))
-      {
-        double sum = 0.0;
-        for (index_t c : orbits)
-        {
-          const Orbit &oc = modelspace.GetOrbit(c);
-          for (int J = std::abs(oc.j2 - oi.j2) / 2; J <= (oc.j2 + oi.j2) / 2; ++J)
-            sum += (2 * J + 1.0) / (oi.j2 + 1.0) * W.TBME_J(J, J, c, i, c, j);
-        }
-        result(i, j) = sum;
-      }
-    }
-    return result;
-  }
-
-  // reduced sum_ab N_ab X_biaj: X scalar two-body, N rank-L one-body.
-  arma::mat ContractScalarTwoTensorOne(const Operator &X, const arma::mat &N,
-                                       const Operator &shape, int L)
-  {
-    ModelSpace &modelspace = *shape.modelspace;
-    const std::vector<index_t> orbits(modelspace.all_orbits.begin(), modelspace.all_orbits.end());
-    arma::mat result(modelspace.GetNumberOrbits(), modelspace.GetNumberOrbits(), arma::fill::zeros);
-#pragma omp parallel for schedule(dynamic, 1)
-    for (size_t ii = 0; ii < orbits.size(); ++ii)
-    {
-      const index_t i = orbits[ii];
-      const Orbit &oi = modelspace.GetOrbit(i);
-      for (index_t j : shape.GetOneBodyChannel(oi.l, oi.j2, oi.tz2))
-      {
-        const Orbit &oj = modelspace.GetOrbit(j);
-        double sum = 0.0;
-        for (index_t a : orbits)
-        {
-          const Orbit &oa = modelspace.GetOrbit(a);
-          for (index_t b : shape.GetOneBodyChannel(oa.l, oa.j2, oa.tz2))
-          {
-            const double n = N(a, b);
-            if (n == 0.0)
-              continue;
-            const Orbit &ob = modelspace.GetOrbit(b);
-            for (int J = std::max(std::abs(oi.j2 - ob.j2), std::abs(oa.j2 - oj.j2)) / 2;
-                 J <= std::min(oi.j2 + ob.j2, oa.j2 + oj.j2) / 2; ++J)
-              sum -= n * (2 * J + 1.0) *
-                     modelspace.GetSixJ(0.5 * oi.j2, 0.5 * oj.j2, L, 0.5 * oa.j2, 0.5 * ob.j2, J) *
-                     X.TwoBody.GetTBME_J(J, J, i, b, a, j);
-          }
-        }
-        result(i, j) = sum;
-      }
-    }
-    return result;
-  }
-
-  // reduced sum_ab S_ab T_biaj: T rank-L two-body, S scalar one-body.
-  arma::mat ContractTensorTwoScalarOne(const Operator &T, const arma::mat &S,
-                                       const Operator &scalar_shape, int L)
-  {
-    ModelSpace &modelspace = *T.modelspace;
-    const std::vector<index_t> orbits(modelspace.all_orbits.begin(), modelspace.all_orbits.end());
-    arma::mat result(modelspace.GetNumberOrbits(), modelspace.GetNumberOrbits(), arma::fill::zeros);
-#pragma omp parallel for schedule(dynamic, 1)
-    for (size_t ii = 0; ii < orbits.size(); ++ii)
-    {
-      const index_t i = orbits[ii];
-      const Orbit &oi = modelspace.GetOrbit(i);
-      for (index_t j : T.GetOneBodyChannel(oi.l, oi.j2, oi.tz2))
-      {
-        const Orbit &oj = modelspace.GetOrbit(j);
-        double sum = 0.0;
-        for (index_t a : orbits)
-        {
-          const Orbit &oa = modelspace.GetOrbit(a);
-          for (index_t b : scalar_shape.GetOneBodyChannel(oa.l, oa.j2, oa.tz2))
-          {
-            const double s = S(a, b);
-            if (s == 0.0)
-              continue;
-            const Orbit &ob = modelspace.GetOrbit(b);
-            for (int J1 = std::abs(ob.j2 - oi.j2) / 2; J1 <= (ob.j2 + oi.j2) / 2; ++J1)
-              for (int J2 = std::max(std::abs(oa.j2 - oj.j2) / 2, std::abs(J1 - L));
-                   J2 <= std::min((oa.j2 + oj.j2) / 2, J1 + L); ++J2)
-                sum += modelspace.phase((oj.j2 + oa.j2) / 2 + J1 + L) *
-                       std::sqrt((2 * J1 + 1.0) * (2 * J2 + 1.0)) *
-                       modelspace.GetSixJ(J1, J2, L, 0.5 * oj.j2, 0.5 * oi.j2, 0.5 * oa.j2) * s *
-                       T.TwoBody.GetTBME_J(J1, J2, b, i, a, j);
-          }
-        }
-        result(i, j) = sum;
-      }
-    }
-    return result;
-  }
-
-  // Cross-coupled scalar element Xbar^J_{(ab),(cd)} = sum_J3 (2J3+1)
-  // {j_a j_b J; j_c j_d J3} X^J3_{(ad),(cb)}.
-  double ScalarCrossCoupled(const TwoBodyME &op, ModelSpace &modelspace, int J,
-                            index_t a, index_t b, index_t c, index_t d)
-  {
-    const Orbit &oa = modelspace.GetOrbit(a);
-    const Orbit &ob = modelspace.GetOrbit(b);
-    const Orbit &oc = modelspace.GetOrbit(c);
-    const Orbit &od = modelspace.GetOrbit(d);
-    double value = 0.0;
-    for (int J3 = std::max(std::abs(oa.j2 - od.j2), std::abs(oc.j2 - ob.j2)) / 2;
-         J3 <= std::min(oa.j2 + od.j2, oc.j2 + ob.j2) / 2; ++J3)
-    {
-      const double x = op.GetTBME_J(J3, J3, a, d, c, b);
-      if (x != 0.0)
-        value += (2 * J3 + 1.0) *
-                 modelspace.GetSixJ(0.5 * oa.j2, 0.5 * ob.j2, J, 0.5 * oc.j2, 0.5 * od.j2, J3) * x;
-    }
-    return value;
-  }
-
-  // Cross-coupled rank-L element Xbar^{J J'}_{(ab),(cd)} = sum_{J3 J4}
-  // Jhat J'hat J3hat J4hat (-1)^(j_b+j_d+J'+J4) {j_a j_d J3; j_b j_c J4; J J' L}
-  // X^{J3 J4}_{(ad),(cb)}.
-  double TensorCrossCoupled(const TwoBodyME &op, ModelSpace &modelspace, int J, int Jp, int L,
-                            index_t a, index_t b, index_t c, index_t d)
-  {
-    const Orbit &oa = modelspace.GetOrbit(a);
-    const Orbit &ob = modelspace.GetOrbit(b);
-    const Orbit &oc = modelspace.GetOrbit(c);
-    const Orbit &od = modelspace.GetOrbit(d);
-    double value = 0.0;
-    for (int J3 = std::abs(oa.j2 - od.j2) / 2; J3 <= (oa.j2 + od.j2) / 2; ++J3)
-      for (int J4 = std::max(std::abs(oc.j2 - ob.j2) / 2, std::abs(J3 - L));
-           J4 <= std::min((oc.j2 + ob.j2) / 2, J3 + L); ++J4)
-      {
-        const double x = op.GetTBME_J(J3, J4, a, d, c, b);
-        if (x == 0.0)
-          continue;
-        value += std::sqrt((2 * J + 1.0) * (2 * Jp + 1.0) * (2 * J3 + 1.0) * (2 * J4 + 1.0)) *
-                 modelspace.phase((ob.j2 + od.j2) / 2 + Jp + J4) *
-                 modelspace.GetNineJ(0.5 * oa.j2, 0.5 * od.j2, J3, 0.5 * ob.j2, 0.5 * oc.j2, J4,
-                                     J, Jp, L) *
-                 x;
-      }
-    return value;
-  }
-
-  // Ring R(x,y)_ij = sum x_iabc y_bejd l_aecd = -sum_t [xbar lbar ybar]_{(it),(jt)},
-  // with S the scalar and T the tensor operand (tensor_first: x = T, y = S).
-  // The lambda2 orbits a, e, c, d are restricted to the active orbits.
-  arma::mat RingTerm(const Operator &S, const Operator &T, const MRReference &reference,
-                     bool tensor_first)
-  {
-    ModelSpace &modelspace = *T.modelspace;
-    const int L = T.GetJRank();
-    const std::vector<index_t> orbits(modelspace.all_orbits.begin(), modelspace.all_orbits.end());
-    const std::vector<bool> active = FindLambdaActiveOrbits(reference);
-    int max_J = 0;
-    for (index_t a : orbits)
-      max_J = std::max(max_J, modelspace.GetOrbit(a).j2);
-    using Pair = std::pair<index_t, index_t>;
-    std::vector<std::vector<Pair>> all_pairs(max_J + 1), active_pairs(max_J + 1);
-    // rows/columns of all_pairs[J] grouped by their second orbit t
-    std::vector<std::map<index_t, std::vector<arma::uword>>> by_second(max_J + 1);
-    for (int J = 0; J <= max_J; ++J)
-      for (index_t a : orbits)
-        for (index_t b : orbits)
-        {
-          const int ja = modelspace.GetOrbit(a).j2, jb = modelspace.GetOrbit(b).j2;
-          if (2 * J < std::abs(ja - jb) || 2 * J > ja + jb)
-            continue;
-          by_second[J][b].push_back(all_pairs[J].size());
-          all_pairs[J].emplace_back(a, b);
-          if (active[a] && active[b])
-            active_pairs[J].emplace_back(a, b);
-        }
-    std::vector<arma::mat> lambda_bar(max_J + 1);
-    for (int J = 0; J <= max_J; ++J)
-    {
-      const auto &pairs = active_pairs[J];
-      lambda_bar[J].zeros(pairs.size(), pairs.size());
-      for (size_t p = 0; p < pairs.size(); ++p)
-        for (size_t q = 0; q < pairs.size(); ++q)
-          lambda_bar[J](p, q) = ScalarCrossCoupled(reference.Lambda2, modelspace, J,
-                                                   pairs[p].first, pairs[p].second,
-                                                   pairs[q].first, pairs[q].second);
-    }
-
-    arma::mat result(modelspace.GetNumberOrbits(), modelspace.GetNumberOrbits(), arma::fill::zeros);
-    std::vector<std::vector<char>> allowed(modelspace.GetNumberOrbits(),
-                                           std::vector<char>(modelspace.GetNumberOrbits(), 0));
-    for (index_t i : orbits)
-    {
-      const Orbit &oi = modelspace.GetOrbit(i);
-      for (index_t j : T.GetOneBodyChannel(oi.l, oi.j2, oi.tz2))
-        allowed[i][j] = 1;
-    }
-    // -sum_t c(J,J') G^{J J'}_{(it),(jt)} with G = left * right
-    auto trace = [&](const arma::mat &left, int J, const arma::mat &right, int Jp)
-    {
-      for (const auto &group : by_second[J])
-      {
-        const index_t t = group.first;
-        const auto column_group = by_second[Jp].find(t);
-        if (column_group == by_second[Jp].end())
-          continue;
-        const arma::uvec rows(group.second), columns(column_group->second);
-        const arma::mat G = left.rows(rows) * right.cols(columns);
-        const Orbit &ot = modelspace.GetOrbit(t);
-        for (arma::uword r = 0; r < rows.n_elem; ++r)
-        {
-          const index_t i = all_pairs[J][rows(r)].first;
-          const Orbit &oi = modelspace.GetOrbit(i);
-          for (arma::uword c = 0; c < columns.n_elem; ++c)
-          {
-            const index_t j = all_pairs[Jp][columns(c)].first;
-            if (!allowed[i][j])
-              continue;
-            const Orbit &oj = modelspace.GetOrbit(j);
-            result(i, j) -= std::sqrt((2 * J + 1.0) * (2 * Jp + 1.0)) *
-                            modelspace.GetSixJ(J, Jp, L, 0.5 * oj.j2, 0.5 * oi.j2, 0.5 * ot.j2) *
-                            modelspace.phase((oi.j2 + ot.j2) / 2 + Jp + L) * G(r, c);
-          }
-        }
-      }
+      int J = 0;
+      std::vector<std::pair<index_t, index_t>> all, active;
+      std::vector<std::vector<arma::uword>> rows_by_second;  // per orbit t
     };
 
-    // cross-coupled scalar block, rows all pairs or active pairs
-    auto scalar_bar = [&](const std::vector<Pair> &rows, const std::vector<Pair> &columns, int J)
+    CrossCoupledChannels(const TensorContext &ctx) : max_J(ctx.pairs.max_J), norbits(ctx.norbits)
     {
-      arma::mat block(rows.size(), columns.size(), arma::fill::zeros);
-      for (size_t p = 0; p < rows.size(); ++p)
-        for (size_t q = 0; q < columns.size(); ++q)
-          block(p, q) = ScalarCrossCoupled(S.TwoBody, modelspace, J, rows[p].first, rows[p].second,
-                                           columns[q].first, columns[q].second);
-      return block;
-    };
-    auto tensor_bar = [&](const std::vector<Pair> &rows, int J, const std::vector<Pair> &columns, int Jp)
-    {
-      arma::mat block(rows.size(), columns.size(), arma::fill::zeros);
-      for (size_t p = 0; p < rows.size(); ++p)
-        for (size_t q = 0; q < columns.size(); ++q)
-          block(p, q) = TensorCrossCoupled(T.TwoBody, modelspace, J, Jp, L, rows[p].first,
-                                           rows[p].second, columns[q].first, columns[q].second);
-      return block;
-    };
-
-    if (!tensor_first)
-    {
+      ModelSpace &modelspace = ctx.modelspace;
+      channels.resize((max_J + 1) * 6);
+      position_all.assign((max_J + 1) * norbits * norbits, -1);
+      position_active.assign((max_J + 1) * norbits * norbits, -1);
       for (int J = 0; J <= max_J; ++J)
+        for (index_t a : ctx.orbits)
+          for (index_t b : ctx.orbits)
+          {
+            const Orbit &oa = modelspace.GetOrbit(a);
+            const Orbit &ob = modelspace.GetOrbit(b);
+            if (2 * J < std::abs(oa.j2 - ob.j2) || 2 * J > oa.j2 + ob.j2)
+              continue;
+            Channel &channel = channels[Id(J, oa, ob)];
+            channel.J = J;
+            if (channel.rows_by_second.empty())
+              channel.rows_by_second.resize(norbits);
+            position_all[(J * norbits + a) * norbits + b] = channel.all.size();
+            channel.rows_by_second[b].push_back(channel.all.size());
+            channel.all.emplace_back(a, b);
+            if (ctx.active[a] && ctx.active[b])
+            {
+              position_active[(J * norbits + a) * norbits + b] = channel.active.size();
+              channel.active.emplace_back(a, b);
+            }
+          }
+    }
+
+    static int Id(int J, int parity, int dtz2)  // dtz2 = tz2_a - tz2_b in {-2, 0, 2}
+    {
+      return (J * 2 + parity) * 3 + (dtz2 / 2 + 1);
+    }
+    static int Id(int J, const Orbit &oa, const Orbit &ob)
+    {
+      return Id(J, (oa.l + ob.l) % 2, oa.tz2 - ob.tz2);
+    }
+    int All(int J, index_t a, index_t b) const { return position_all[(J * norbits + a) * norbits + b]; }
+    int Active(int J, index_t a, index_t b) const { return position_active[(J * norbits + a) * norbits + b]; }
+
+    int max_J;
+    size_t norbits;
+    std::vector<Channel> channels;
+    std::vector<int> position_all, position_active;
+  };
+
+  // Ring R(X,Y)_ij = sum X_iabc Y_bejd l_aecd (X scalar, Y rank L) with
+  // cross-coupled matrices; the lambda2 orbits a, e, c, d are active.
+  arma::mat RingTerm(TensorContext &ctx)
+  {
+    ModelSpace &modelspace = ctx.modelspace;
+    const int L = ctx.L;
+    const int Y_parity = ctx.Y.GetParity();
+    const CrossCoupledChannels cc(ctx);
+    const int nchannels = cc.channels.size();
+    const int max_J = cc.max_J;
+
+    // lbar and Xbar (rows: all pairs, columns: active pairs) per scalar channel.
+    std::vector<arma::mat> lambda_bar(nchannels), x_bar(nchannels);
+    for (int id = 0; id < nchannels; ++id)
+    {
+      const auto &channel = cc.channels[id];
+      lambda_bar[id].zeros(channel.active.size(), channel.active.size());
+      x_bar[id].zeros(channel.all.size(), channel.active.size());
+    }
+    std::vector<std::pair<index_t, index_t>> active_pairs, all_pairs;
+    for (index_t a : ctx.orbits)
+      for (index_t b : ctx.orbits)
       {
-        if (active_pairs[J].empty())
+        all_pairs.emplace_back(a, b);
+        if (ctx.active[a] && ctx.active[b])
+          active_pairs.emplace_back(a, b);
+      }
+    // Xbar^J_{(it),(sr)} = sum_J3 six * X^J3_{(ir),(st)}; also lbar for active rows.
+    // Each task owns the rows of one ordered pair (i,t).
+#pragma omp parallel for schedule(dynamic, 1)
+    for (size_t p = 0; p < all_pairs.size(); ++p)
+    {
+      const index_t i = all_pairs[p].first, t = all_pairs[p].second;
+      const Orbit &oi = modelspace.GetOrbit(i), &ot = modelspace.GetOrbit(t);
+      const bool row_active = ctx.active[i] && ctx.active[t];
+      std::vector<double> x_values(max_J + 1), l_values(max_J + 1);
+      for (const auto &sr : active_pairs)
+      {
+        const index_t s = sr.first, r = sr.second;
+        const Orbit &os = modelspace.GetOrbit(s), &orb = modelspace.GetOrbit(r);
+        if ((oi.l + ot.l + os.l + orb.l) % 2 != 0 || oi.tz2 - ot.tz2 != os.tz2 - orb.tz2)
           continue;
-        const arma::mat left = scalar_bar(all_pairs[J], active_pairs[J], J) * lambda_bar[J];
-        for (int Jp = std::abs(J - L); Jp <= std::min(J + L, max_J); ++Jp)
-          trace(left, J, tensor_bar(active_pairs[J], J, all_pairs[Jp], Jp), Jp);
+        const auto &six = ctx.tables.Six(JIndex(oi), JIndex(ot), JIndex(os), JIndex(orb));
+        const int J3min = std::max(std::abs(oi.j2 - orb.j2), std::abs(os.j2 - ot.j2)) / 2;
+        const int J3max = std::min(oi.j2 + orb.j2, os.j2 + ot.j2) / 2;
+        bool any = false;
+        for (int J3 = J3min; J3 <= J3max; ++J3)
+        {
+          x_values[J3] = ctx.x_access(J3, J3, i, r, s, t);
+          l_values[J3] = row_active ? ctx.lambda_access(J3, J3, i, r, s, t) : 0.0;
+          any = any || x_values[J3] != 0.0 || l_values[J3] != 0.0;
+        }
+        if (!any)
+          continue;
+        for (const auto &entry : six)
+        {
+          const int id = CrossCoupledChannels::Id(entry.J, oi, ot);
+          const int row = cc.All(entry.J, i, t), column = cc.Active(entry.J, s, r);
+          if (row < 0 || column < 0)
+            continue;
+          x_bar[id](row, column) += entry.coefficient * x_values[entry.J3];
+          if (row_active)
+            lambda_bar[id](cc.Active(entry.J, i, t), column) += entry.coefficient * l_values[entry.J3];
+        }
       }
     }
-    else
+
+    // Ybar^{JJ'}_{(vw),(jt)} = sum nine * Y^{J3J4}_{(vt),(jw)} for active (v,w):
+    // one matrix per (row channel, J').  Each task owns the rows of one (v,w).
+    std::vector<std::array<int, 4>> tuples;
+    for (const auto &vw : active_pairs)
+      for (index_t j : ctx.orbits)
+        for (index_t t : ctx.orbits)
+          tuples.push_back({JIndex(modelspace.GetOrbit(vw.first)), JIndex(modelspace.GetOrbit(vw.second)),
+                            JIndex(modelspace.GetOrbit(j)), JIndex(modelspace.GetOrbit(t))});
+    std::sort(tuples.begin(), tuples.end());
+    tuples.erase(std::unique(tuples.begin(), tuples.end()), tuples.end());
+    ctx.tables.PrepareNine(tuples);
+    auto y_bar_index = [&](int id, int Jp) { return id * (2 * L + 1) + (Jp - cc.channels[id].J + L); };
+    std::vector<arma::mat> y_bar(nchannels * (2 * L + 1));
+    for (int id = 0; id < nchannels; ++id)
     {
-      std::vector<arma::mat> right(max_J + 1);
-      for (int Jp = 0; Jp <= max_J; ++Jp)
-        if (!active_pairs[Jp].empty())
-          right[Jp] = scalar_bar(active_pairs[Jp], all_pairs[Jp], Jp);
-      for (int J = 0; J <= max_J; ++J)
-        for (int Jp = std::abs(J - L); Jp <= std::min(J + L, max_J); ++Jp)
-        {
-          if (active_pairs[Jp].empty())
-            continue;
-          trace(tensor_bar(all_pairs[J], J, active_pairs[Jp], Jp) * lambda_bar[Jp], J,
-                right[Jp], Jp);
-        }
+      const auto &channel = cc.channels[id];
+      if (channel.active.empty())
+        continue;
+      const int parity = (id / 3) % 2, dtz = id % 3;
+      for (int Jp = std::abs(channel.J - L); Jp <= std::min(channel.J + L, max_J); ++Jp)
+      {
+        const int column_id = (Jp * 2 + (parity + Y_parity) % 2) * 3 + dtz;
+        y_bar[y_bar_index(id, Jp)].zeros(channel.active.size(), cc.channels[column_id].all.size());
+      }
     }
+#pragma omp parallel for schedule(dynamic, 1)
+    for (size_t p = 0; p < active_pairs.size(); ++p)
+    {
+      const index_t v = active_pairs[p].first, w = active_pairs[p].second;
+      const Orbit &ov = modelspace.GetOrbit(v), &ow = modelspace.GetOrbit(w);
+      std::vector<double> y_values((max_J + 1) * (max_J + 1));
+      for (const auto &jt : all_pairs)
+      {
+        const index_t j = jt.first, t = jt.second;
+        const Orbit &oj = modelspace.GetOrbit(j), &ot = modelspace.GetOrbit(t);
+        if ((ov.l + ow.l + oj.l + ot.l + Y_parity) % 2 != 0 || ov.tz2 - ow.tz2 != oj.tz2 - ot.tz2)
+          continue;
+        bool any = false;
+        for (int J3 = std::abs(ov.j2 - ot.j2) / 2; J3 <= (ov.j2 + ot.j2) / 2; ++J3)
+          for (int J4 = std::max(std::abs(oj.j2 - ow.j2) / 2, std::abs(J3 - L));
+               J4 <= std::min((oj.j2 + ow.j2) / 2, J3 + L); ++J4)
+          {
+            const double y = ctx.y_access(J3, J4, v, t, j, w);
+            y_values[J3 * (max_J + 1) + J4] = y;
+            any = any || y != 0.0;
+          }
+        if (!any)
+          continue;
+        for (const auto &entry : ctx.tables.Nine(JIndex(ov), JIndex(ow), JIndex(oj), JIndex(ot)))
+        {
+          const double y = y_values[entry.J3 * (max_J + 1) + entry.J4];
+          if (y == 0.0)
+            continue;
+          const int id = CrossCoupledChannels::Id(entry.J, ov, ow);
+          y_bar[y_bar_index(id, entry.Jp)](cc.Active(entry.J, v, w), cc.All(entry.Jp, j, t)) +=
+              entry.coefficient * y;
+        }
+      }
+    }
+
+    // H = Xbar lbar per channel, then -sum_t RingTrace * [H Ybar]_{(it),(jt)};
+    // each row channel accumulates into its own buffer.
+    std::vector<arma::mat> buffers(nchannels);
+#pragma omp parallel for schedule(dynamic, 1)
+    for (int id = 0; id < nchannels; ++id)
+    {
+      const auto &channel = cc.channels[id];
+      if (channel.active.empty() || channel.all.empty())
+        continue;
+      const arma::mat H = x_bar[id] * lambda_bar[id];
+      arma::mat &buffer = buffers[id];
+      buffer.zeros(ctx.norbits, ctx.norbits);
+      const int parity = (id / 3) % 2, dtz = id % 3;
+      for (int Jp = std::abs(channel.J - L); Jp <= std::min(channel.J + L, max_J); ++Jp)
+      {
+        const auto &column_channel = cc.channels[(Jp * 2 + (parity + Y_parity) % 2) * 3 + dtz];
+        const arma::mat &Ybar = y_bar[y_bar_index(id, Jp)];
+        if (column_channel.all.empty())
+          continue;
+        for (index_t t : ctx.orbits)
+        {
+          const auto &rows = channel.rows_by_second[t];
+          const auto &columns = column_channel.rows_by_second[t];
+          if (rows.empty() || columns.empty())
+            continue;
+          const arma::mat G = H.rows(arma::uvec(rows)) * Ybar.cols(arma::uvec(columns));
+          const int jt = JIndex(modelspace.GetOrbit(t));
+          for (size_t r = 0; r < rows.size(); ++r)
+          {
+            const index_t i = channel.all[rows[r]].first;
+            const int ji = JIndex(modelspace.GetOrbit(i));
+            for (size_t c = 0; c < columns.size(); ++c)
+            {
+              const index_t j = column_channel.all[columns[c]].first;
+              if (ctx.allowed[i][j])
+                buffer(i, j) -= ctx.tables.RingTrace(channel.J, Jp, ji, JIndex(modelspace.GetOrbit(j)), jt) * G(r, c);
+            }
+          }
+        }
+      }
+    }
+    arma::mat result(ctx.norbits, ctx.norbits, arma::fill::zeros);
+    for (const arma::mat &buffer : buffers)
+      if (!buffer.empty())
+        result += buffer;
     return result;
   }
 }
@@ -1328,40 +1704,70 @@ namespace MRCommutator
       throw std::invalid_argument(
           "MR lambda2 tensor terms need a scalar and an isospin-conserving tensor of rank > 0");
     const double total_start = omp_get_wtime();
-    ModelSpace &modelspace = *X.modelspace;
-    modelspace.PreCalculateSixJ();
-    const int L = Y.GetJRank();
+    TensorContext ctx(X, Y, reference);
+    ModelSpace &modelspace = ctx.modelspace;
+    const int L = ctx.L;
 
-    // W1 = X l Y - Y l X and W2 = Y l - l Y for every tensor channel order,
-    // W3 = X l - l X per scalar channel.
-    PairBlocks W1(modelspace), W2(modelspace), W3(modelspace);
-    for (const auto &channels : TensorChannelPairs(Y))
+    // Products with lambda2 over active kets only: P = X l Y and W2 = Y l - l Y
+    // for every tensor channel order, W3 = X l - l X per scalar channel.
+    double section_start = omp_get_wtime();
+    const auto channel_pairs = TensorChannelPairs(Y);
+    std::vector<arma::mat> P(channel_pairs.size()), W2(channel_pairs.size());
+#pragma omp parallel for schedule(dynamic, 1)
+    for (size_t p = 0; p < channel_pairs.size(); ++p)
     {
-      const size_t ch_bra = channels.first, ch_ket = channels.second;
-      const arma::mat &x_bra = X.TwoBody.GetMatrix(ch_bra, ch_bra);
-      const arma::mat &x_ket = X.TwoBody.GetMatrix(ch_ket, ch_ket);
-      const arma::mat &l_bra = reference.Lambda2.GetMatrix(ch_bra, ch_bra);
-      const arma::mat &l_ket = reference.Lambda2.GetMatrix(ch_ket, ch_ket);
+      const size_t ch_bra = channel_pairs[p].first, ch_ket = channel_pairs[p].second;
+      const arma::uvec &bra_active = ctx.active_kets[ch_bra];
+      const arma::uvec &ket_active = ctx.active_kets[ch_ket];
       const arma::mat y = StoredBlock(Y, ch_bra, ch_ket);
-      W1.Block(ch_bra, ch_ket) = x_bra * l_bra * y - y * l_ket * x_ket;
-      W2.Block(ch_bra, ch_ket) = y * l_ket - l_bra * y;
+      P[p].zeros(y.n_rows, y.n_cols);
+      W2[p].zeros(y.n_rows, y.n_cols);
+      if (!bra_active.empty())
+      {
+        const arma::mat ly = reference.Lambda2.GetMatrix(ch_bra, ch_bra)(bra_active, bra_active) *
+                             y.rows(bra_active);
+        P[p] = X.TwoBody.GetMatrix(ch_bra, ch_bra).cols(bra_active) * ly;
+        W2[p].rows(bra_active) -= ly;
+      }
+      if (!ket_active.empty())
+        W2[p].cols(ket_active) +=
+            y.cols(ket_active) * reference.Lambda2.GetMatrix(ch_ket, ch_ket)(ket_active, ket_active);
     }
+    std::vector<std::pair<size_t, size_t>> scalar_pairs;
+    std::vector<arma::mat> W3;
     for (size_t ch = 0; ch < modelspace.GetNumberTwoBodyChannels(); ++ch)
     {
-      if (modelspace.GetTwoBodyChannel(ch).GetNumberKets() == 0)
+      const arma::uvec &active = ctx.active_kets[ch];
+      if (active.empty())
         continue;
       const arma::mat &x = X.TwoBody.GetMatrix(ch, ch);
       const arma::mat &l = reference.Lambda2.GetMatrix(ch, ch);
-      W3.Block(ch, ch) = x * l - l * x;
+      arma::mat w(x.n_rows, x.n_cols, arma::fill::zeros);
+      w.cols(active) += x.cols(active) * l(active, active);
+      w.rows(active) -= l(active, active) * x.rows(active);
+      scalar_pairs.emplace_back(ch, ch);
+      W3.push_back(std::move(w));
     }
+    X.profiler.timer["MR comm221 lambda2 tensor products"] += omp_get_wtime() - section_start;
 
-    arma::mat result = PartialTraceTensor(W1, Y, L);
-    result += ContractScalarTwoTensorOne(X, PartialTraceTensor(W2, Y, L), Y, L);
-    result -= ContractTensorTwoScalarOne(Y, PartialTraceScalar(W3, X), X, L);
-    const double ring_start = omp_get_wtime();
-    result += RingTerm(X, Y, reference, false);
-    result -= RingTerm(X, Y, reference, true);
-    X.profiler.timer["MR comm221 lambda2 tensor ring"] += omp_get_wtime() - ring_start;
+    section_start = omp_get_wtime();
+    arma::mat result = ContractScalarTwoTensorOne(ctx, PartialTrace(ctx, channel_pairs, W2, L));
+    result -= ContractTensorTwoScalarOne(ctx, PartialTrace(ctx, scalar_pairs, W3, 0));
+    arma::mat first = PartialTrace(ctx, channel_pairs, P, L);
+    X.profiler.timer["MR comm221 lambda2 tensor traces"] += omp_get_wtime() - section_start;
+
+    section_start = omp_get_wtime();
+    first += RingTerm(ctx);
+    X.profiler.timer["MR comm221 lambda2 tensor ring"] += omp_get_wtime() - section_start;
+
+    // PT(Y l X) and R(Y,X) are the Hermitian conjugates of PT(X l Y) and R(X,Y).
+    const int hZ = -Hermiticity(X) * Hermiticity(Y);
+    for (index_t i : ctx.orbits)
+      for (index_t j : ctx.orbits)
+        if (ctx.allowed[i][j])
+          result(i, j) += first(i, j) +
+                          hZ * modelspace.phase((modelspace.GetOrbit(i).j2 - modelspace.GetOrbit(j).j2) / 2) *
+                              first(j, i);
     X.profiler.timer["MR comm221 lambda2 tensor total"] += omp_get_wtime() - total_start;
     return result;
   }

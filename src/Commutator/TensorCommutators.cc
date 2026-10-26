@@ -6,11 +6,103 @@
 #include "PandyaHelpers.hh"
 #include "MemoryBudget.hh"
 
+#include <cstdint>
+#include <unordered_map>
+#include <unordered_set>
+
 namespace Commutator
 {
 
   namespace
   {
+    // Recoupling terms between cross-coupled and pp-coupled rank-L matrix
+    // elements depend only on angular momenta: L, the (J_bra, J_ket) of the
+    // coupled block and the j quartet.  The forward and inverse tensor Pandya
+    // transformations share them; they are built once per (L, J_bra, J_ket)
+    // and kept across calls instead of being recomputed from 6j/9j hash
+    // lookups for every quartet of every block.  RecouplingTerms() is the
+    // arithmetic of the former per-call lambdas, so results are unchanged.
+    // Budget in MiB: IMSRG_TENSOR_RECOUPLING_CACHE_MB (default 2048); beyond
+    // it the terms are computed on the fly as before.
+    struct RecouplingTerm
+    {
+      int J3, J4;
+      double coefficient;
+    };
+
+    std::vector<RecouplingTerm> RecouplingTerms(ModelSpace &ms, int L, int Jb, int Jk,
+                                                double ja, double jb, double jc, double jd)
+    {
+      std::vector<RecouplingTerm> terms;
+      for (int J3 = std::abs(ja - jd); J3 <= ja + jd; ++J3)
+        for (int J4 = std::max(int(std::abs(jc - jb)), std::abs(J3 - L));
+             J4 <= std::min(int(jc + jb), J3 + L); ++J4)
+        {
+          const double ninej = L == 0
+            ? AngMom::phase(jb + jd + J3 + Jb) * ms.GetSixJ(ja, jb, Jb, jc, jd, J3) / std::sqrt((2 * J4 + 1) * (2 * Jb + 1))
+            : ms.GetNineJ(ja, jd, J3, jb, jc, J4, Jb, Jk, L);
+          if (std::abs(ninej) < 1e-10) continue;
+          const double hat = std::sqrt((2 * J3 + 1) * (2 * J4 + 1) * (2 * Jb + 1) * (2 * Jk + 1));
+          terms.push_back({J3, J4, hat * ms.phase(jb + jd + Jk + J4) * ninej});
+        }
+      return terms;
+    }
+
+    class RecouplingCache
+    {
+     public:
+      static RecouplingCache &Instance()
+      {
+        static RecouplingCache cache;
+        return cache;
+      }
+
+      static uint64_t Key(int L, int Jb, int Jk, int j2a, int j2b, int j2c, int j2d)
+      {
+        return (((((uint64_t(L) << 7 | Jb) << 7 | Jk) << 7 | j2a) << 7 | j2b) << 7 | j2c) << 7 | j2d;
+      }
+
+      // Build every j quartet of (L, Jb, Jk) once; call outside parallel regions.
+      void Prepare(ModelSpace &ms, int L, int Jb, int Jk)
+      {
+        const uint64_t block = Key(L, Jb, Jk, 0, 0, 0, 0);
+        if (prepared.count(block) || full)
+          return;
+        prepared.insert(block);
+        int j2max = 1;
+        for (auto a : ms.all_orbits)
+          j2max = std::max(j2max, ms.GetOrbit(a).j2);
+        const size_t budget = detail::MemoryBudgetBytes("IMSRG_TENSOR_RECOUPLING_CACHE_MB", 2048);
+        for (int j2a = 1; j2a <= j2max; j2a += 2)
+          for (int j2b = 1; j2b <= j2max; j2b += 2)
+          {
+            if (j2a + j2b < 2 * Jb || std::abs(j2a - j2b) > 2 * Jb) continue;
+            for (int j2c = 1; j2c <= j2max; j2c += 2)
+              for (int j2d = 1; j2d <= j2max; j2d += 2)
+              {
+                if (j2c + j2d < 2 * Jk || std::abs(j2c - j2d) > 2 * Jk) continue;
+                auto &entry = terms[Key(L, Jb, Jk, j2a, j2b, j2c, j2d)];
+                entry = RecouplingTerms(ms, L, Jb, Jk, 0.5 * j2a, 0.5 * j2b, 0.5 * j2c, 0.5 * j2d);
+                bytes += entry.size() * sizeof(RecouplingTerm) + 64;
+              }
+          }
+        full = bytes > budget;
+      }
+
+      // Read-only during parallel regions; nullptr when not cached.
+      const std::vector<RecouplingTerm> *Find(int L, int Jb, int Jk, int j2a, int j2b, int j2c, int j2d) const
+      {
+        const auto it = terms.find(Key(L, Jb, Jk, j2a, j2b, j2c, j2d));
+        return it == terms.end() ? nullptr : &it->second;
+      }
+
+     private:
+      std::unordered_map<uint64_t, std::vector<RecouplingTerm>> terms;
+      std::unordered_set<uint64_t> prepared;
+      size_t bytes = 0;
+      bool full = false;
+    };
+
     // A one-body action changes just one member of a two-body ket. Prepare
     // its index and coefficient once, instead of looking them up for every
     // matrix element in the other channel. Keep normalization separate to
@@ -627,73 +719,127 @@ namespace Commutator
 
     } // for itmat
 
-    // The one body part takes some additional work
-
-    //   int norbits = Z.modelspace->GetNumberOrbits();
-    int norbits = Z.modelspace->all_orbits.size();
-    std::vector<index_t> allorb_vec(Z.modelspace->all_orbits.begin(), Z.modelspace->all_orbits.end());
-    //   #pragma omp parallel for schedule(dynamic,1) if (not Z.modelspace->tensor_transform_first_pass[Z.GetJRank()*2+Z.GetParity()])
-    #pragma omp parallel for schedule(dynamic, 1) if (not single_thread)
-    for (int indexi = 0; indexi < norbits; ++indexi)
-    //   for (int i=0;i<norbits;++i)
+    // One-body part: sum_c [n_c Mpp + (1-n_c) Mhh]^{J1J2}_{(ci),(cj)} with the
+    // partial-trace recoupling (particles: Mhh only), upper triangle i <= j
+    // and the rest by Hermiticity.  The stored blocks are read through the kets
+    // that contain each orbit c instead of GetTBME_J lookups per element; each
+    // bra channel accumulates into its own buffer, summed in channel order.
     {
-      //      auto i = Z.modelspace->all_orbits[indexi];
-      auto i = allorb_vec[indexi];
-      Orbit &oi = Z.modelspace->GetOrbit(i);
-      double ji = oi.j2 / 2.0;
-      //      for (auto j : Z.OneBodyChannels.at({oi.l, oi.j2, oi.tz2}) )
-      for (auto j : Z.GetOneBodyChannel(oi.l, oi.j2, oi.tz2))
+      ModelSpace &ms = *Z.modelspace;
+      const size_t norbits = ms.GetNumberOrbits();
+      const size_t nchannels = ms.GetNumberTwoBodyChannels();
+      int j2max = 1;
+      for (auto a : ms.all_orbits)
+        j2max = std::max(j2max, ms.GetOrbit(a).j2);
+      const int nj = (j2max + 1) / 2;
+      std::map<std::pair<int, int>, std::vector<double>> recoupling;  // (J1,J2) -> [ji][jj][jc]
+      struct Orientation { const arma::mat *pp, *hh; bool transposed; double sign; int J2; size_t ket; };
+      std::vector<std::vector<Orientation>> by_bra(nchannels);
+      for (const auto &entry : Z.TwoBody.MatEl)
       {
-        if (j < i)
+        const size_t b = entry.first[0], k = entry.first[1];
+        const int Jb = ms.GetTwoBodyChannel(b).J, Jk = ms.GetTwoBodyChannel(k).J;
+        const arma::mat *pp = &Mpp.GetMatrix(b, k), *hh = &Mhh.GetMatrix(b, k);
+        by_bra[b].push_back({pp, hh, false, 1.0, Jk, k});
+        recoupling[{Jb, Jk}];
+        if (b != k)
+        {
+          by_bra[k].push_back({pp, hh, true, double(hZ * ms.phase(Jk - Jb)), Jb, b});
+          recoupling[{Jk, Jb}];
+        }
+      }
+      for (auto &table : recoupling)
+      {
+        const int J1 = table.first.first, J2 = table.first.second;
+        table.second.assign(nj * nj * nj, 0.0);
+        for (int ji = 0; ji < nj; ++ji)
+          for (int jj = 0; jj < nj; ++jj)
+            for (int jc = 0; jc < nj; ++jc)
+              table.second[(ji * nj + jj) * nj + jc] =
+                  sqrt((2 * J1 + 1) * (2 * J2 + 1)) * ms.GetSixJ(J1, J2, Lambda, jj + 0.5, ji + 0.5, jc + 0.5) *
+                  ms.phase(jj + jc + 1 + J1 + Lambda);
+      }
+      // kets of each channel containing orbit c, as |c other> = factor * stored ket
+      struct OrbitKet { size_t index; index_t other; double factor; };
+      std::vector<std::vector<std::vector<OrbitKet>>> kets(nchannels, std::vector<std::vector<OrbitKet>>(norbits));
+      for (size_t ch = 0; ch < nchannels; ++ch)
+      {
+        TwoBodyChannel &tbc = ms.GetTwoBodyChannel(ch);
+        for (size_t index = 0; index < tbc.GetNumberKets(); ++index)
+        {
+          const Ket &ket = tbc.GetKet(index);
+          if (ket.p == ket.q)
+          {
+            kets[ch][ket.p].push_back({index, (index_t)ket.q, PhysConst::SQRT2});
+            continue;
+          }
+          kets[ch][ket.p].push_back({index, (index_t)ket.q, 1.0});
+          kets[ch][ket.q].push_back({index, (index_t)ket.p, double(ms.phase((ket.op->j2 + ket.oq->j2) / 2 + tbc.J + 1))});
+        }
+      }
+      std::vector<char> is_particle(norbits, 0);
+      for (auto c : ms.particles)
+        is_particle[c] = 1;
+      std::vector<std::vector<char>> allowed(norbits, std::vector<char>(norbits, 0));
+      for (auto i : ms.all_orbits)
+      {
+        const Orbit &oi = ms.GetOrbit(i);
+        for (auto j : Z.GetOneBodyChannel(oi.l, oi.j2, oi.tz2))
+          allowed[i][j] = j >= i;
+      }
+      std::vector<arma::mat> buffers(nchannels);
+      #pragma omp parallel for schedule(dynamic, 1) if (not single_thread)
+      for (size_t b = 0; b < nchannels; ++b)
+      {
+        if (by_bra[b].empty())
           continue;
-        Orbit &oj = Z.modelspace->GetOrbit(j);
-        double jj = oj.j2 / 2.0;
-        int phase_ij = AngMom::phase((oi.j2 - oj.j2) / 2);
-        double cijJ = 0;
-        // Sum c over holes and include the nbar_a * nbar_b terms
-        for (auto &c : Z.modelspace->holes)
+        arma::mat &buffer = buffers[b];
+        buffer.zeros(norbits, norbits);
+        const int J1 = ms.GetTwoBodyChannel(b).J;
+        for (const auto &o : by_bra[b])
         {
-          Orbit &oc = Z.modelspace->GetOrbit(c);
-          double jc = oc.j2 / 2.0;
-          int j1min = std::abs(jc - ji);
-          int j1max = jc + ji;
-          for (int J1 = j1min; J1 <= j1max; ++J1)
+          const std::vector<double> &table = recoupling.at({J1, o.J2});
+          for (auto c : ms.all_orbits)
           {
-            int j2min = std::max(int(std::abs(jc - jj)), std::abs(Lambda - J1));
-            int j2max = std::min(int(jc + jj), J1 + Lambda);
-            for (int J2 = j2min; J2 <= j2max; ++J2)
+            const auto &bra_kets = kets[b][c];
+            const auto &ket_kets = kets[o.ket][c];
+            if (bra_kets.empty() || ket_kets.empty())
+              continue;
+            const Orbit &oc = ms.GetOrbit(c);
+            const int jc = (oc.j2 - 1) / 2;
+            const double w_pp = is_particle[c] ? 0.0 : oc.occ;
+            const double w_hh = is_particle[c] ? 1.0 : 1 - oc.occ;
+            for (const auto &bra : bra_kets)
             {
-              double hatfactor = sqrt((2 * J1 + 1) * (2 * J2 + 1));
-              double sixj = Z.modelspace->GetSixJ(J1, J2, Lambda, jj, ji, jc);
-              cijJ += hatfactor * sixj * Z.modelspace->phase(jj + jc + J1 + Lambda) * (oc.occ * Mpp.GetTBME_J(J1, J2, c, i, c, j) + (1 - oc.occ) * Mhh.GetTBME_J(J1, J2, c, i, c, j));
-            }
-          }
-          // Sum c over particles and include the n_a * n_b terms
-        }
-        for (auto &c : Z.modelspace->particles)
-        {
-          Orbit &oc = Z.modelspace->GetOrbit(c);
-          double jc = oc.j2 / 2.0;
-          int j1min = std::abs(jc - ji);
-          int j1max = jc + ji;
-          for (int J1 = j1min; J1 <= j1max; ++J1)
-          {
-            int j2min = std::max(int(std::abs(jc - jj)), std::abs(Lambda - J1));
-            int j2max = std::min(int(jc + jj), J1 + Lambda);
-            for (int J2 = j2min; J2 <= j2max; ++J2)
-            {
-              double hatfactor = sqrt((2 * J1 + 1) * (2 * J2 + 1));
-              double sixj = Z.modelspace->GetSixJ(J1, J2, Lambda, jj, ji, jc);
-              cijJ += hatfactor * sixj * Z.modelspace->phase(jj + jc + J1 + Lambda) * Mhh.GetTBME_J(J1, J2, c, i, c, j);  // The phase here is different than in Parzuchowski et al. It appears that the published phase is wrong.
+              const int ji = (ms.GetOrbit(bra.other).j2 - 1) / 2;
+              for (const auto &ket : ket_kets)
+              {
+                if (!allowed[bra.other][ket.other])
+                  continue;
+                const size_t r = o.transposed ? ket.index : bra.index;
+                const size_t col = o.transposed ? bra.index : ket.index;
+                const double value = o.sign * (w_pp * (*o.pp)(r, col) + w_hh * (*o.hh)(r, col));
+                const int jj = (ms.GetOrbit(ket.other).j2 - 1) / 2;
+                buffer(bra.other, ket.other) += table[(ji * nj + jj) * nj + jc] * bra.factor * ket.factor * value;
+              }
             }
           }
         }
-        //         #pragma omp critical
-        Z.OneBody(i, j) += cijJ;
-        if (i != j)
-          Z.OneBody(j, i) += hZ * phase_ij * cijJ;
-      } // for j
-    }   // for i
+      }
+      arma::mat total(norbits, norbits, arma::fill::zeros);
+      for (const auto &buffer : buffers)
+        if (!buffer.empty())
+          total += buffer;
+      for (auto i : ms.all_orbits)
+        for (auto j : ms.all_orbits)
+        {
+          if (!allowed[i][j])
+            continue;
+          Z.OneBody(i, j) += total(i, j);
+          if (i != j)
+            Z.OneBody(j, i) += hZ * AngMom::phase((ms.GetOrbit(i).j2 - ms.GetOrbit(j).j2) / 2) * total(i, j);
+        }
+    }
     X.profiler.timer["comm222_pp_hh_221st"] += omp_get_wtime() - tstart;
   }
 
@@ -886,28 +1032,17 @@ namespace Commutator
       const auto &ket=kc.GetKet(k);
       kets[{ket.op->j2,ket.oq->j2}].push_back(k);
     }
-    struct Term { int J1, J2; double coefficient; };
+    const auto &cache = RecouplingCache::Instance();
     auto prepare = [&](double ja,double jb,double jc,double jd)
     {
-      std::vector<Term> terms;
-      for (int J1=std::abs(ja-jd);J1<=ja+jd;++J1)
-        for (int J2=std::max(int(std::abs(jc-jb)),std::abs(J1-L));
-             J2<=std::min(int(jc+jb),J1+L);++J2)
-        {
-          const double ninej=L==0
-            ? AngMom::phase(jb+jd+J1+Jb)*Z.modelspace->GetSixJ(ja,jb,Jb,jc,jd,J1)/std::sqrt((2*J2+1)*(2*Jb+1))
-            : Z.modelspace->GetNineJ(ja,jd,J1,jb,jc,J2,Jb,Jk,L);
-          if (std::abs(ninej)<1e-10) continue;
-          const double hat=std::sqrt((2*J1+1)*(2*J2+1)*(2*Jb+1)*(2*Jk+1));
-          terms.push_back({J1,J2,hat*Z.modelspace->phase(jb+jd+Jk+J2)*ninej});
-        }
-      return terms;
+      const auto *cached = cache.Find(L, Jb, Jk, 2*ja, 2*jb, 2*jc, 2*jd);
+      return cached ? *cached : RecouplingTerms(*Z.modelspace, L, Jb, Jk, ja, jb, jc, jd);
     };
-    auto contract = [&](int a,int b,int c,int d,const std::vector<Term> &terms)
+    auto contract = [&](int a,int b,int c,int d,const std::vector<RecouplingTerm> &terms)
     {
       const detail::TwoBodyElement element(*Z.modelspace,a,d,c,b);
       double sum=0;
-      for (const auto &t : terms) sum -= t.coefficient*element.Get(Z.TwoBody,blocks,t.J1,t.J2);
+      for (const auto &t : terms) sum -= t.coefficient*element.Get(Z.TwoBody,blocks,t.J3,t.J4);
       return sum;
     };
     for (const auto &bg : bras)
@@ -919,7 +1054,7 @@ namespace Commutator
       {
         const double jc=kg.first[0]*0.5, jd=kg.first[1]*0.5;
         const auto direct=prepare(ja,jb,jc,jd);
-        const auto swapped=exchange?prepare(jb,ja,jc,jd):std::vector<Term>{};
+        const auto swapped=exchange?prepare(jb,ja,jc,jd):std::vector<RecouplingTerm>{};
         for (size_t r : bg.second)
         {
           const auto &bra=bc.GetKet(ph[r]);
@@ -935,157 +1070,165 @@ namespace Commutator
     }
   }
 
+  // Inverse tensor Pandya: Z^{J1J2}_{(ij),(kl)} += [sum_{J3J4} c Zbar^{J3J4}_{(i lbar),(k jbar)}
+  //   - (-1)^(j_i+j_j-J1) (i <-> j)] / norm.
+  // Loop order: one task per bra pair (i <= j), which gathers the cross-coupled
+  // values of each orbit quartet once for all (J3, J4) and then applies the
+  // cached recoupling terms of every (J1, J2) block.  The former per-element
+  // loop re-read every Zbar element once per output block.  The terms and the
+  // per-element summation order are unchanged; a task writes only the rows of
+  // its own bra pair, and the Hermitian completion of diagonal blocks follows
+  // in a separate pass.
   void AddInverseTensorPandyaTransformation(Operator &Z, const std::map<std::array<index_t, 2>, arma::mat> &Zbar)
   {
-    const int Lambda=Z.rank_J;
-    const int hZ=Z.IsHermitian()?1:-1;
-    std::vector<decltype(Z.TwoBody.MatEl.begin())> channels;
-    for (auto it=Z.TwoBody.MatEl.begin();it!=Z.TwoBody.MatEl.end();++it) channels.push_back(it);
-    struct Term { int J3, J4; double coefficient; };
+    ModelSpace &ms = *Z.modelspace;
+    const int Lambda = Z.rank_J;
+    const int hZ = Z.IsHermitian() ? 1 : -1;
+    const size_t nchannels = ms.GetNumberTwoBodyChannels();
+    const size_t norbits = ms.GetNumberOrbits();
+    std::vector<arma::mat *> blocks(nchannels * nchannels, nullptr);
+    for (auto &entry : Z.TwoBody.MatEl)
+    {
+      blocks[entry.first[0] * nchannels + entry.first[1]] = &entry.second;
+      RecouplingCache::Instance().Prepare(ms, Lambda, ms.GetTwoBodyChannel(entry.first[0]).J,
+                                          ms.GetTwoBodyChannel(entry.first[1]).J);
+    }
+    const auto &cache = RecouplingCache::Instance();
+    int max_J = 0;
+    for (auto a : ms.all_orbits)
+      max_J = std::max(max_J, ms.GetOrbit(a).j2);
+    // cross-coupled channel and local index of the pair {a, d} for each J
+    struct CrossIndex { int channel = -1; size_t local = 0, nkets = 0; };
+    std::vector<CrossIndex> cross((max_J + 1) * norbits * norbits);
+    for (int J = 0; J <= max_J; ++J)
+      for (auto a : ms.all_orbits)
+        for (auto d : ms.all_orbits)
+        {
+          const Orbit &oa = ms.GetOrbit(a), &od = ms.GetOrbit(d);
+          if (2 * J < std::abs(oa.j2 - od.j2) || 2 * J > oa.j2 + od.j2)
+            continue;
+          const int channel = ms.GetTwoBodyChannelIndex(J, (oa.l + od.l) % 2, std::abs(oa.tz2 - od.tz2) / 2);
+          const auto &tbc = ms.GetTwoBodyChannel_CC(channel);
+          cross[(J * norbits + a) * norbits + d] =
+              {channel, tbc.GetLocalIndex(ms.GetKetIndex(std::min(a, d), std::max(a, d))), tbc.GetNumberKets()};
+        }
+    const size_t nkets = ms.GetNumberKets();
+    const size_t ncc = ms.GetNumberTwoBodyChannels_CC();
+    std::vector<const arma::mat *> cross_blocks(ncc * ncc, nullptr);
+    for (const auto &entry : Zbar)
+      cross_blocks[entry.first[0] * ncc + entry.first[1]] = &entry.second;
 
     #pragma omp parallel for schedule(dynamic, 1) if (not single_thread)
-    for (size_t ch=0;ch<channels.size();++ch)
+    for (size_t bra_index = 0; bra_index < nkets; ++bra_index)
     {
-      const auto block=channels[ch];
-      const auto cb=block->first[0], ck=block->first[1];
-      auto &output=block->second;
-      const auto &bc=Z.modelspace->GetTwoBodyChannel(cb);
-      const auto &kc=Z.modelspace->GetTwoBodyChannel(ck);
-      const int J1=bc.J, J2=kc.J;
-      detail::ChannelMatrices<index_t> matrices(Zbar,Z.modelspace->GetNumberTwoBodyChannels_CC());
-
-      // Recoupling depends on angular momenta, not radial or isospin labels.
-      // Group ket indices only: O(nkets) scratch, never a dense transform table.
-      auto group_kets = [](const TwoBodyChannel &channel)
+      const Ket &bra = ms.GetKet(bra_index);
+      const int i = bra.p, j = bra.q;
+      const Orbit &oi = ms.GetOrbit(i), &oj = ms.GetOrbit(j);
+      std::vector<double> direct((max_J + 1) * (max_J + 1)), exchange((max_J + 1) * (max_J + 1));
+      // sum over (J3, J4) of the cross-coupled value of (a d̄),(c b̄), as in the former contract()
+      auto gather = [&](int a, int b, int c, int d, std::vector<double> &values)
       {
-        std::map<std::array<int,2>,std::vector<size_t>> groups;
-        for (size_t k=0;k<channel.GetNumberKets();++k)
+        const Orbit &oa = ms.GetOrbit(a), &ob = ms.GetOrbit(b), &oc = ms.GetOrbit(c), &od = ms.GetOrbit(d);
+        const int jsum = (oa.j2 + ob.j2 + oc.j2 + od.j2) / 2;
+        for (int J3 = std::abs(oa.j2 - od.j2) / 2; J3 <= (oa.j2 + od.j2) / 2; ++J3)
         {
-          const auto &ket=channel.GetKet(k);
-          groups[{ket.op->j2,ket.oq->j2}].push_back(k);
+          const CrossIndex &e1 = cross[(J3 * norbits + a) * norbits + d];
+          for (int J4 = std::max(std::abs(oc.j2 - ob.j2) / 2, std::abs(J3 - Lambda));
+               J4 <= std::min((oc.j2 + ob.j2) / 2, J3 + Lambda); ++J4)
+          {
+            const CrossIndex &e2 = cross[(J4 * norbits + c) * norbits + b];
+            double value = 0;
+            const bool normal = e1.channel <= e2.channel;
+            const arma::mat *matrix = cross_blocks[std::min(e1.channel, e2.channel) * ncc + std::max(e1.channel, e2.channel)];
+            if (matrix)
+            {
+              if (normal)
+              {
+                if (a <= d) value = (*matrix)(e1.local, e2.local + (c > b ? e2.nkets : 0));
+                else value = (*matrix)(e1.local, e2.local + (c > b ? 0 : e2.nkets)) * hZ * ms.phase(Lambda + J3 + J4 + jsum);
+              }
+              else
+              {
+                if (c <= b) value = (*matrix)(e2.local, e1.local + (a > d ? e1.nkets : 0)) * hZ * ms.phase(J3 - J4);
+                else value = (*matrix)(e2.local, e1.local + (a > d ? 0 : e1.nkets)) * ms.phase(Lambda + jsum);
+              }
+            }
+            values[J3 * (max_J + 1) + J4] = value;
+          }
         }
-        return groups;
       };
-      const auto bra_groups=group_kets(bc), ket_groups=group_kets(kc);
-      auto prepare = [&](double ja,double jb,double jc,double jd)
+      auto combine = [&](const std::vector<RecouplingTerm> &terms, const std::vector<double> &values)
       {
-        std::vector<Term> terms;
-        for (int J3=std::abs(ja-jd);J3<=ja+jd;++J3)
-          for (int J4=std::max(int(std::abs(jc-jb)),std::abs(J3-Lambda));
-               J4<=std::min(int(jc+jb),J3+Lambda);++J4)
-          {
-            const double ninej = Lambda==0
-              ? AngMom::phase(jb+jd+J1+J3)*Z.modelspace->GetSixJ(ja,jb,J1,jc,jd,J3)/std::sqrt((2*J2+1)*(2*J4+1))
-              : Z.modelspace->GetNineJ(ja,jd,J3,jb,jc,J4,J1,J2,Lambda);
-            if (std::abs(ninej)<1e-10) continue;
-            const double hat=std::sqrt((2*J1+1)*(2*J2+1)*(2*J3+1)*(2*J4+1));
-            terms.push_back({J3,J4,hat*Z.modelspace->phase(jb+jd+J2+J4)*ninej});
-          }
-        return terms;
-      };
-      struct Access
-      {
-        const TwoBodyChannel_CC *bra, *ket;
-        const arma::mat *matrix;
-        size_t nbras, nkets;
-        double coefficient;
-        int phase_direct, phase_transposed, phase_both;
-        bool normal;
-      };
-      struct Plans
-      {
-        std::array<std::vector<Access>,16> entries;
-        std::array<bool,16> ready{};
-      };
-      auto contract = [&](int a,int b,int c,int d,const std::vector<Term> &terms,Plans &plans)
-      {
-        const auto &oa=Z.modelspace->GetOrbit(a), &ob=Z.modelspace->GetOrbit(b);
-        const auto &oc=Z.modelspace->GetOrbit(c), &od=Z.modelspace->GetOrbit(d);
-        const int pb=(oa.l+od.l)%2, pk=(oc.l+ob.l)%2;
-        const int tb=std::abs(oa.tz2-od.tz2)/2, tk=std::abs(oc.tz2-ob.tz2)/2;
-        const int jsum=(oa.j2+ob.j2+oc.j2+od.j2)/2;
-        const size_t key=8*pb+4*pk+2*tb+tk;
-        auto &plan=plans.entries[key];
-        if (!plans.ready[key])
-        {
-          plan.reserve(terms.size());
-          for (const auto &t : terms)
-          {
-            const auto cb_cc=Z.modelspace->GetTwoBodyChannelIndex(t.J3,pb,tb);
-            const auto ck_cc=Z.modelspace->GetTwoBodyChannelIndex(t.J4,pk,tk);
-            const auto *matrix=matrices.Find(std::min(cb_cc,ck_cc),std::max(cb_cc,ck_cc));
-            if (!matrix) continue;
-            const auto &bra=Z.modelspace->GetTwoBodyChannel_CC(cb_cc);
-            const auto &ket=Z.modelspace->GetTwoBodyChannel_CC(ck_cc);
-            plan.push_back({&bra,&ket,matrix,bra.GetNumberKets(),ket.GetNumberKets(),t.coefficient,
-              Z.modelspace->phase(Lambda+t.J3+t.J4+jsum),Z.modelspace->phase(t.J3-t.J4),
-              Z.modelspace->phase(Lambda+jsum),cb_cc<=ck_cc});
-          }
-          plans.ready[key]=true;
-        }
-        const auto ad=Z.modelspace->GetKetIndex(std::min(a,d),std::max(a,d));
-        const auto cb_index=Z.modelspace->GetKetIndex(std::min(c,b),std::max(c,b));
-        double sum=0;
-        const TwoBodyChannel_CC *last_bra=nullptr;
-        size_t ibra=0;
-        for (const auto &t : plan)
-        {
-          if (t.bra!=last_bra)
-          {
-            ibra=t.bra->GetLocalIndex(ad);
-            last_bra=t.bra;
-          }
-          const auto iket=t.ket->GetLocalIndex(cb_index);
-          double value;
-          if (t.normal)
-          {
-            if (a<=d) value=(*t.matrix)(ibra,iket+(c>b?t.nkets:0));
-            else value=(*t.matrix)(ibra,iket+(c>b?0:t.nkets))*hZ*t.phase_direct;
-          }
-          else
-          {
-            if (c<=b) value=(*t.matrix)(iket,ibra+(a>d?t.nbras:0))*hZ*t.phase_transposed;
-            else value=(*t.matrix)(iket,ibra+(a>d?0:t.nbras))*t.phase_both;
-          }
-          sum += t.coefficient*value;
-        }
+        double sum = 0;
+        for (const auto &t : terms)
+          sum += t.coefficient * values[t.J3 * (max_J + 1) + t.J4];
         return sum;
       };
-
-      for (const auto &bra_group : bra_groups)
+      for (size_t ket_index = 0; ket_index < nkets; ++ket_index)
       {
-        const double ji=bra_group.first[0]*0.5, jj=bra_group.first[1]*0.5;
-        const bool exchange_needed=std::any_of(bra_group.second.begin(),bra_group.second.end(),
-          [&](size_t index) { const auto &bra=bc.GetKet(index); return bra.p!=bra.q; });
-        for (const auto &ket_group : ket_groups)
+        const Ket &ket = ms.GetKet(ket_index);
+        const int k = ket.p, l = ket.q;
+        const Orbit &ok = ms.GetOrbit(k), &ol = ms.GetOrbit(l);
+        if ((oi.l + oj.l + ok.l + ol.l + Z.parity) % 2 != 0 ||
+            std::abs(oi.tz2 + oj.tz2 - ok.tz2 - ol.tz2) > 2 * Z.rank_T)
+          continue;
+        bool gathered = false;
+        for (int J1 = std::abs(oi.j2 - oj.j2) / 2; J1 <= (oi.j2 + oj.j2) / 2; ++J1)
         {
-          if (cb==ck && ket_group.second.back()<bra_group.second.front()) continue;
-          const double jk=ket_group.first[0]*0.5, jl=ket_group.first[1]*0.5;
-          const auto direct=prepare(ji,jj,jk,jl);
-          const auto exchanged=exchange_needed?prepare(jj,ji,jk,jl):std::vector<Term>{};
-          // At most 16 parity/isospin channel combinations for this angular quartet.
-          // Rebuilt for each quartet: storage never grows with all orbit quadruples.
-          Plans direct_plans, exchange_plans;
-          for (size_t ibra : bra_group.second)
+          if (i == j && J1 % 2)
+            continue;
+          const size_t cb = ms.GetTwoBodyChannelIndex(J1, (oi.l + oj.l) % 2, (oi.tz2 + oj.tz2) / 2);
+          const auto &bc = ms.GetTwoBodyChannel(cb);
+          const size_t ibra = bc.GetLocalIndex(i, j);
+          if (ibra >= bc.GetNumberKets())
+            continue;
+          for (int J2 = std::max(std::abs(ok.j2 - ol.j2) / 2, std::abs(J1 - Lambda));
+               J2 <= std::min((ok.j2 + ol.j2) / 2, J1 + Lambda); ++J2)
           {
-            const auto &bra=bc.GetKet(ibra);
-            const int i=bra.p, j=bra.q;
-            const size_t ketmin=cb==ck?ibra:0;
-            auto first=std::lower_bound(ket_group.second.begin(),ket_group.second.end(),ketmin);
-            for (auto it=first;it!=ket_group.second.end();++it)
+            if (k == l && J2 % 2)
+              continue;
+            const size_t ck = ms.GetTwoBodyChannelIndex(J2, (ok.l + ol.l) % 2, (ok.tz2 + ol.tz2) / 2);
+            if (cb > ck)
+              continue;
+            arma::mat *output = blocks[cb * nchannels + ck];
+            if (!output)
+              continue;
+            const auto &kc = ms.GetTwoBodyChannel(ck);
+            const size_t iket = kc.GetLocalIndex(k, l);
+            if (iket >= kc.GetNumberKets() || (cb == ck && iket < ibra))
+              continue;
+            if (!gathered)
             {
-              const size_t iket=*it;
-              const auto &ket=kc.GetKet(iket);
-              const int k=ket.p, l=ket.q;
-              const double commij=contract(i,j,k,l,direct,direct_plans);
-              const double commji=i==j?commij:contract(j,i,k,l,exchanged,exchange_plans);
-              const double norm=bra.delta_pq()==ket.delta_pq()?1+bra.delta_pq():PhysConst::SQRT2;
-              output(ibra,iket) += (commij-Z.modelspace->phase(ji+jj-J1)*commji)/norm;
-              if (cb==ck) output(iket,ibra)=hZ*output(ibra,iket);
+              gather(i, j, k, l, direct);
+              if (i != j)
+                gather(j, i, k, l, exchange);
+              gathered = true;
             }
+            const auto *direct_terms = cache.Find(Lambda, J1, J2, oi.j2, oj.j2, ok.j2, ol.j2);
+            const double commij = direct_terms ? combine(*direct_terms, direct)
+                : combine(RecouplingTerms(ms, Lambda, J1, J2, 0.5 * oi.j2, 0.5 * oj.j2, 0.5 * ok.j2, 0.5 * ol.j2), direct);
+            double commji = commij;
+            if (i != j)
+            {
+              const auto *exchange_terms = cache.Find(Lambda, J1, J2, oj.j2, oi.j2, ok.j2, ol.j2);
+              commji = exchange_terms ? combine(*exchange_terms, exchange)
+                  : combine(RecouplingTerms(ms, Lambda, J1, J2, 0.5 * oj.j2, 0.5 * oi.j2, 0.5 * ok.j2, 0.5 * ol.j2), exchange);
+            }
+            const double norm = bra.delta_pq() == ket.delta_pq() ? 1 + bra.delta_pq() : PhysConst::SQRT2;
+            (*output)(ibra, iket) += (commij - ms.phase((oi.j2 + oj.j2) / 2 - J1) * commji) / norm;
           }
         }
       }
+    }
+    // Hermitian completion of the diagonal blocks.
+    for (size_t ch = 0; ch < nchannels; ++ch)
+    {
+      arma::mat *output = blocks[ch * nchannels + ch];
+      if (!output)
+        continue;
+      for (size_t ibra = 0; ibra < output->n_rows; ++ibra)
+        for (size_t iket = ibra; iket < output->n_cols; ++iket)
+          (*output)(iket, ibra) = hZ * (*output)(ibra, iket);
     }
   }
 
@@ -1320,6 +1463,12 @@ namespace Commutator
     };
 
     X.profiler.timer["_Allocate Z_bar_tensor"] += omp_get_wtime() - t_internal;
+    for (int i = 0; i < counter; ++i)
+    {
+      const auto cc_J = [&](index_t ch) { return Z.modelspace->GetTwoBodyChannel_CC(ch).J; };
+      RecouplingCache::Instance().Prepare(*Z.modelspace, Lambda, cc_J(inter_x_states[i]), cc_J(zkets[i]));
+      RecouplingCache::Instance().Prepare(*Z.modelspace, Lambda, cc_J(inter_y_states[i]), cc_J(zbras[i]));
+    }
 
     t_internal = omp_get_wtime();
     // BEGIN OLD WAY
