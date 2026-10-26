@@ -25,6 +25,8 @@ import re
 import subprocess
 import time
 
+EXACT_MAX = 2000   # M-scheme dimension up to which BIGSTICK diagonalizes fully
+
 
 def parse_res(path: Path):
     """States (E, Ex, J, T, parity) from a BIGSTICK .res file."""
@@ -51,8 +53,10 @@ def run_nmax(args, nmax: int):
     link.symlink_to(args.no2bpack.resolve())
     name = f"Z{args.Z}N{args.N}_Nmax{nmax}"
     start = time.time()
-    # Lanczos ("ld"); tiny spaces (e.g. a closed-shell Nmax=0 determinant)
-    # break it, so fall back to full diagonalization ("ex").
+    # Lanczos ("ld"); small spaces break it (a closed-shell Nmax=0 determinant
+    # fails outright, the 81-dimensional O20 Nmax=0 space gave a non-J-pure
+    # state 26 MeV below the exact ground state), so spaces up to EXACT_MAX
+    # use full diagonalization ("ex").
     for method, solver in (("lanczos", ["ld", f"{args.states} {args.max_iter}"]),
                            ("exact", ["ex", str(args.states)])):
         deck = "\n".join(["n", name, "auto", str(args.emax), f"{args.Z} {args.N}", str(args.jz2),
@@ -66,13 +70,13 @@ def run_nmax(args, nmax: int):
             status = subprocess.run([str(args.bigstick)], stdin=stdin, stdout=log,
                                     stderr=subprocess.STDOUT, cwd=work, check=False).returncode
         states = parse_res(res) if res.is_file() else []
-        if status == 0 and states:
+        match = re.search(r"Total basis\s*=\s*(\d+)", (work / "bigstick.log").read_text(errors="replace"))
+        dimension = int(match.group(1)) if match else None
+        if status == 0 and states and (method == "exact" or (dimension or 0) > EXACT_MAX):
             break
     else:
         raise RuntimeError(f"BIGSTICK failed for Nmax={nmax}; see {work / 'bigstick.log'}")
-    log_text = (work / "bigstick.log").read_text(errors="replace")
-    match = re.search(r"Total basis\s*=\s*(\d+)", log_text)
-    return {"Nmax": nmax, "dimension": int(match.group(1)) if match else None, "method": method,
+    return {"Nmax": nmax, "dimension": dimension, "method": method,
             "seconds": round(time.time() - start, 1), "states": states}
 
 
