@@ -1436,3 +1436,26 @@ He4 Nrefmax=2 嵌入 emax6/8，随机 [Ω, E2]，本机 4 线程、`OPENBLAS_NUM
 ### 10.4 待做
 
 - 下游：NCSM 读回程序算导出算符的期望值与跃迁（标量 jcoupled64，张量 `.opbin`）。
+
+## 11. BIGSTICK 参考态 → jref
+
+MR 程序只读 jref；不同来源的参考态在外部转成 jref（来源适配 → 统一的秩 0 密度 → 自然轨道、λ2 → 同一写出函数）。第一个接通的来源是 BIGSTICK。
+
+- BIGSTICK 原生两体密度（菜单 `2d`）在 Nmax（W）截断空间里失败（"Problem cannot find sector jumps PP"），不截断时正常；上游 WHATSNEW 记录过截断下两体密度的问题。
+  参考态正是截断空间，所以 `prototype/mrimsrg/bigstick_jref.py` 从波函数自算密度：读 `.wfn`（菜单 `n` 写出）和同空间、同截断的 ASCII 基 `.bas`（菜单 `ba`），
+  用一、二湮灭振幅 A1、A2 得 γ1 与 γ2 的秩 0 投影（γ2^J = (2J+1)^-1 Σ_M (A2 P_M)^T (A2 P_M)，P_M 为耦合到 (J, M) 的归一化对投影），不形成 m-scheme 两体数组；
+  自然轨道规则与 `prepare_natural_basis` 相同（每个 (l, j, tz) 块内按 γ1 连通分量对角化，占据降序放到 n 升序的槽位，主元取正），γ2 在对基里转到自然基，
+  λ2 = γ2 − n_a n_b（自然基下对角）。写出与 `export_jref.py` 共用 `write_jref()`（重构后 simpleFCI 路径的 jref 逐字节不变）。
+- 只用秩 0 投影（对所有 M 平均）：只取 M = 0 时，BIGSTICK 单精度波函数的微小 J 不纯会让 λ2 与 γ1 的收缩恒等式偏离 2.6e-8，C++ 读入校验（1e-10）拒绝；
+  秩 0 投影下该恒等式代数成立。
+- BIGSTICK 默认 `lanc_prec = 4`（单精度 Lanczos 向量，编译期参数），密度精度约 1e-7 相对。读入同时支持 real4 与 real8 文件。
+- 验收（He4 Nrefmax=2，emax2，N2LO_opt，ħω = 20）：BIGSTICK E = −17.01349 MeV，维数 59，与 simpleFCI 参考一致；转换得到的 jref 与 simpleFCI 路径相比
+  占据数差 5.3e-9、自然轨道变换差 5.6e-9、λ2 差 4.3e-8（`MRBigstickReference`）。MR 驱动（magnus_adaptive，s = 0.5，Operators=Rp2,E2）：初始 E 两者都是
+  −17.0134907986，导出的 H 差 ≤ 6e-8 MeV，Rp2 差 ≤ 5e-9 fm²。夹具与 BIGSTICK 输入在 `test/data/bigstick_He4_Nrefmax2/`。
+- 用法：
+  ```
+  python3 -m prototype.mrimsrg.bigstick_jref --bas X.bas --wfn X.wfn --interaction H.MFDn \
+      --nrefmax 2 --hw 20 [--e2max E] [--state 1] --output X.jref
+  ```
+  更大的 emax 再用 `embed_jref.py` 或 `MRReference.EmbedInModelSpace` 嵌入。
+- 规模：A1、A2 为稀疏矩阵，耦合按通道用稀疏乘积；纯 Python 的组态读入与对投影循环适合中等维数，参考态维数很大时再换 C++。

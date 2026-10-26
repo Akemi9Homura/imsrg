@@ -75,6 +75,46 @@ def _extract_spherical_transformation(
     return result
 
 
+def write_jref(
+    output: Path,
+    *,
+    header: tuple,
+    orbits: list[tuple[int, int, int, int, int]],
+    occupations: np.ndarray,
+    transformation: np.ndarray,
+    lambda_blocks: list[tuple],
+    digests: tuple[str, str, str],
+) -> None:
+    """Write mrimsrg_jref_v1.
+
+    header: (A, Z, Nrefmax, J2, parity, emax, e2max, hw); orbits: rows
+    (index, n, l, 2j, 2tz) with contiguous indices; transformation[old, new]
+    in that orbit order; lambda_blocks: (J, parity, Tz, pairs, matrix) with
+    normalized fixed-M pair matrix elements; digests: interaction, RDM and
+    wavefunction SHA-256 (lowercase hex).
+    """
+    for name, value in zip(("interaction", "RDM", "wavefunction"), digests):
+        if len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+            raise ValueError(f"invalid lowercase SHA-256 for {name}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("xb") as stream:
+        stream.write(MAGIC)
+        stream.write(struct.pack("<II", ENDIAN_MARKER, SCHEMA_VERSION))
+        A, Z, nrefmax, J2, parity, emax, e2max, hw = header
+        stream.write(struct.pack("<7idQQ", A, Z, nrefmax, J2, parity, emax, e2max, float(hw),
+                                 len(orbits), len(lambda_blocks)))
+        for value in digests:
+            stream.write(value.encode("ascii"))
+        for index, n, l, j2, tz2 in orbits:
+            stream.write(struct.pack("<5id", index, n, l, j2, tz2, float(occupations[index])))
+        stream.write(np.asarray(transformation, dtype="<f8").tobytes(order="C"))
+        for J, block_parity, Tz, pairs, matrix in lambda_blocks:
+            stream.write(struct.pack("<3iIQ", J, block_parity, Tz, 0, len(pairs)))
+            for a, b in pairs:
+                stream.write(struct.pack("<II", a, b))
+            stream.write(np.asarray(matrix, dtype="<f8").tobytes(order="C"))
+
+
 def export_reference(
     reference_path: str | Path,
     output_path: str | Path,
@@ -115,55 +155,18 @@ def export_reference(
     wavefunction_sha256 = _digest_files(
         (root / "orbits.npy", root / "determinants.npy", root / "coefficients.npy")
     )
-    for name, value in (
-        ("interaction", interaction_sha256),
-        ("RDM", rdm_sha256),
-        ("wavefunction", wavefunction_sha256),
-    ):
-        if len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
-            raise ValueError(f"invalid lowercase SHA-256 for {name}")
-
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("xb") as stream:
-        stream.write(MAGIC)
-        stream.write(struct.pack("<II", ENDIAN_MARKER, SCHEMA_VERSION))
-        metadata = reference.metadata
-        stream.write(
-            struct.pack(
-                "<7idQQ",
-                metadata["A"],
-                metadata["Z"],
-                metadata["Nrefmax"],
-                metadata["J2"],
-                metadata["parity"],
-                metadata["emax"],
-                metadata["e2max"],
-                float(metadata["hw"]),
-                len(j_orbits),
-                len(lambda_blocks),
-            )
-        )
-        stream.write(interaction_sha256.encode("ascii"))
-        stream.write(rdm_sha256.encode("ascii"))
-        stream.write(wavefunction_sha256.encode("ascii"))
-        for orbit in j_orbits:
-            stream.write(
-                struct.pack(
-                    "<5id",
-                    orbit.index,
-                    orbit.n,
-                    orbit.l,
-                    orbit.j2,
-                    orbit.tz2,
-                    occupations[orbit.index],
-                )
-            )
-        stream.write(np.asarray(transformation, dtype="<f8").tobytes(order="C"))
-        for block in lambda_blocks:
-            stream.write(struct.pack("<3iIQ", block.J, block.parity, block.Tz, 0, len(block.pairs)))
-            for a, b in block.pairs:
-                stream.write(struct.pack("<II", a, b))
-            stream.write(np.asarray(block.matrix, dtype="<f8").tobytes(order="C"))
+    metadata = reference.metadata
+    write_jref(
+        output,
+        header=(metadata["A"], metadata["Z"], metadata["Nrefmax"], metadata["J2"],
+                metadata["parity"], metadata["emax"], metadata["e2max"], float(metadata["hw"])),
+        orbits=[(orbit.index, orbit.n, orbit.l, orbit.j2, orbit.tz2) for orbit in j_orbits],
+        occupations=occupations,
+        transformation=transformation,
+        lambda_blocks=[(block.J, block.parity, block.Tz, block.pairs, block.matrix)
+                       for block in lambda_blocks],
+        digests=(interaction_sha256, rdm_sha256, wavefunction_sha256),
+    )
 
     return {
         "schema": "mrimsrg_jref_v1",
