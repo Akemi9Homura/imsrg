@@ -38,15 +38,15 @@ def weights(occupation, amplitudes, e_of_mstate):
     return {N: v / total for N, v in w.items()}
 
 
-def ground_state(bigstick, h_path, workdir, nmax):
-    """BIGSTICK ground state of a no2bpack in the He4 emax2 Nmax space: energy and N weights."""
+def ground_state(bigstick, h_path, workdir, nmax, nucleons=(2, 2), exact_nmax=2):
+    """BIGSTICK ground state of a no2bpack in an emax2 Nmax space (He4 by default): energy and N weights."""
     workdir.mkdir(parents=True, exist_ok=True)
     link = workdir / "h.bin"
     if link.exists() or link.is_symlink():
         link.unlink()
     link.symlink_to(Path(h_path).resolve())
-    space = f"auto\n2\n2 2\n0\n+\ny\n{nmax}\n"
-    solver = "ex\n2\n" if nmax <= 2 else "ld\n3 300\n"
+    space = f"auto\n2\n{nucleons[0]} {nucleons[1]}\n0\n+\ny\n{nmax}\n"
+    solver = "ex\n2\n" if nmax <= exact_nmax else "ld\n3 300\n"
     with open(workdir / "n.log", "w") as log:
         subprocess.run([bigstick], input=f"n\ngs\n{space}no2\nh.bin\n20 0\nend\n{solver}", text=True,
                        cwd=workdir, stdout=log, stderr=subprocess.STDOUT, check=True)
@@ -61,17 +61,19 @@ def ground_state(bigstick, h_path, workdir, nmax):
     return energy, weights(occupation, amplitudes, e_of)
 
 
-def run_flow(imsrg, bare, jref, s, h_out, scratch, flowfile, intfile, env):
-    """MR White-NCSM flow of the He4 emax2 Hamiltonian to s; H(s) is exported in the HO basis. Returns E(s)."""
+def run_flow(imsrg, bare, jref, s, h_out, scratch, flowfile, intfile, env, operators=(), nucleus="He4", A=4):
+    """MR White-NCSM flow of an emax2 Hamiltonian (He4 by default) to s; H(s) and the operators (as
+    <h_out stem>_<name>.no2bpack) are exported in the HO basis. Returns E(s)."""
     Path(scratch).mkdir(parents=True, exist_ok=True)
-    run = subprocess.run(
-        [str(imsrg), f"2bme={bare}", "fmt2=jcoupled64", "3bme=none", "reference=He4",
-         "valence_space=He4", "A=4", "hw=20", "emax=2", "basis=oscillator", "method=magnus_adaptive",
-         "nsteps=1", "core_generator=white-ncsm", "denominator_partitioning=Epstein_Nesbet", "BetaCM=0",
-         "nucleon_mass_correction=false", f"mr_reference_file={jref}", f"smax={s:g}",
-         "eta_criterion=1e-12", f"scratch={scratch}", f"flowfile={flowfile}",
-         f"intfile={intfile}", f"write_H_no2bpack={h_out}"],
-        capture_output=True, text=True, env=env)
+    command = [str(imsrg), f"2bme={bare}", "fmt2=jcoupled64", "3bme=none", f"reference={nucleus}",
+               f"valence_space={nucleus}", f"A={A}", "hw=20", "emax=2", "basis=oscillator", "method=magnus_adaptive",
+               "nsteps=1", "core_generator=white-ncsm", "denominator_partitioning=Epstein_Nesbet", "BetaCM=0",
+               "nucleon_mass_correction=false", f"mr_reference_file={jref}", f"smax={s:g}",
+               "eta_criterion=1e-12", f"scratch={scratch}", f"flowfile={flowfile}",
+               f"intfile={intfile}", f"write_H_no2bpack={h_out}"]
+    if operators:
+        command.append(f"Operators={','.join(operators)}")
+    run = subprocess.run(command, capture_output=True, text=True, env=env)
     if run.returncode != 0:
         raise SystemExit(f"imsrg++ failed for {h_out}:\n{run.stdout[-2000:]}")
     return float([line.split() for line in open(flowfile) if line.strip()][-1][2])
