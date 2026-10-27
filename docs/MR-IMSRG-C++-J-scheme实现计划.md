@@ -1478,3 +1478,14 @@ MR 程序只读 jref；不同来源的参考态在外部转成 jref（来源适�
   （Darmstadt 格式过完备、单精度）；BIGSTICK 与 simpleFCI 的 λ3 差 3.7e-9。实现中发现 pn 存储在并行区内取 6j 需要预先填表，
   MR-NO2B 入口调用 `PreCalculateSixJ`。
 - 待做：用能生成的力（NuHamil）估计 λ3·V3 项的实际大小；与 3NF400（Gebrerufael 设定）做文献对照；FCIQMC 3-RDM 接入。
+
+## 13. 2026-10-26：IM-NCSM 文献对照
+
+结果与表格见 [docs/mr-imsrg/文献对照.md](mr-imsrg/文献对照.md)。要点：
+
+- HF 基参考态链：imsrg++ `basis=HF` 写出 HF 基 H 与 HO→HF 矩阵，BIGSTICK 在 HF 基求参考态，`bigstick_jref --basis-transformation`
+  写 C_total = C_HF·C_nat；驱动 `mr_export_basis=natural` 在 MR 基导出，后对角化在同一基做（`ab5b37c6`，测试 `MRBasisReference`）。
+- ¹⁶O NNLOopt（Gysbers 2026）：s = 0 一致到 0.01 MeV，E(s) 与文献曲线在 s ≥ 1 差 ≤ 0.1 MeV，E0(∞) = −125.30 一致；MR 与 SR 流逐位一致。
+- ¹²C/²⁰O 3NF400（Gebrerufael 2017）：s = 0 低 0.04–0.8 MeV，emax/Nmax 趋势相同；White-NCSM 流的收敛值 ¹²C −91.53（文献 −93.3）、
+  ²⁰O −149.72（文献 −149.1），偏差符号相反，归因于解耦方式（White-NCSM 按 Δe，文献按占据数），未验证。
+- BIGSTICK Lanczos 在小空间给出错误态（²⁰O Nmax 0，维数 81），`postdiag_bigstick.py` 维数 ≤ 2000 改完全对角化（`6a6aad33`）。
