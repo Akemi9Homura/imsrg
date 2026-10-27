@@ -61,6 +61,22 @@ def ground_state(bigstick, h_path, workdir, nmax):
     return energy, weights(occupation, amplitudes, e_of)
 
 
+def run_flow(imsrg, bare, jref, s, h_out, scratch, flowfile, intfile, env):
+    """MR White-NCSM flow of the He4 emax2 Hamiltonian to s; H(s) is exported in the HO basis. Returns E(s)."""
+    Path(scratch).mkdir(parents=True, exist_ok=True)
+    run = subprocess.run(
+        [str(imsrg), f"2bme={bare}", "fmt2=jcoupled64", "3bme=none", "reference=He4",
+         "valence_space=He4", "A=4", "hw=20", "emax=2", "basis=oscillator", "method=magnus_adaptive",
+         "nsteps=1", "core_generator=white-ncsm", "denominator_partitioning=Epstein_Nesbet", "BetaCM=0",
+         "nucleon_mass_correction=false", f"mr_reference_file={jref}", f"smax={s:g}",
+         "eta_criterion=1e-12", f"scratch={scratch}", f"flowfile={flowfile}",
+         f"intfile={intfile}", f"write_H_no2bpack={h_out}"],
+        capture_output=True, text=True, env=env)
+    if run.returncode != 0:
+        raise SystemExit(f"imsrg++ failed for {h_out}:\n{run.stdout[-2000:]}")
+    return float([line.split() for line in open(flowfile) if line.strip()][-1][2])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--workdir", type=Path, required=True)
@@ -92,23 +108,12 @@ def main():
         rows = []
         for s in args.s:
             tag = f"{label}_s{s:g}"
-            omega = work / f"omega_{tag}"
-            omega.mkdir(exist_ok=True)
             h = work / f"H_{tag}.no2bpack"
-            run = subprocess.run(
-                [str(args.imsrg), f"2bme={bare}", "fmt2=jcoupled64", "3bme=none", "reference=He4",
-                 "valence_space=He4", "A=4", "hw=20", "emax=2", "basis=oscillator", "method=magnus_adaptive",
-                 "nsteps=1", "core_generator=white-ncsm", "denominator_partitioning=Epstein_Nesbet", "BetaCM=0",
-                 "nucleon_mass_correction=false", f"mr_reference_file={jref}", f"smax={s:g}",
-                 "eta_criterion=1e-12", f"scratch={omega}", f"flowfile={work / ('flow_' + tag + '.dat')}",
-                 f"intfile={work / tag}", f"write_H_no2bpack={h}"],
-                capture_output=True, text=True, env=env)
-            if run.returncode != 0:
-                raise SystemExit(f"imsrg++ failed for {tag}:\n{run.stdout[-2000:]}")
-            flow = [line.split() for line in open(work / f"flow_{tag}.dat") if line.strip()]
+            e_s = run_flow(args.imsrg, bare, jref, s, h, work / f"omega_{tag}", work / f"flow_{tag}.dat",
+                           work / tag, env)
             e4, w4 = ground_state(str(args.bigstick), h, work / f"N4_{tag}", 4)
             e2, w2 = ground_state(str(args.bigstick), h, work / f"N2_{tag}", 2)
-            rows.append({"s": s, "E_s": float(flow[-1][2]), "Nmax4": {"E": e4, "weights": w4},
+            rows.append({"s": s, "E_s": e_s, "Nmax4": {"E": e4, "weights": w4},
                          "Nmax2": {"E": e2, "weights": w2}})
             print(f"{label} s={s:<6g} E(s)={rows[-1]['E_s']:9.4f} | Nmax4 E={e4:9.4f} N0 {w4.get(0, 0):.4f} "
                   f"N2 {w4.get(2, 0):.4f} N4 {w4.get(4, 0):.4f} | Nmax2 E={e2:9.4f} N2 {w2.get(2, 0):.4f}", flush=True)
