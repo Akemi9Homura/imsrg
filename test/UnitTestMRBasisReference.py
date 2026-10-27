@@ -14,7 +14,10 @@ reference is the HF determinant, so
 2. the MR White-NCSM flow equals imsrg++ single-reference basis=HF with the
    White generator (s = 1);
 3. the export in the MR basis (mr_export_basis=natural) gives back E(s) as the
-   BIGSTICK Nmax=0 energy (BIGSTICK stores float32 matrix elements: 1e-4).
+   BIGSTICK Nmax=0 energy (BIGSTICK stores float32 matrix elements: 1e-4);
+4. the exported HCM(s), Rp2(s) evaluated by postdiag_bigstick.py (BIGSTICK `x`)
+   in that determinant equal the reference values imsrg++ prints, and
+   no2bpack_combine.py gives E(H + 0.1 HCM) = E + 0.1 <HCM>.
 
 The 3N file (N3LO lnl, emax6, hw16) only supplies realistic matrix elements;
 the energies are not physical (hw differs from the NN part).
@@ -22,6 +25,7 @@ Needs BIGSTICK (env BIGSTICK or ~/BigstickPublick/bin/bigstick-openmp.x).
 """
 
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -107,8 +111,12 @@ def main():
               f"mr_reference_file={root / 'ref.jref'}", "eta_criterion=1e-12", "mr_export_basis=natural"]
         log0 = run([*mr, "smax=0", f"flowfile={root / 'mr0.dat'}", f"intfile={root / 'mr0'}"], root / "mr0.log")
         e_mr0 = float(re.search(r"MR initial natural-basis Hamiltonian: E=(\S+)", log0).group(1))
-        run([*mr, "smax=1", f"flowfile={root / 'mr1.dat'}", f"intfile={root / 'mr1'}",
-             f"write_H_no2bpack={root / 'H_mr1.no2bpack'}"], root / "mr1.log")
+        (root / "omega").mkdir()
+        log1 = run([*mr, "smax=1", f"flowfile={root / 'mr1.dat'}", f"intfile={root / 'mr1'}",
+                    f"scratch={root / 'omega'}", "Operators=HCM,Rp2",
+                    f"write_H_no2bpack={root / 'H_mr1.no2bpack'}"], root / "mr1.log")
+        reference_value = {name: float(re.search(rf"export check: {name}\(s\)\.ZeroBody = (\S+)", log1).group(1))
+                           for name in ("HCM", "Rp2")}
         run([exe, *common, "basis=HF", "method=magnus_adaptive", "core_generator=white", "smax=1",
              "eta_criterion=1e-12", f"flowfile={root / 'sr1.dat'}", f"intfile={root / 'sr1'}"], root / "sr1.log")
         e_mr1, e_sr1 = last_flow_energy(root / "mr1.dat"), last_flow_energy(root / "sr1.dat")
@@ -118,10 +126,32 @@ def main():
         bigstick(root / "pd", "n\npd\nauto\n2\n8 8\n0\n+\ny\n0\nno2\nh.bin\n20 0\nend\nex\n3\n", "pd.log")
         e_pd = first_energy(root / "pd/pd.res")
 
+        # Scalar operators through postdiag_bigstick.py (BIGSTICK `x`): for the
+        # Nmax=0 determinant <psi|O(s)|psi> is the reference value imsrg++ prints.
+        tools = REPOSITORY / "prototype/mrimsrg"
+        postdiag = [sys.executable, str(tools / "postdiag_bigstick.py"), "--Z", "8", "--N", "8", "--emax", "2",
+                    "--hw", "20", "--nmax", "0", "--states", "1", "--bigstick", str(BIGSTICK)]
+        run([*postdiag, "--no2bpack", str(root / "H_mr1.no2bpack"),
+             "--operator", f"HCM={root / 'H_mr1_HCM.no2bpack'}", "--operator", f"Rp2={root / 'H_mr1_Rp2.no2bpack'}",
+             "--workdir", str(root / "x"), "--output", str(root / "x.json")], root / "x.log")
+        expectation = json.loads((root / "x.json").read_text())["results"][0]["states"][0]["expectation"]
+        # H + beta HCM (no2bpack_combine.py): one state, so E(beta) = E(0) + beta <HCM> exactly
+        run([sys.executable, str(tools / "no2bpack_combine.py"), "--term", "1", str(root / "H_mr1.no2bpack"),
+             "--term", "0.1", str(root / "H_mr1_HCM.no2bpack"), "--output", str(root / "H_lawson.no2bpack")],
+            root / "combine.log")
+        run([*postdiag, "--no2bpack", str(root / "H_lawson.no2bpack"), "--workdir", str(root / "lawson"),
+             "--output", str(root / "lawson.json")], root / "lawson.log")
+        e_lawson = json.loads((root / "lawson.json").read_text())["results"][0]["states"][0]["E"]
+
     print(f"HF {ehf:.7f}, BIGSTICK HF-basis reference {e_reference:.5f}, MR initial {e_mr0:.9f}")
     print(f"s=1: MR White-NCSM {e_mr1:.9f}, SR basis=HF White {e_sr1:.9f}, Nmax=0 of the MR-basis export {e_pd:.5f}")
+    print("s=1 <Phi|O(s)|Phi>: " + ", ".join(f"{k} imsrg++ {reference_value[k]:.7f} BIGSTICK x {expectation[k]:.6f}"
+                                            for k in reference_value))
+    print(f"E(H + 0.1 HCM) {e_lawson:.5f}, E + 0.1 <HCM> {e_pd + 0.1 * expectation['HCM']:.5f}")
     assert abs(e_mr0 - ehf) < 1e-6 and abs(e_reference - ehf) < 1e-4
     assert abs(e_mr1 - e_sr1) < 1e-8 and abs(e_pd - e_mr1) < 1e-4
+    assert all(abs(expectation[k] - reference_value[k]) < 1e-4 for k in reference_value)
+    assert abs(e_lawson - (e_pd + 0.1 * expectation["HCM"])) < 5e-4
     print("HF-basis reference chain is self-consistent")
 
 
