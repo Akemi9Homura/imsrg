@@ -119,7 +119,7 @@ def main() -> None:
     parser.add_argument(
         "--input",
         type=Path,
-        default=repository / "docs/MR-IMSRG-Jscheme-large-space.json",
+        default=repository / "doc/data/acceptance/MR-IMSRG-Jscheme-large-space.json",
     )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()

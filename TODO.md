@@ -2,7 +2,7 @@
 
 ## 当前待办（2026-10-27 起，MR-IMSRG 的待办只记在这里）
 
-与 im-fciqmc 隔离：MR-IMSRG 的待办与工作记录放本仓库（本文件与 `docs/mr-imsrg/工作记录.md`），不再写入 im-fciqmc 的 TODO/work-log。
+与 im-fciqmc 隔离：MR-IMSRG 的待办与工作记录放本仓库（本文件与 `doc/records/工作记录.md`），不再写入 im-fciqmc 的 TODO/work-log。
 
 - [ ] 与用户确定 White-NCSM 慢尾的处理（分母补占据因子，或换 Brillouin 分子；都会改变已发表的生成元）
 - [ ] 在集群生成 emax10–12 的嵌入参考与 J64 输入，测 MR-IMSRG 线程扩展（同一分区内比较）
@@ -11,7 +11,7 @@
 - [ ] 用集群已有的 3NF400 full 3N 文件（hw20，emax12，E3max14，5.7 GB）在开壳 Nrefmax=0（C12 emax4/6）上实测 MR-NO2B 的 λ3·V3 零体项（jref 带 λ3，`3bme_type=full`，只算 s=0）
 - [ ] 确认 im-fciqmc 的 RDM/TDM 能否吃外部给定的向量（BIGSTICK 波函数转行列式），据此实现张量算符（E2、M1）的两体跃迁读回
 
-暂缓，需要时再做（已讨论，见 `docs/mr-imsrg/工作记录.md` 2026-10-27）：一次流内多 s 导出（目标 s 处强制分段、流后按段递推 BCH）；导出截断 `mr_export_emax`。
+暂缓，需要时再做（已讨论，见 `doc/records/工作记录.md` 2026-10-27）：一次流内多 s 导出（目标 s 处强制分段、流后按段递推 BCH）；导出截断 `mr_export_emax`。
 
 ## 历史阶段清单（2026-08–09，生产 MR-Magnus(2) 之前的计划与验收记录）
 
@@ -19,7 +19,7 @@
       `/tns/mengziyan/mr-imsrg`，输入放 `inputs/`，旧 checkout/结果放
       `archive/2026-09-08-home-consolidation/`。删除已核对 Git 历史的
       15 个冗余 bundle（1.63 GiB），修复 worktree 登记和结果软链接；
-      迁移清单及历史路径解析见 `docs/远程目录归档.md`。
+      迁移清单及历史路径解析见 `doc/records/远程目录归档.md`。
 
 ## P1：当前唯一目标——生产 C++ J-scheme MR-Magnus(2)
 
@@ -219,7 +219,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
 
 - [x] 逐篇阅读 `refs/` 中 Hergert 2016、Gebrerufael/Vobig/Mongelli 学位
       论文和 IM-NCSM 系列论文，建立 m-scheme 公式、J-scheme 张量约定与
-      `lambda3=0` 截断表；见 `docs/MR-IMSRG-J-scheme公式与代码映射.md`。
+      `lambda3=0` 截断表；见 `doc/method/公式与代码映射.md`。
 - [x] 重生并核对 QCombo `MR_IMSRG2.ipynb`，固定指标方向、反对称、
       组合系数和每个命名 contraction。QCombo 0.2.0 / SymPy 1.14.0
       的 17 个 LaTeX display 与保存输出逐字一致；1B `lambda2` 八项、
@@ -287,7 +287,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       vacuum 0/1/2B 均与原生 SR driver 逐元素为零。
 - [x] 比较 `E/f/Gamma`、每个被选中的 EN 分母、`eta(s=0)`、每个
       命名 RHS contraction 与总 RHS，报告 max-abs/Frobenius/最坏元素；
-      完整机器表见 `docs/MR-IMSRG-SR-degeneration.json`。
+      完整机器表见 `doc/data/acceptance/MR-IMSRG-SR-degeneration.json`。
 - [x] 代数级输入转换、分母、eta 和 RHS 均通过：两核输入最坏
       `3.55e-15 MeV`，分母最坏 `4.26e-14 MeV`，命名 RHS 最坏
       `1.15e-14 MeV`；短流相对 Frobenius 最坏 `1.24e-15`。完整
@@ -305,16 +305,16 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `1.954e-14 MeV`（从同一 J 可表示输入展开；原始 m→J 输入误差另列）。
 - [x] 为四体系各命名项生成机器可读误差表，补齐相对 Frobenius 与最坏
       J/m 元素索引；40 个命名项/体系项组合的全局相对 Frobenius
-      `1.380e-15`，见 `docs/MR-IMSRG-Jscheme-contractions.json`。
+      `1.380e-15`，见 `doc/data/acceptance/MR-IMSRG-Jscheme-contractions.json`。
 - [x] 对四个相关参考测试点逐条比较 White-NCSM 生成元实际选中的 EN
       分母：每核 4 个 1B 与 704 个 2B 正/反向通道，四核 2832 条全部
       通过，全局 max-abs `1.421e-14 MeV`；完整表见
-      `docs/MR-IMSRG-Jscheme-denominators.json`。
+      `doc/data/acceptance/MR-IMSRG-Jscheme-denominators.json`。
 - [x] 比较共同固定步 RK4 checkpoints：四体系用 `ds=1e-3` 到
       `s=0.001,0.002,0.003`，每点从 driver 的 HO 真空 J64 输出读回、
       HO→NAT 并 MR 正规序后重新比较 `H/eta/RHS`；同 J 输入的全局最坏
       `H/RHS` max-abs 为 `1.279e-13/2.665e-14 MeV`。机器记录见
-      `docs/MR-IMSRG-Jscheme-checkpoints.json`。四体系显式
+      `doc/data/acceptance/MR-IMSRG-Jscheme-checkpoints.json`。四体系显式
       `H_1=H_0+10^-4 RHS(H_0)` Euler J/m 对照也通过，全局最坏
       `1.776e-15 MeV`；不使用历史上实际调用 RK4 的 `flow_euler` 名称冒充。
 - [x] 增加相关参考固定-s 完整流验收器：按生产顺序执行
@@ -324,7 +324,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `E0+t+V` 与 NCSM 谱；四体系全流 max-abs 为
       `4.40e-9--6.88e-8 MeV`。float64 J64 与 float32 `no2bpack`
       均由独立 NCSM reader 对角化，打包引起的基态差不超过
-      `1.225e-6 MeV`；见 `docs/MR-IMSRG-Jscheme-full-flow.json`。
+      `1.225e-6 MeV`；见 `doc/data/acceptance/MR-IMSRG-Jscheme-full-flow.json`。
 
 ### G. 性能与完成定义
 
@@ -332,14 +332,14 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       矩阵/现有 channel 索引。真实 `He4 Nrefmax=2` 单线程 RHS 比 Python
       m-scheme 快 `256.8` 倍，输入主数组小 `1468` 倍；解析存储估算可到
       `emax=14` 且不分配稠密 m-scheme 张量。见
-      `docs/MR-IMSRG-Jscheme-performance.json`。
+      `doc/data/acceptance/MR-IMSRG-Jscheme-performance.json`。
 - [x] `He4/O16 Nrefmax=0`、`Be8/C12 Nrefmax=0` 和 `He4/O16 Nrefmax=2`
       按 E--F 门禁通过。
 - [x] 四核完成流和 NCSM/no2bpack 读回通过，命令、commit、环境、
       误差表、最坏元素及性能写入新验收文档。ODE 容差从 `1e-9` 收紧到
       `1e-10` 后，四核各三条最低 NCSM 能级的最坏变化为
       `1.683e-11 MeV = 1.683e-8 keV`，通过 `<1 keV` 门禁；见
-      `docs/MR-IMSRG-Jscheme-full-flow.json`。
+      `doc/data/acceptance/MR-IMSRG-Jscheme-full-flow.json`。
 
 ### H. 实际较大空间门禁
 
@@ -361,7 +361,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       对称性和 1/64 线程数值一致性。生产运行不得构造完整 m-scheme 张量。
       实测 30 个 J-orbit、34320 条 TBME，单线程 RK4 短流 `1.37 s`、峰值
       RSS `54,360 KiB`；1/64 线程两体最坏差 `4.44e-16 MeV`。V/VI 收缩
-      分别占 `0.628/0.492 s`，见 `docs/MR-IMSRG-Jscheme-large-space.json`。
+      分别占 `0.628/0.492 s`，见 `doc/data/acceptance/MR-IMSRG-Jscheme-large-space.json`。
 - [x] 根据 emax4 profiler 优化真实瓶颈；每次优化必须先过 emax2 的 SR、
       相关参考逐项、完整流和 NCSM 回归，再重跑 emax4 门禁。
       第一步已把 VI 的独立 `(J2,w)` 迹提出循环，emax4 VI 从 `0.492 s`
@@ -435,7 +435,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `refs/qcombo/examples/MR_IMSRG2.ipynb`，把重生的 0B/1B/2B 项数、
       系数和指标序与 `MRCommutator.cc` 的命名项逐项记录。规范化 LaTeX
       输出 SHA-256 为 `431b893e...1a629a57`，完整环境、项数和映射见
-      `docs/MR-IMSRG-J-scheme公式与代码映射.md` Sec. 3.1。
+      `doc/method/公式与代码映射.md` Sec. 3.1。
 - [x] 在根目录生产 `gen_job.py` 增加显式、一次只生成一个参数点的
       `--mr-jscheme` 模式；冻结 C++ direct-flow 参数、输入/reference
       SHA-256、累计 `start_s/target_s`、该段 `smax`、J64/no2bpack 输出和
@@ -701,7 +701,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       driver 和同时覆盖空/full/partial channel 的 emax4 短流通过。最后的
       emax12 容量门只放大已通过这些回归的相同 C++ 路径，没有再引入算法
       改动；输入/可执行文件/输出哈希、wall/RSS 与 profiler 已写入
-      `docs/MR-IMSRG-Jscheme-large-space.json` schema v14，本轮 P3 完成。
+      `doc/data/acceptance/MR-IMSRG-Jscheme-large-space.json` schema v14，本轮 P3 完成。
 - [x] **MR-P4：生产 C++ J-scheme 严格脱耦门禁。** 固定同一个
       `He4, Nrefmax=2, hw=20, emax=2/e2max=4` 相关参考态、NNLOopt 输入、
       White-NCSM/EN 分母和 `Delta e != 0` 掩码，从 `s=0` 先流到 `1000`，
@@ -721,7 +721,7 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       `MRReference/MRDriver/MRSRDriver/MRCorrelatedDriver/MRDenominators/
       MRJobGenerator/MRTailDiagnostic` 七项以 `417.82 s` 全通过，其中四核
       m-scheme oracle 用时 `373.60 s`。完整哈希、资源和诊断见
-      `docs/MR-IMSRG-Jscheme-large-space.json` schema v15。该门禁只验收
+      `doc/data/acceptance/MR-IMSRG-Jscheme-large-space.json` schema v15。该门禁只验收
       MR-IMSRG 实现、停止判据、重启和物化，不重新启动 finite-s IM-NCSM
       效果研究。
 - [x] **MR-P5：完成审计与整库回归。** 逐条把当前 `CLAUDE.md`、本文件
@@ -755,4 +755,4 @@ contractions、`Generator` 和 `IMSRGSolver`。Python m-scheme 只作相关参�
       commutator、White-NCSM、真空物化与 NCSM/no2bpack 闭环。
 - [x] Python 生产 MR 路径在 `He4/O16, Nrefmax=0` 下对当前 C++
       `imsrg++` 逐正规序、分母、eta、命名 RHS 收缩、Euler/RK4 和
-      `s=100` 完整流严格退化；证据见 `docs/MR-IMSRG-验收结果.md`。
+      `s=100` 完整流严格退化；证据见 `doc/results/验收结果.md`。

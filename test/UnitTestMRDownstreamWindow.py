@@ -16,7 +16,7 @@ from prototype.mrimsrg.select_downstream_flow_window import evaluate_window  # n
 
 def main() -> None:
     document = json.loads(
-        (REPOSITORY / "docs/MR-IMSRG-Jscheme-large-space.json").read_text(
+        (REPOSITORY / "doc/data/acceptance/MR-IMSRG-Jscheme-large-space.json").read_text(
             encoding="utf-8"
         )
     )

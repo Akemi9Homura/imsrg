@@ -1,10 +1,11 @@
 # Rapid MR-IMSRG prototype
 
 User guide for the production C++ MR-IMSRG path (jref inputs incl. BIGSTICK,
-driver, operators, tests): `docs/mr-imsrg/README.md`.
+driver, operators, tests): `doc/README.md`.
 
-This directory contains the deliberately small m-scheme prototype described in
-`docs/MR-IMSRG-快速结果计划.md`.  The C++ bridge does not implement another
+This directory contains the deliberately small m-scheme prototype that served as
+the first emax2 results path and is now the independent oracle for correlated
+references (acceptance evidence: `doc/results/验收结果.md`).  The C++ bridge does not implement another
 interaction reader or NCSM solver: it builds against the validated
 `/home/mengziyan/simple-ncsm` `Hamiltonian` and `simpleFCI` libraries.  This
 lightweight path is only for deterministic bridge smoke tests; formal NCSM

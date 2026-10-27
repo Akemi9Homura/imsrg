@@ -11,30 +11,24 @@
 6. **本机资源不足时转到远程 Slurm 集群。** 远程地址固定为 `mengziyan@162.105.151.37`。如果预计内存、CPU 时间或并行规模超出本开发机可承受范围，不得通过削弱物理空间或跳过验收来规避；应连接远程集群，在对应 checkout 中先执行 `source ./sourceme.sh`，再按仓库的 Slurm 约定生成、检查并提交作业。禁止在登录节点直接运行重计算；提交后必须检查队列和日志，确认输入、资源、输出及实际启动状态。只同步任务必要的代码、输入和小型结果，不提交或误同步大波函数、Hamiltonian、RDM 与日志。
 7. **论文公式与现有 `imsrg++` 代码必须双重对照。** MR 新增的 cumulant 收缩要以论文和 QCombo 为依据；与 SR-IMSRG 共通的张量约定、对易子极限、生成元、能量分母、对角/非对角划分、ODE 控制、对称性维护及输出流程，必须同时阅读并优先复用本仓库当前 `src/` 中的成熟实现和测试，不能只看文章另写一套。若原代码与论文写法不同，先查明是基底、指标、截断或数值实现差异，再选择并记录与本原型一致的做法。
 
-## 当前唯一目标
+## 当前状态与方向
 
-当前目标是在已经验收的球形 C++ J-scheme MR-IMSRG(2) 对易子和
-direct-flow 路径上实现生产 MR-Magnus(2)：得到反 Hermitian 的标量
-`Omega`，并用同一 MR 对易子驱动 BCH，将初始 Hamiltonian 变换为
-可物化给 NCSM/FCIQMC 的 0B/1B/2B Hamiltonian。
-已验收的 `prototype/mrimsrg/` Python m-scheme 实现不再是交付主路，
-而是相关参考态的独立物理 oracle；现有 C++ SR-IMSRG(2) 则是单
-Slater 极限的生产 oracle。
+生产 MR-IMSRG(2) 已完成并通过验收：MR-Magnus(2)（`magnus_adaptive`）、White-NCSM、3N 的 MR-NO2B、λ3、标量与张量算符的
+Ω 演化、HF 基参考态链、BIGSTICK 后对角化与标量算符读回；同力文献对照见 `doc/results/文献对照.md`。
+当前方向是作为 FCIQMC → IMSRG → FCIQMC 流程的变换环节：参考态最终来自 FCIQMC（秩 0 OBTD/TBTD，3-RDM 给 λ3），
+导出的 H(s)、O(s) 交给 FCIQMC/NCSM 后对角化；NCSM（BIGSTICK）参考态用于测试阶段。
 
-执行计划以 `docs/MR-IMSRG-C++-J-scheme实现计划.md` 与根目录
-`TODO.md` 为准。禁止为了通过验收另写一套测试专用的 MR 或 SR
-commutator/generator/flow；验收必须运行将来真正用于生产计算的同一
-C++ 入口。
+待办以根目录 `TODO.md` 的"当前待办"为准，进展写 `doc/records/工作记录.md`；与 im-fciqmc 仓库隔离，不在那里记录 MR 工作。
+Python m-scheme 原型是相关参考态的独立 oracle，C++ SR-IMSRG(2) 是单 Slater 极限的 oracle。禁止为了通过验收另写一套
+测试专用的 MR 或 SR commutator/generator/flow；验收必须运行生产计算用的同一 C++ 入口。
 
-## 固定物理范围
+## 物理设置
 
-- 相互作用：NNLOopt（本机文件名采用 `N2LO_opt`）。
-- `hw = 20 MeV`。
-- 单粒子截断 `emax = 2`，二体截断 `e2max = 4`。
-- 只用 NN；不加入显式 3N，不做初始 3N MR-NO2B。
-- 目标核：`He4`、`Be8`、`C12`、`O16`，均取最低 `J=0` 正宇称态。
-- 第一批统一使用 `Nrefmax=0`：`Be8`、`C12` 是非平凡多参考测试；`He4`、`O16` 是单参考极限对照，不能宣称为非平凡 MR。
-- 第一批管线通过后，仅把 `He4`、`O16` 升级到 `Nrefmax=2`，获得相关参考态版本。
+- 回归基准（ctest 与退化门禁）：NNLOopt（本机文件名 `N2LO_opt`）、`hw = 20 MeV`、`emax = 2`、`e2max = 4`、只用 NN；
+  `He4`、`Be8`、`C12`、`O16` 的最低 `J=0` 正宇称态，`Nrefmax=0`（`He4`、`O16` 是单参考极限对照，不能宣称为非平凡 MR），
+  `He4`、`O16` 另有 `Nrefmax=2` 相关参考态。3N 的测试用 `prototype/mrimsrg/data/N3LO_lnl_3N/` 的小文件（只作矩阵元来源）。
+- 已用的较大设置：emax 6–8，NNLOopt 与 3NF400（NN + 3N NO2B，E3max 14），HO 基或 HF 基参考态。核力只读引用
+  `/tns/public/Forces`，不生成新核力或新的 3N 格式。
 
 固定核力文件：
 
@@ -50,43 +44,25 @@ C++ 入口。
 
 `/home/mengziyan/ptqmc/TwBME_N2LO_opt_hw20_emax2_e2max4.minipack` 是字节相同的副本。普通 NN `minipack` 与 `normal-order` 产生的 `no2bpack` 是不同格式，禁止混用 reader 或语义。
 
-基准采用 HO 基、`BetaCM=0`、无库伦、无额外核子质量修正，和现有 N2LO_opt emax2 的 NCSM/FCI 基准保持一致。读取 `minipack` 时仍必须按目标质量数 `A` 构造内禀动能，因此四个核的 Hamiltonian 是四份 A-dependent 输出，不能互相复用。
+基准采用 HO 基、`BetaCM=0`、无库伦、无额外核子质量修正，和现有 N2LO_opt emax2 的 NCSM/FCI 基准保持一致。读取 `minipack`
+时仍必须按目标质量数 `A` 构造内禀动能，因此不同核的 Hamiltonian 是各自 A-dependent 的输出，不能互相复用。
 
 ## 当前算法边界
 
-- 生产实现是 `Jref=0` 标量参考态下的球形 J-scheme
-  MR-IMSRG(2)；不通过展开完整 m-scheme 张量实现生产 commutator。
-- 必须复用 `Operator`/`TwoBodyME`/`ModelSpace` 的 J-coupled 块、现有
-  SR contractions、`Generator` 和 `IMSRGSolver`；MR 代码只新增不可约化为
-  现有 SR 项的 reference-density/cumulant 数据与收缩。
-- Python m-scheme 原型仅作独立 oracle 和小模型诊断，不能成为 C++
-  生产 driver 的运行时后端，也不能在 C++ 内部无条件展开整个
-  m-scheme 空间。
-- 参考态由 `Nrefmax` 截断 NCSM 波函数产生。
-- 至少输入 `gamma1`、`gamma2`，构造并真正保留 `lambda2`。
-- 当前版本设 `lambda3=0`；这一近似必须写入输出元数据。
-- Hamiltonian 和生成元始终截断到参考态正规序 0B/1B/2B。
-- 当前阶段复用现有 `IMSRGSolver` 的生产 Magnus、分段 `Omega` 和 BCH
-  框架；所有 Bernoulli/BCH/BCH-product 嵌套对易子必须通过同一个
-  `MRCommutator` dispatcher。已验收 direct flow 只作独立交叉验证，不再
-  是当前交付目标。
-- 使用 IM-NCSM 的放松解耦：只处理 `Delta e != 0` 的 1p1h 与 2p2h 通道，保留同 HO 量子数参考空间内部耦合。
-- 首选一个有文献公式和 QCombo 输出可核对的生成元；第一批只实现一种。不要同时开发多种生成元。
-- 当前不做显式 3N、`lambda3`、奇核、`Jref!=0` 的非标量密度、
-  一般张量观测算符或 MPI 重构。这里不禁止 Vobig Sec. 6.5.3
-  要求的球形自然基：相关参考态的流方程、生成元和 `Delta e`
-  掩码必须在该基中自洽求值，最终 Hamiltonian 再变回下游约定。
+- `Jref=0` 标量参考态下的球形 J-scheme MR-IMSRG(2)；不通过展开完整 m-scheme 张量实现生产 commutator。
+- 复用 `Operator`/`TwoBodyME`/`ModelSpace` 的 J-coupled 块、现有 SR contractions、`Generator` 和 `IMSRGSolver`；MR 代码只新增
+  不可约化为现有 SR 项的参考密度收缩。所有 Bernoulli/BCH 嵌套对易子经同一个 `MRCommutator` dispatcher。
+- 参考态由 `Nrefmax` 截断的波函数产生，输入 `gamma1`、`lambda2`（秩 0），可选 `lambda3` 与参考能量（jref v2）；
+  λ3 有就用：对易子零体项总是计入，MR-NO2B 的 λ3·V3 只在 full 3N 文件时计入，元数据写明。
+- 3N 只在流前以 MR-NO2B 进入（`full`/`no2b` 文件，`mono` 拒绝）；Hamiltonian 与生成元截断到参考态正规序 0B/1B/2B。
+- 生成元只有 White-NCSM（`Delta e != 0` 的 1p1h、2p2h 掩码，MR-EN 分母，分子不含 λ）；慢尾的处理待用户决定，
+  不自行研发或修改已发表的生成元。
+- 算符：偶宇称、同位旋守恒的标量与 J > 0、同位旋守恒的张量；改变同位旋的算符、奇宇称标量、三体算符在流前拒绝。
+- 不支持（启动时拒绝或未实现）：`Jref!=0` 与奇核参考态、IMSRG(3) 与微扰三体、goose-tank、factorized、Brueckner BCH、
+  `emax_imsrg` 二次截断、流内 Lawson 项（下游用 `no2bpack_combine.py` 加）、MPI 重构。
+- Python m-scheme 原型只作独立 oracle 和小模型诊断，不能成为 C++ 生产 driver 的运行时后端。
 
 ## 输入输出硬要求
-
-内部中间格式至少保存：
-
-- 完整轨道表与指标顺序；
-- `A,Z,hw,emax,e2max,Nrefmax`；
-- NCSM 参考态标识以及 `gamma1/gamma2`；
-- 初始与演化后的 `E,f,Gamma`；
-- 生成元、流参数、ODE 容差、`lambda3=0` 和解耦掩码；
-- 核力路径及 SHA-256。
 
 交给 NCSM/FCIQMC 的文件必须转换回普通真空正规序的
 
@@ -94,28 +70,17 @@ C++ 入口。
 E0 + one-body + two-body
 ```
 
-不能直接把相对于相关参考态正规序的 `E,f,Gamma` 当成普通矩阵元输出。零体常数必须保留并由下游计入总能量。
+不能直接把相对于相关参考态正规序的 `E,f,Gamma` 当成普通矩阵元输出；零体常数必须保留并由下游计入总能量。
+导出格式为 no2bpack（下游 NCSM/FCIQMC 读）、无损 jcoupled64、张量的 `.opbin`，每个文件旁写 `.mrmeta.json`：
+轨道与截断、`A,Z,hw,emax,e2max,Nrefmax`、参考态标识与哈希、生成元与掩码、流与 ODE 参数、λ3 与 3N 的使用情况、输出基
+（HO 或 MR 基）、核力与输入的 SHA-256（见 `doc/guide/驱动参数与输出.md`）。
 
-优先输出现有下游程序可读的普通 `minipack`；如第一版先用自描述 NPZ/HDF5，则必须同时提供到 NCSM reader 的转换器，不能只停在内部张量文件。
+## 加新功能的顺序
 
-## 开发顺序
-
-1. 锁定已通过的 Python m-scheme 与 C++ SR 基准、轨道/相位/归一化约定。
-2. 建立球形 `gamma1/lambda2` J-coupled 输入与恒等式/J 重构测试。
-3. 在现有 `Commutator` 中复用全部 SR 项，只新增并逐项验证
-   `lambda2` 收缩。
-4. 复读 Morris--Parzuchowski--Bogner、Hergert、Vobig、Mongelli 的
-   Magnus 章节并逐调用点审计现有 `BCH`/`IMSRGSolver`，冻结符号、乘法
-   顺序、Bernoulli 与截断判据。
-5. 先用 Python m-scheme oracle 验收固定 `Omega` 下每阶 MR-BCH、
-   BCH product 和首步 `dOmega/ds=eta`，再把现有 C++ Magnus/BCH 的所有
-   scalar commutator 调用接到 MR dispatcher；不得另写生产求解器。
-6. 先让 `He4/O16, Nrefmax=0` 的同一生产 MR-Magnus 入口退化到现有 SR
-   Magnus，再让 `Be8/C12, Nrefmax=0` 及 `He4/O16, Nrefmax=2` 的
-   `Omega`、逐阶 BCH 和变换后 Hamiltonian 复现 Python m-scheme 原型。
-7. 用 direct flow、十倍收紧步长/BCH 阈值、真空物化及 NCSM 读回作完整
-   交叉验收；张量观测算符在这一阶段暂不处理。
-8. 代数、短流、完整流和性能门禁通过后，才扩展到更大空间。
+1. 读 `refs/` 中的公式与现有 `imsrg++` 实现，核清约定（规则 4、7）。
+2. 先在小空间对独立 oracle 逐项核对：m-scheme 精确量（Python 原型或稠密构造）、SR 极限逐位退化。
+3. 接入同一生产入口，加 ctest（`test/UnitTestMR*.py`），文档写进 `doc/guide/` 或 `doc/method/`。
+4. 通过后再上大空间与集群。
 
 ## 最低验收门槛
 
@@ -137,7 +102,7 @@ E0 + one-body + two-body
 
 ## 仓库工作约定
 
-- 新的项目设计文档放在 `docs/`；上游 Doxygen 文件留在 `doc/`。
+- 文档只放在 `doc/` 一个目录：`doc/README.md` 为入口，按 `guide/`（使用）、`method/`（方法）、`results/`（结果）、`data/`（JSON 数据）、`records/`（工作记录与历史计划）分类；上游 Doxygen 文件留在 `doc/` 根目录，不移动。
 - `refs/` 是本地文献库，已被 `.gitignore` 排除，不要提交 PDF、提取文本或 QCombo 克隆。
 - 构建前执行 `source ./sourceme.sh`。
 - 生产 MR 必须扩展现有 `imsrg++` 路径，但默认 SR/VS-IMSRG 的物理

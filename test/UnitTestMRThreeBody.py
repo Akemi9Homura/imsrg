@@ -379,7 +379,7 @@ def main():
     args = parser.parse_args()
     for path in (FULL_FILE, NO2B_FILE):
         if not path.is_file():
-            raise SystemExit(f"missing 3N test file {path} (see docs/mr-imsrg/测试.md)")
+            raise SystemExit(f"missing 3N test file {path} (see doc/guide/测试.md)")
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         v1, v2 = check_reference_files(root)
