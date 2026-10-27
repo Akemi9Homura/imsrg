@@ -1,5 +1,20 @@
 # MR-IMSRG 当前 TODO
 
+## 当前待办（2026-10-27 起，MR-IMSRG 的待办只记在这里）
+
+与 im-fciqmc 隔离：MR-IMSRG 的待办与工作记录放本仓库（本文件与 `docs/mr-imsrg/工作记录.md`），不再写入 im-fciqmc 的 TODO/work-log。
+
+- [ ] 与用户确定 White-NCSM 慢尾的处理（分母补占据因子，或换 Brillouin 分子；都会改变已发表的生成元）
+- [ ] 在集群生成 emax10–12 的嵌入参考与 J64 输入，测 MR-IMSRG 线程扩展（同一分区内比较）
+- [ ] 核对 He4 emax2 Magnus 完整复跑（job 128680）的终点 H 与存档，结果补入计划文档 9.5 节
+- [ ] 接入 FCIQMC 的秩 0 OBTD/TBTD 作为 jref 来源（适配层，复用 `bigstick_jref.py` 的自然轨道、λ2 与写出），对 BIGSTICK 算得动的 Nmax_ref 比较；3-RDM 可用后同样写入 jref v2 的 λ3
+- [ ] 用集群已有的 3NF400 full 3N 文件（hw20，emax12，E3max14，5.7 GB）在开壳 Nrefmax=0（C12 emax4/6）上实测 MR-NO2B 的 λ3·V3 零体项（jref 带 λ3，`3bme_type=full`，只算 s=0）
+- [ ] 确认 im-fciqmc 的 RDM/TDM 能否吃外部给定的向量（BIGSTICK 波函数转行列式），据此实现张量算符（E2、M1）的两体跃迁读回
+
+暂缓，需要时再做（已讨论，见 `docs/mr-imsrg/工作记录.md` 2026-10-27）：一次流内多 s 导出（目标 s 处强制分段、流后按段递推 BCH）；导出截断 `mr_export_emax`。
+
+## 历史阶段清单（2026-08–09，生产 MR-Magnus(2) 之前的计划与验收记录）
+
 - [x] 2026-09-08：远程家目录散落的 10 个项目目录已集中到
       `/tns/mengziyan/mr-imsrg`，输入放 `inputs/`，旧 checkout/结果放
       `archive/2026-09-08-home-consolidation/`。删除已核对 Git 历史的
