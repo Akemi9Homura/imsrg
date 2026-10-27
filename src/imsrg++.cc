@@ -532,12 +532,17 @@ int main(int argc, char** argv)
                 << "monopole part); got 3bme_type=" << input3bme_type << std::endl;
       return EXIT_FAILURE;
     }
+    // With a valence space (MR-VS) the VS generators and two-step decoupling are
+    // kept unchanged; only the normal ordering uses the MR densities.
+    const bool mr_generators_supported =
+        modelspace.valence.empty()
+            ? (nsteps == 1 && core_generator == "white-ncsm")
+            : (nsteps <= 2 && core_generator != "white-ncsm" && valence_generator != "white-ncsm");
     if (physical_system != "nuclear" || basis != "oscillator" ||
-        !supported_method || nsteps != 1 || IMSRG3 ||
+        !supported_method || !mr_generators_supported || IMSRG3 ||
         imsrg3_at_end ||
         perturbative_triples || goose_tank || use_brueckner_bch ||
         std::abs(BetaCM) > 1e-12 ||
-        core_generator != "white-ncsm" || !modelspace.valence.empty() ||
         eMax_imsrg != -1 || e2Max_imsrg != -1 || e3Max_imsrg != -1 ||
         eMax_3body_imsrg != -1 ||
         (!magnus_method && (!opnames.empty() || !opsfromfile.empty())) ||
@@ -547,8 +552,9 @@ int main(int argc, char** argv)
       std::cerr << "Explicit MR-IMSRG currently requires nuclear basis=oscillator, "
                 << "a one-step direct flow or production Magnus flow, "
                 << "IMSRG(2), BetaCM=0, "
-                << "core_generator=white-ncsm, no secondary IMSRG-space "
-                << "truncation, no valence space, and extra operators only with "
+                << "nsteps=1 and core_generator=white-ncsm without a valence space "
+                << "or the VS generators (not white-ncsm) with one (MR-VS), "
+                << "no secondary IMSRG-space truncation, and extra operators only with "
                 << "a Magnus method (no PT1/RPA/TDA, write_HO_ops or write_HF_ops)."
                 << std::endl;
       return EXIT_FAILURE;
@@ -566,8 +572,26 @@ int main(int argc, char** argv)
     }
     try
     {
-      modelspace.SetReference(
-          MRReference::ReadOccupationMap(modelspace, mr_reference_file));
+      std::map<index_t, double> occupations =
+          MRReference::ReadOccupationMap(modelspace, mr_reference_file);
+      if (!modelspace.valence.empty())
+      {
+        // MR-VS: SetReference puts every listed non-valence orbit in the core, so pass only the
+        // occupied ones, and require the reference to be the filled core times a valence-space
+        // state (occupied non-valence orbits = the core, with occupation 1).
+        const std::set<index_t> core(modelspace.core.begin(), modelspace.core.end());
+        for (auto it = occupations.begin(); it != occupations.end();)
+        {
+          const bool valence = std::find(modelspace.valence.begin(), modelspace.valence.end(),
+                                         it->first) != modelspace.valence.end();
+          if (!valence && (it->second > 0.0) != (core.count(it->first) > 0))
+            throw std::runtime_error("MR-VS reference is not the filled core times a valence-space state");
+          if (!valence && it->second > 0.0 && std::abs(it->second - 1.0) > mr_validation_tolerance)
+            throw std::runtime_error("MR-VS reference has a partially occupied core orbit");
+          it = it->second > 0.0 ? std::next(it) : occupations.erase(it);
+        }
+      }
+      modelspace.SetReference(occupations);
       mr_reference_context.reset(new MRReference(
           MRReference::ReadBinary(modelspace, mr_reference_file,
                                   mr_validation_tolerance)));
@@ -1359,7 +1383,7 @@ int main(int argc, char** argv)
 
   IMSRGSolver imsrgsolver(HNO);
   if (use_mr_reference)
-    imsrgsolver.SetMRReference(*mr_reference_context);
+    imsrgsolver.SetMRReference(*mr_reference_context, mr_validation_tolerance);
 //  imsrgsolver.SetHin(HNO); // necessary?
   imsrgsolver.SetReadWrite(rw);
   imsrgsolver.SetMethod(method);
@@ -1714,8 +1738,9 @@ int main(int argc, char** argv)
       HNO.SetParticleRank(2);
     }
 
-    HNO = HNO.UndoNormalOrdering();
-    
+    // MR-VS: undo the correlated (gamma1, lambda2) normal ordering instead of the ensemble one.
+    HNO = use_mr_reference ? mr_reference_context->UndoNormalOrder(HNO) : HNO.UndoNormalOrdering();
+
     // HNO.SetModelSpace(ms2);
     std::cout << "Doing NO wrt A=" << ms2.GetAref() << " Z=" << ms2.GetZref() << "  norbits = " << ms2.GetNumberOrbits() << std::endl;
     HNO = HNO.DoNormalOrderingCore();
@@ -2013,14 +2038,14 @@ int main(int argc, char** argv)
         if (!write_vacuum_exports(opvac, opname))
           return EXIT_FAILURE;
       }
-      if (use_mr_reference)
+      if (use_mr_reference && modelspace_imsrg.valence.empty())
         continue; // no valence space: the shell-model writers below do not apply
 
       //      std::cout << "Before renormal ordering Op(5,4) is " << std::setprecision(10) << op.OneBody(5,4) << std::endl;
-      if (renormal_order) 
+      if (renormal_order)
       {
         if ( op.GetParticleRank()>2) op.SetParticleRank(2); // Discard the residual 3N because we don't want to deal with it in the valence calculation
-        op = op.UndoNormalOrdering();
+        op = use_mr_reference ? mr_reference_context->UndoNormalOrder(op) : op.UndoNormalOrdering();
 //        op.SetModelSpace(ms2);
 //        op = op.DoNormalOrdering();
         op = op.DoNormalOrderingCore();

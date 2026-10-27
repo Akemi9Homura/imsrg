@@ -605,7 +605,8 @@ PYBIND11_MODULE(pyIMSRG, m)
           .def("Reset", &IMSRGSolver::Reset)
           .def("SetGenerator", &IMSRGSolver::SetGenerator)
           .def("SetMRReference", &IMSRGSolver::SetMRReference,
-               py::arg("reference"), py::keep_alive<1, 2>())
+               py::arg("reference"), py::arg("validation_tolerance") = 1e-10,
+               py::keep_alive<1, 2>())
           .def("ClearMRReference", &IMSRGSolver::ClearMRReference)
           .def("HasMRReference", &IMSRGSolver::HasMRReference)
           .def("EvaluateCommutator", &IMSRGSolver::EvaluateCommutator,

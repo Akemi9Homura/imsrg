@@ -142,11 +142,11 @@ void IMSRGSolver::SetHin(Operator &H_in)
   }
 }
 
-void IMSRGSolver::SetMRReference(const MRReference& reference)
+void IMSRGSolver::SetMRReference(const MRReference& reference, double validation_tolerance)
 {
   if (modelspace == nullptr || reference.modelspace != modelspace)
     throw std::invalid_argument("IMSRGSolver and MRReference use different ModelSpace objects");
-  reference.Validate();
+  reference.Validate(validation_tolerance);
   mr_reference = &reference;
 }
 

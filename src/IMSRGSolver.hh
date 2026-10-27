@@ -145,7 +145,7 @@ class IMSRGSolver
   void SetMagnusAdaptive(bool b=true){magnus_adaptive = b;};
   void SetHunterGatherer(bool b=true){hunter_gatherer = b;};
   void SetPerturbativeTriples(bool b=true){perturbative_triples = b;};
-  void SetMRReference(const MRReference& reference);
+  void SetMRReference(const MRReference& reference, double validation_tolerance = 1e-10);
   void ClearMRReference(){mr_reference = nullptr;};
   bool HasMRReference() const {return mr_reference != nullptr;};
   Operator EvaluateCommutator(const Operator& X, const Operator& Y) const;
