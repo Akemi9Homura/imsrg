@@ -980,6 +980,22 @@ Operator IMSRGSolver::InverseTransform(Operator &OpIn)
 
 /// Returns \f$ e^{\Omega} \mathcal{O} e^{-\Omega} \f$
 /// for the \f$\Omega_i\f$s with index greater than or equal to n.
+Operator IMSRGSolver::GetOmegaSegment(size_t i)
+{
+  if (i >= GetNumberOfOmegaSegments())
+    throw std::out_of_range("IMSRGSolver::GetOmegaSegment: no such Omega segment");
+  if (i >= static_cast<size_t>(n_omega_written))
+    return Omega[i - n_omega_written];
+  Operator omega(Eta);
+  std::ostringstream filename;
+  filename << scratchdir.c_str() << "/OMEGA_" << std::setw(6) << std::setfill('0') << getpid() << std::setw(3) << std::setfill('0') << i;
+  std::ifstream ifs(filename.str(), std::ios::binary);
+  if (not ifs.good())
+    throw std::runtime_error("IMSRGSolver::GetOmegaSegment: cannot read " + filename.str());
+  omega.ReadBinary(ifs);
+  return omega;
+}
+
 Operator IMSRGSolver::Transform_Partial(Operator &OpIn, int n)
 {
   Operator OpOut = OpIn;

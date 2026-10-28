@@ -46,7 +46,12 @@ size_t ThreeBodyChannel::GetLocalIndex( int p, int q, int r, int Jpq )
 //   std::cout << "|||||In " << __func__ << " Ket3Index = " << modelspace->GetKet3Index(p,q,r,Jpq) << std::endl;
 //   std::cout << "pqr,Jpq = " << p << " " << q << " " << r << " " << Jpq << "    and this channel has JPT = " << twoJ << " " << parity << " " << twoTz << std::endl;
 //   return KetMap[ modelspace->GetKet3Index(p,q,r,Jpq)];
-   return KetMap.at( modelspace->GetKet3Index(p,q,r,Jpq));
+   // A ket outside the three-body space (e.g. one restricted with ModelSpace::SetThreeBodyOrbits) does not
+   // participate, like a ket of another channel: return -1, which the callers already skip.
+   auto it = modelspace->Ket3IndexLookup.find(modelspace->Ket3IndexHash(p,q,r,Jpq));
+   if (it == modelspace->Ket3IndexLookup.end() or it->second >= KetMap.size())
+     return size_t(-1);
+   return KetMap[it->second];
 }
 
 

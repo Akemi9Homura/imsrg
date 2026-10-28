@@ -415,6 +415,8 @@ class ModelSpace
 
    void SetupKets();
    void Setup3bKets();
+   /// Restrict the orbits spanning the three-body space (e.g. to the valence space) and rebuild the three-body kets and channels.
+   void SetThreeBodyOrbits(const std::set<index_t> &orbits);
    void AddOrbit(Orbit orb);
    void AddOrbit(int n, int l, int j2, int tz2, double occ, int cvq);  // cvq: 0=>core, 1=>valence, 2=>qspace
 //   void AddOrbit(int n, int l, int j2, int tz2, double occ, int io);

@@ -1264,6 +1264,13 @@ void ModelSpace::SetE3max(int e3)
   Setup3bKets();
 }
 
+void ModelSpace::SetThreeBodyOrbits(const std::set<index_t> &orbits)
+{
+  orbits_3body_space_ = orbits;
+  norbits_3body_ = orbits_3body_space_.size();
+  Setup3bKets();
+}
+
 /// We keep things relatively simple (?) for now.
 /// Just make a vector of all the possible 3b kets
 void ModelSpace::Setup3bKets()

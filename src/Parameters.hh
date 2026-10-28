@@ -89,6 +89,10 @@ std::map<std::string,std::string> Parameters::string_par = {
   {"imsrg3_mp4",                 "false"},       // include only 4th order (in PT analysis) 3-body terms in commutators. Only does something if IMSRG3=true.
   {"imsrg3_at_end",             "false"},       // After doing Magnus IMSRG(2) to obtain Omega, evaluate e^Omega H e^-Omega at the IMSRG(3) level
   {"imsrg3_no_qqq",             "false"},       // After doing Magnus IMSRG(2) to obtain Omega, evaluate e^Omega H e^-Omega at the IMSRG(3) level
+  {"valence_3b_file",           "none"},        // valence-space three-body output stem: <stem>.snt (with the lower-body terms it gives relative to the core) and <stem>_3b.int
+  {"valence_3b_source",         "perturbative"},// perturbative: [Omega, H + 1/2 [Omega,H]] three-body part after an IMSRG(2) Magnus flow; flow: the three-body part of H(s) (IMSRG3=true)
+  {"valence_3b_omega",          "gathered"},    // perturbative source: one Omega gathered from the Magnus segments (default), or segments: accumulate per segment
+                                                //   (misses the three-body made with core indices in the core step and rotated into vvv by the valence step)
   {"physical_system",           "nuclear"},     // treat nucleus or atom. For atom, switch units from MeV,fm to eV,nm.
   {"freeze_occupations",        "false"},       // Should we freeze the occupations, or fill according to HF energy
   {"discard_no2b_from_3n",      "false"},       // For diagnostics. Use the 3N, but discard the 3N contribution to the NO 2-body after HF.

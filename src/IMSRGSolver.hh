@@ -110,6 +110,11 @@ class IMSRGSolver
   void SetOmega(size_t i, Operator& om);
   size_t GetOmegaSize(){return Omega.size();};
   int GetNOmegaWritten(){return n_omega_written;};
+  /// Number of Omega segments of the whole flow, on disk and in memory.
+  size_t GetNumberOfOmegaSegments() const {return n_omega_written + Omega.size();};
+  /// Omega segment i of the whole flow: the segments flushed to the scratch directory come first (read back
+  /// as in Transform_Partial), then the ones kept in memory.
+  Operator GetOmegaSegment(size_t i);
   Operator Transform_Partial(Operator& OpIn, int n);
   Operator Transform_Partial(Operator&& OpIn, int n);
 

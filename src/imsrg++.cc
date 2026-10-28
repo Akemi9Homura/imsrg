@@ -95,6 +95,9 @@ int main(int argc, char** argv)
   std::string physical_system = parameters.s("physical_system");
   std::string denominator_partitioning = parameters.s("denominator_partitioning");
   std::string NAT_order = parameters.s("NAT_order");
+  std::string valence_3b_file = parameters.s("valence_3b_file");
+  std::string valence_3b_source = parameters.s("valence_3b_source");
+  std::string valence_3b_omega = parameters.s("valence_3b_omega");
 
   bool use_brueckner_bch = parameters.s("use_brueckner_bch") == "true";
   bool nucleon_mass_correction = parameters.s("nucleon_mass_correction") == "true";
@@ -1234,6 +1237,96 @@ int main(int argc, char** argv)
 */
 
 
+  // Valence-space three-body (valence_3b_file).  W is normal ordered with respect to the reference like H(s):
+  //   perturbative: W = [Omega, H + 1/2 [Omega, H]] three-body part after an IMSRG(2) Magnus flow, accumulated
+  //                 over the Omega segments (H the transformed Hamiltonian before each segment) or with one gathered Omega;
+  //   flow:         the three-body part of H(s) from an IMSRG(3) flow.
+  // Only vvv|vvv elements act in the valence space (core contractions cancel between the reference and core normal
+  // orderings), so the perturbative W is computed in a three-body space restricted to the valence orbits.
+  Operator valence3b;
+  const bool write_valence_3b = valence_3b_file != "none";
+  if (write_valence_3b)
+  {
+    if (modelspace_imsrg.valence.empty())
+    {
+      std::cerr << "valence_3b_file needs a valence space" << std::endl;
+      return EXIT_FAILURE;
+    }
+    if (valence_3b_source == "flow")
+    {
+      if (not IMSRG3 or imsrgsolver.GetH_s().GetParticleRank() < 3)
+      {
+        std::cerr << "valence_3b_source=flow needs IMSRG3=true" << std::endl;
+        return EXIT_FAILURE;
+      }
+      valence3b = imsrgsolver.GetH_s();
+      valence3b.EraseZeroBody();
+      valence3b.EraseOneBody();
+      valence3b.EraseTwoBody();
+    }
+    else if (valence_3b_source == "perturbative")
+    {
+      if (method != "magnus" or IMSRG3)
+      {
+        std::cerr << "valence_3b_source=perturbative needs an IMSRG(2) method=magnus flow" << std::endl;
+        return EXIT_FAILURE;
+      }
+      int emax_valence = 0;
+      for (auto v : modelspace_imsrg.valence)
+        emax_valence = std::max(emax_valence, 2 * modelspace_imsrg.GetOrbit(v).n + modelspace_imsrg.GetOrbit(v).l);
+      modelspace_imsrg.SetThreeBodyOrbits(modelspace_imsrg.valence);
+      if (modelspace_imsrg.GetE3max() < 3 * emax_valence)
+        modelspace_imsrg.SetE3max(3 * emax_valence);
+      valence3b = Operator(modelspace_imsrg, 0, 0, 0, 3);
+      if (valence3b.ThreeBody.GetStorageMode() != "pn")
+        valence3b.ThreeBody.SetMode("pn");
+      valence3b.ThreeBody.Allocate(); // three-body storage is not allocated by the constructor
+      Commutator::SetIMSRG3Onlyvvv(true);
+      // Omega segments in flow order, from the scratch directory and from memory alike
+      const size_t nsegments = imsrgsolver.GetNumberOfOmegaSegments();
+      Operator H0 = *(imsrgsolver.H_0);
+      if (valence_3b_omega == "segments")
+      {
+        Operator Hk = H0;
+        for (size_t k = 0; k < nsegments; ++k)
+        {
+          Operator omega = imsrgsolver.GetOmegaSegment(k);
+          Operator Htilde = Hk + 0.5 * Commutator::Commutator(omega, Hk);
+          Commutator::comm223ss(omega, Htilde, valence3b);
+          Hk = BCH::BCH_Transform(Hk, omega);
+        }
+        std::cout << "valence 3b: " << nsegments << " Omega segments (" << imsrgsolver.GetNOmegaWritten()
+                  << " from scratch); ||H(s) - segment-wise transform of H|| = "
+                  << std::scientific << (Hk - imsrgsolver.GetH_s()).Norm() << std::fixed << std::endl;
+      }
+      else if (valence_3b_omega == "gathered")
+      {
+        Operator omega_total = imsrgsolver.GetOmegaSegment(0);
+        for (size_t k = 1; k < nsegments; ++k)
+        {
+          Operator omega = imsrgsolver.GetOmegaSegment(k);
+          omega_total = BCH::BCH_Product(omega, omega_total);
+        }
+        Operator Htilde = H0 + 0.5 * Commutator::Commutator(omega_total, H0);
+        Commutator::comm223ss(omega_total, Htilde, valence3b);
+        std::cout << "valence 3b: " << nsegments << " Omega segments gathered into one, ||Omega|| = "
+                  << omega_total.Norm() << std::endl;
+      }
+      else
+      {
+        std::cerr << "valence_3b_omega must be segments or gathered; got " << valence_3b_omega << std::endl;
+        return EXIT_FAILURE;
+      }
+      Commutator::SetIMSRG3Onlyvvv(false);
+    }
+    else
+    {
+      std::cerr << "valence_3b_source must be perturbative or flow; got " << valence_3b_source << std::endl;
+      return EXIT_FAILURE;
+    }
+    std::cout << "valence 3b (" << valence_3b_source << "): ||W|| = " << valence3b.ThreeBodyNorm() << std::endl;
+  }
+
   // If we're doing targeted/ensemble normal ordering
   // we now re-normal order wrt to the core
   // and do any remaining flow.
@@ -1306,6 +1399,26 @@ int main(int argc, char** argv)
 //    }
   }
 
+
+  // Valence 3b output.  Going from the reference to the core normal ordering, W keeps its three-body matrix
+  // elements and gives zero-, one- and two-body terms from contractions with the valence part of the reference
+  // density (holes in the valence space; the core part is common to both orderings).  DoNormalOrdering3 with
+  // sign -1 returns exactly those lower-body terms (it drops the three-body part itself).
+  if (write_valence_3b)
+  {
+    std::set<index_t> valence_holes;
+    for (auto v : modelspace_imsrg.valence)
+      if (modelspace_imsrg.GetOrbit(v).occ > 0)
+        valence_holes.insert(v);
+    Operator lower = renormal_order ? valence3b.DoNormalOrdering3(-1, valence_holes) : Operator(modelspace_imsrg, 0, 0, 0, 2);
+    std::cout << std::setprecision(8) << "valence 3b lower-body terms relative to the core: E0' = " << lower.ZeroBody
+              << "  ||f'|| = " << lower.OneBodyNorm() << "  ||Gamma'|| = " << lower.TwoBodyNorm() << std::endl;
+    Operator Hv = imsrgsolver.GetH_s() + lower;
+    rw.WriteTokyo(Hv, valence_3b_file + ".snt", "");
+    rw.WriteValence3body(valence3b.ThreeBody, valence_3b_file + "_3b.int");
+    std::cout << "Wrote " << valence_3b_file << ".snt (H(s) plus the lower-body terms of W) and "
+              << valence_3b_file << "_3b.int" << std::endl;
+  }
 
   // Write the output
 
