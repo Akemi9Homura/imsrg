@@ -1240,10 +1240,15 @@ int main(int argc, char** argv)
   // Valence-space three-body (valence_3b_file).  W is normal ordered with respect to the reference like H(s):
   //   perturbative: W = [Omega, H + 1/2 [Omega, H]] three-body part after an IMSRG(2) Magnus flow, accumulated
   //                 over the Omega segments (H the transformed Hamiltonian before each segment) or with one gathered Omega;
-  //   flow:         the three-body part of H(s) from an IMSRG(3) flow.
+  //   flow:         the three-body part of H(s) from an IMSRG(3) flow;
+  //   at_end:       diagnostic only.  The IMSRG(2) Magnus segments applied to H at the IMSRG(3) level, segment by segment
+  //                 (as imsrg3_at_end), keeping the three-body.  The Omega was found for the IMSRG(2) truncation, so this
+  //                 transform is no longer decoupled (Be8 emax2 p shell: ||H_od|| 0 -> 21), and its valence-space block is not
+  //                 a valid valence Hamiltonian.  Its two-body part replaces H(s) in <stem>.snt and is also in <stem>_2b.snt.
   // Only vvv|vvv elements act in the valence space (core contractions cancel between the reference and core normal
   // orderings), so the perturbative W is computed in a three-body space restricted to the valence orbits.
   Operator valence3b;
+  Operator valence3b_twobody; // at_end: two-body part of the IMSRG(3)-level transform, reference normal ordered
   const bool write_valence_3b = valence_3b_file != "none";
   if (write_valence_3b)
   {
@@ -1319,9 +1324,53 @@ int main(int argc, char** argv)
       }
       Commutator::SetIMSRG3Onlyvvv(false);
     }
+    else if (valence_3b_source == "at_end")
+    {
+      if (method != "magnus" or IMSRG3 or imsrg3_at_end)
+      {
+        std::cerr << "valence_3b_source=at_end needs an IMSRG(2) method=magnus flow (without IMSRG3 or imsrg3_at_end)" << std::endl;
+        return EXIT_FAILURE;
+      }
+      // Three-body space as in imsrg3_at_end (dE3max, OccNat3Cut, E3max)
+      modelspace_imsrg.SetdE3max(dE3max);
+      modelspace_imsrg.SetOccNat3Cut(OccNat3Cut);
+      std::map<int, double> e_fermi = modelspace_imsrg.GetEFermi();
+      int new_E3max = std::min(modelspace_imsrg.GetE3max(), int(std::ceil(3 * std::max(e_fermi[-1], e_fermi[+1]) + dE3max)));
+      modelspace_imsrg.SetE3max(new_E3max);
+      Operator H3(modelspace_imsrg, 0, 0, 0, 3);
+      H3.ZeroBody = imsrgsolver.H_0->ZeroBody;
+      H3.OneBody = imsrgsolver.H_0->OneBody;
+      H3.TwoBody = imsrgsolver.H_0->TwoBody;
+      H3.ThreeBody.SwitchToPN_and_discard();
+      Commutator::SetUseIMSRG3(true);
+      Commutator::SetUseIMSRG3N7(imsrg3_n7);
+      Operator H_end = imsrgsolver.Transform(H3);
+      Commutator::SetUseIMSRG3(false);
+      std::cout << "valence 3b (at_end): E3max = " << new_E3max << ", dE3max = " << dE3max << ", imsrg3_n7 = " << imsrg3_n7
+                << "; E0 at the IMSRG(3) level minus E0 of H(s) = " << H_end.ZeroBody - imsrgsolver.GetH_s().ZeroBody
+                << ", ||Gamma_end - Gamma(s)|| = " << (H_end.TwoBody - imsrgsolver.GetH_s().TwoBody).Norm() << std::endl;
+      valence3b = H_end;
+      valence3b.EraseZeroBody();
+      valence3b.EraseOneBody();
+      valence3b.EraseTwoBody();
+      valence3b_twobody = H_end;
+      valence3b_twobody.SetNumberLegs(4);
+      valence3b_twobody.SetParticleRank(2);
+      // decoupling check: the Omega was found for the IMSRG(2) truncation, so the IMSRG(3)-level transform need not
+      // stay decoupled; off-diagonal part of the last (valence) generator for H(s) and for the new two-body part
+      Operator twobody_only(modelspace_imsrg, 0, 0, 0, 2); // without three-body storage, for the generator
+      twobody_only.ZeroBody = H_end.ZeroBody;
+      twobody_only.OneBody = H_end.OneBody;
+      twobody_only.TwoBody = H_end.TwoBody;
+      std::cout << "WARNING: valence_3b_source=at_end is a diagnostic; the IMSRG(3)-level transform with the IMSRG(2) Omega "
+                << "is not decoupled, compare the ||H_od|| below" << std::endl;
+      std::cout << "valence 3b (at_end): ||H_od|| of the " << valence_generator << " generator: H(s) "
+                << imsrgsolver.GetGenerator().GetHod(imsrgsolver.GetH_s()).Norm() << ", IMSRG(3)-level two-body part "
+                << imsrgsolver.GetGenerator().GetHod(twobody_only).Norm() << std::endl;
+    }
     else
     {
-      std::cerr << "valence_3b_source must be perturbative or flow; got " << valence_3b_source << std::endl;
+      std::cerr << "valence_3b_source must be perturbative, flow or at_end; got " << valence_3b_source << std::endl;
       return EXIT_FAILURE;
     }
     std::cout << "valence 3b (" << valence_3b_source << "): ||W|| = " << valence3b.ThreeBodyNorm() << std::endl;
@@ -1413,7 +1462,13 @@ int main(int argc, char** argv)
     Operator lower = renormal_order ? valence3b.DoNormalOrdering3(-1, valence_holes) : Operator(modelspace_imsrg, 0, 0, 0, 2);
     std::cout << std::setprecision(8) << "valence 3b lower-body terms relative to the core: E0' = " << lower.ZeroBody
               << "  ||f'|| = " << lower.OneBodyNorm() << "  ||Gamma'|| = " << lower.TwoBodyNorm() << std::endl;
-    Operator Hv = imsrgsolver.GetH_s() + lower;
+    Operator base = imsrgsolver.GetH_s();
+    if (valence_3b_source == "at_end")
+    {
+      base = renormal_order ? valence3b_twobody.UndoNormalOrdering().DoNormalOrderingCore() : valence3b_twobody;
+      rw.WriteTokyo(base, valence_3b_file + "_2b.snt", "");
+    }
+    Operator Hv = base + lower;
     rw.WriteTokyo(Hv, valence_3b_file + ".snt", "");
     rw.WriteValence3body(valence3b.ThreeBody, valence_3b_file + "_3b.int");
     std::cout << "Wrote " << valence_3b_file << ".snt (H(s) plus the lower-body terms of W) and "

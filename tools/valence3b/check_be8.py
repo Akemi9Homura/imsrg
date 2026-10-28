@@ -56,9 +56,14 @@ def lowest(states):
     return gs, ex2
 
 
+def base_snt(d):
+    """The two-body Hamiltonian that v3b.snt adds the lower-body terms of W to."""
+    return d / "v3b_2b.snt" if (d / "v3b_2b.snt").exists() else d / "run.snt"
+
+
 def check_lower_body(d, occ_by_orbit):
-    """imsrg++ lower-body terms (v3b.snt minus run.snt) against the m-scheme formula from the three-body file."""
-    std, v3b = pspace.read_snt(d / "run.snt"), pspace.read_snt(d / "v3b.snt")
+    """imsrg++ lower-body terms (v3b.snt minus its base) against the m-scheme formula from the three-body file."""
+    std, v3b = pspace.read_snt(base_snt(d)), pspace.read_snt(d / "v3b.snt")
     space = pspace.Space(std["orbits"])
     one_s, two_s, _ = pspace.hamiltonian(std, space)
     one_v, two_v, _ = pspace.hamiltonian(v3b, space)
@@ -74,9 +79,9 @@ def check_lower_body(d, occ_by_orbit):
 
 
 def decomposition(d, Zv, Nv):
-    """Expectation values in the ground state of the standard H(s): three-body, lower-body one+two-body, zero-body."""
-    std, v3b = pspace.read_snt(d / "run.snt"), pspace.read_snt(d / "v3b.snt")
-    states, (space, basis, X, H) = pspace.spectrum(d / "run.snt", Zv, Nv)
+    """Expectation values in the ground state of the base Hamiltonian: three-body, lower-body one+two-body, zero-body."""
+    std, v3b = pspace.read_snt(base_snt(d)), pspace.read_snt(d / "v3b.snt")
+    states, (space, basis, X, H) = pspace.spectrum(base_snt(d), Zv, Nv)
     one_s, two_s, _ = pspace.hamiltonian(std, space)
     one_v, two_v, three = pspace.hamiltonian(v3b, space, pspace.read_3b(d / "v3b_3b.int", std["orbits"]))
     diff1 = {k: one_v.get(k, 0) - one_s.get(k, 0) for k in set(one_v) | set(one_s)}
@@ -85,6 +90,16 @@ def decomposition(d, Zv, Nv):
     m3 = pspace.many_body_matrix(basis, None, None, three)
     m12 = pspace.many_body_matrix(basis, diff1, diff2, None)
     return {"3B": float(x @ m3 @ x), "1+2B": float(x @ m12 @ x), "0B": v3b["zero"] - std["zero"]}
+
+
+def compare_w(a, b):
+    """|W_a - W_b| / |W_b| over the J-coupled elements of two three-body files."""
+    va = {e[:9]: e[9] for e in pspace.read_3b(a)}
+    vb = {e[:9]: e[9] for e in pspace.read_3b(b)}
+    keys = set(va) | set(vb)
+    num = sum((va.get(k, 0.0) - vb.get(k, 0.0)) ** 2 for k in keys)
+    den = sum(v ** 2 for v in vb.values())
+    return (num / den) ** 0.5 if den > 0 else float("nan"), den ** 0.5
 
 
 def main():
@@ -99,6 +114,8 @@ def main():
         "Be8_gathered": ("Be8", 8, ["valence_3b_omega=gathered"]),
         "Be8_segments": ("Be8", 8, ["valence_3b_omega=segments"]),
         "C12_gathered": ("C12", 12, ["valence_3b_omega=gathered"]),
+        "Be8_at_end": ("Be8", 8, ["valence_3b_source=at_end"]),
+        "C12_at_end": ("C12", 12, ["valence_3b_source=at_end"]),
     }
     if args.with_imsrg3:
         runs["Be8_imsrg3"] = ("Be8", 8, ["IMSRG3=true", "valence_3b_source=flow"])
@@ -109,7 +126,7 @@ def main():
     print(f"Omega from scratch vs in memory: v3b.snt and v3b_3b.int identical apart from the header line: {same}")
 
     print(f"exact Be8: E {EXACT['E']:.4f}  2+ {EXACT['Ex2+']:.4f}  Rp2 {EXACT['Rp2']:.4f}")
-    for tag in [t for t in ("Be8_gathered", "Be8_segments", "Be8_imsrg3") if t in dirs]:
+    for tag in [t for t in ("Be8_gathered", "Be8_segments", "Be8_at_end", "Be8_imsrg3") if t in dirs]:
         d = dirs[tag]
         ops = [("Rp2", d / "runRp2.snt")]
         std, _ = pspace.spectrum(d / "run.snt", 2, 2, operator_paths=ops)
@@ -117,16 +134,31 @@ def main():
         (g0, x0), (g1, x1) = lowest(std), lowest(w3)
         print(f"{tag:13s} without W: E {g0['E']:.4f}  2+ {x0:.4f}  Rp2 {g0['Rp2']:.4f} | with W: E {g1['E']:.4f}  "
               f"2+ {x1:.4f}  Rp2 {g1['Rp2']:.4f} | shift E {g1['E'] - g0['E']:+.4f}  2+ {x1 - x0:+.4f}")
+        if base_snt(d) != d / "run.snt":
+            b2, _ = pspace.spectrum(base_snt(d), 2, 2, operator_paths=ops)
+            gb, xb = lowest(b2)
+            print(f"{'':13s} two-body feedback only (v3b_2b.snt): E {gb['E']:.4f}  2+ {xb:.4f}  Rp2 {gb['Rp2']:.4f}"
+                  f" | shift E {gb['E'] - g0['E']:+.4f}  2+ {xb - x0:+.4f}")
         dec = decomposition(d, 2, 2)
         print(f"{'':13s} in the ground state without W: 3B {dec['3B']:+.5f}  1+2B {dec['1+2B']:+.5f}  "
               f"0B {dec['0B']:+.5f}  sum {sum(dec.values()):+.5f}")
-    for tag, occ in (("Be8_gathered", {o: 0.5 for o in P32}), ("C12_gathered", {o: 1.0 for o in P32})):
+    for tag, occ in (("Be8_gathered", {o: 0.5 for o in P32}), ("C12_gathered", {o: 1.0 for o in P32}),
+                     ("Be8_at_end", {o: 0.5 for o in P32}), ("C12_at_end", {o: 1.0 for o in P32})):
         c = check_lower_body(dirs[tag], occ)
         print(f"{tag:13s} lower-body terms, imsrg++ minus m-scheme formula: zero {c['zero']:+.1e}  one {c['one']:.1e}  "
               f"two {c['two']:.1e}  (max |W| {c['max|W|']:.2e}, E0' {c['E0p']:+.6f})")
+    # W relative to the at_end (and, if run, the IMSRG(3) flow) three-body
+    for ref in [r for r in ("Be8_at_end", "Be8_imsrg3") if r in dirs]:
+        for tag in [t for t in ("Be8_gathered", "Be8_segments", "Be8_at_end", "Be8_imsrg3") if t in dirs and t != ref]:
+            rel, norm = compare_w(dirs[tag] / "v3b_3b.int", dirs[ref] / "v3b_3b.int")
+            print(f"|W({tag}) - W({ref})| / |W({ref})| = {rel:.3f}   (|W({ref})| = {norm:.4f})")
     # C12: <Phi0|:W:|Phi0> = 0 for the reference determinant p3/2^4 x p3/2^4
-    d = dirs["C12_gathered"]
-    std, v3b = pspace.read_snt(d / "run.snt"), pspace.read_snt(d / "v3b.snt")
+    for tag in ("C12_gathered", "C12_at_end"):
+        c12_determinant_check(dirs[tag])
+
+
+def c12_determinant_check(d):
+    std, v3b = pspace.read_snt(base_snt(d)), pspace.read_snt(d / "v3b.snt")
     space = pspace.Space(std["orbits"])
     phi0 = sum(1 << k for k, (o, m) in enumerate(space.mstates) if std["orbits"][o] in P32)
     basis = pspace.Basis(space, 4, 4, 0)
@@ -135,7 +167,7 @@ def main():
     hs = pspace.many_body_matrix(basis, *pspace.hamiltonian(std, space)[:2], None, std["zero"])
     hv = pspace.many_body_matrix(basis, *pspace.hamiltonian(v3b, space, pspace.read_3b(d / "v3b_3b.int",
                                                                                          std["orbits"])), v3b["zero"])
-    print(f"C12 <Phi0|H(s) + :W:|Phi0> - <Phi0|H(s)|Phi0> = {e @ hv @ e - e @ hs @ e:+.2e} MeV (must vanish)")
+    print(f"{d.name}: <Phi0|base + :W:|Phi0> - <Phi0|base|Phi0> = {e @ hv @ e - e @ hs @ e:+.2e} MeV (must vanish)")
 
 
 if __name__ == "__main__":
