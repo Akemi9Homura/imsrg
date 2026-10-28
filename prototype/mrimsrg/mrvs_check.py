@@ -10,12 +10,16 @@ space of an exported vacuum H(s) and supplies the valence-space reference (bigst
   gate      MR-VS with the ensemble occupations, lambda2 = 0 and C = C_HF: must reproduce sr
             (run with mr_validation_tolerance=0.3: lambda2 = 0 is not N-representable)
   mr<k>     MR-VS with the reference from the Nmax 0 ground state of the previous H(s) (k = 1: sr)
+  g1only    the last mr run with lambda2 set to zero (same gamma1, C): splits the gamma1 and lambda2 effects
+  s0_*      smax = 0 with and without lambda2: with NN only the .snt must agree (exact rewrite); with 3N the
+            difference is the lambda2 part of MR-NO2B (1/4 V3 lambda2 in f, A(gamma1 lambda2) in E)
 
 Each H(s) is diagonalized in Nmax 0 (E, 2+, <Rp2>); the .snt route (core energy + KSHELL) must give the
-same energies, which checks the MR -> core re-normal-ordering.  Exact Be8 values: BIGSTICK Nmax 12
-(full emax2), doc/records/工作记录.md, 2026-10-27 Be8 gate.
+same energies, which checks the MR -> core re-normal-ordering.  Exact Be8 values (NN only): BIGSTICK Nmax 12
+(full emax2), doc/records/工作记录.md, 2026-10-27 Be8 gate.  --three-body adds the small N3LO_lnl 3N test file
+(hw16 e3max6, matrix-element source only, as UnitTestMRThreeBody): SR NO2B in the HF basis, MR-NO2B in MR-VS.
 
-  mrvs_check.py --workdir DIR --fixture-dir DATA [--iterations 3]
+  mrvs_check.py --workdir DIR --fixture-dir DATA [--iterations 3] [--three-body none|full|no2b]
 """
 
 import argparse
@@ -40,7 +44,7 @@ from prototype.mrimsrg.postdiag_bigstick import expectation_values, parse_res  #
 from prototype.mrimsrg.reference_io import load_reference  # noqa: E402
 
 EXACT = {"E": -26.325, "Rp2": 4.209, "Ex2+": 3.340}
-COMMON = ["fmt2=jcoupled64", "3bme=none", "reference=Be8", "valence_space=p-shell", "A=8", "hw=20", "emax=2",
+COMMON = ["fmt2=jcoupled64", "reference=Be8", "valence_space=p-shell", "A=8", "hw=20", "emax=2",
           "BetaCM=0", "nucleon_mass_correction=false", "method=magnus", "Operators=Rp2"]
 
 
@@ -148,6 +152,23 @@ def gate_reference(template, occ_file, c_mat, labels, output):
                digests=template["digests"])
 
 
+def zero_lambda2(source, output):
+    """Copy of a jref with lambda2 set to zero (same occupations and transformation)."""
+    ref = read_jref(source)
+    write_jref(output, header=ref["header"], orbits=ref["orbits"], occupations=ref["occupations"],
+               transformation=ref["C"], digests=ref["digests"],
+               lambda_blocks=[(J, p, Tz, pairs, np.zeros_like(m)) for J, p, Tz, pairs, m in ref["blocks"]])
+
+
+def snt_spe(snt):
+    """Valence single-particle energies {(n, l, 2j, 2tz): e} of a .snt."""
+    lines = [line.split() for line in Path(snt).read_text().splitlines() if not line.lstrip().startswith("!")]
+    nprot, nneut = int(lines[0][0]), int(lines[0][1])
+    orbits = {int(f[0]): tuple(int(x) for x in f[1:5]) for f in lines[1:1 + nprot + nneut]}
+    nspe = int(lines[1 + nprot + nneut][0])
+    return {orbits[int(f[0])]: float(f[2]) for f in lines[2 + nprot + nneut:2 + nprot + nneut + nspe]}
+
+
 def next_reference(bigstick, run, jref_in, output):
     """Nmax 0 ground state of the exported (natural-basis) H(s), written as a jref in that basis."""
     work = run / "reference"
@@ -170,6 +191,7 @@ def main():
     parser.add_argument("--workdir", type=Path, required=True)
     parser.add_argument("--fixture-dir", type=Path, default=REPOSITORY / "prototype/mrimsrg/data")
     parser.add_argument("--iterations", type=int, default=3)
+    parser.add_argument("--three-body", choices=("none", "full", "no2b"), default="none")
     parser.add_argument("--imsrg", type=Path, default=REPOSITORY / "build/src/imsrg++")
     parser.add_argument("--bigstick", type=Path, default=Path.home() / "BigstickPublick/bin/bigstick-openmp.x")
     args = parser.parse_args()
@@ -177,6 +199,14 @@ def main():
     work.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="2")
     bigstick = str(args.bigstick)
+    if args.three_body == "none":
+        COMMON.append("3bme=none")
+    else:
+        stem = "full" if args.three_body == "full" else "NO2B"
+        COMMON.extend([f"3bme={args.fixture_dir}/N3LO_lnl_3N/ThBME_{stem}_srg2.0_N3LO_EM500_lnl_N3max40_hw16_emax6"
+                       "_e2max12_e3max6.me3j.gz", f"3bme_type={args.three_body}", "e3max=6", "file3e1max=6",
+                       "file3e2max=12", "file3e3max=6"])
+    exact = EXACT if args.three_body == "none" else None
 
     bare = work / "Be8_bare.jcoupled64"
     if not bare.exists():
@@ -201,12 +231,14 @@ def main():
             r["<Phi|H(s)|Phi>"] = next(float(line.split("=")[1].split()[0]) for line in open(run / "imsrg.log")
                                        if line.startswith("IM-FCIQMC export check: H(s).ZeroBody"))
         results[label] = r
-        print(f"{label:6s} E={r['E']:9.4f} ({r['E'] - EXACT['E']:+.4f})  2+={r['Ex2+']:.4f}  "
-              f"Rp2={r['Rp2']:.4f} ({r['Rp2'] - EXACT['Rp2']:+.4f})  KSHELL-BIGSTICK={r['kshell'][0] - r['E']:+.1e}"
+        d = (lambda key: f" ({r[key] - exact[key]:+.4f})") if exact else (lambda key: "")
+        print(f"{label:6s} E={r['E']:9.4f}{d('E')}  2+={r['Ex2+']:.4f}  "
+              f"Rp2={r['Rp2']:.4f}{d('Rp2')}  KSHELL-BIGSTICK={r['kshell'][0] - r['E']:+.1e}"
               + (f"  <Phi|H(s)|Phi>={r['<Phi|H(s)|Phi>']:9.4f}  |lambda2|={r['|lambda2|']:.3f}" if jref else ""),
               flush=True)
 
-    print(f"exact  E={EXACT['E']:9.4f}  2+={EXACT['Ex2+']:.4f}  Rp2={EXACT['Rp2']:.4f}")
+    if exact:
+        print(f"exact  E={EXACT['E']:9.4f}  2+={EXACT['Ex2+']:.4f}  Rp2={EXACT['Rp2']:.4f}")
     sr = work / "sr"
     run_imsrg(args.imsrg, bare, sr, ["basis=HF", "write_omega=true"], env)
     record("sr", sr)
@@ -237,8 +269,27 @@ def main():
         new = work / f"ref{k + 1}.jref"
         if not new.exists():
             next_reference(bigstick, run, jref, new)
-        jref = new
-    (work / "results.json").write_text(json.dumps({"exact": EXACT, **results}, indent=1))
+        last, jref = jref, new
+
+    # same reference as the last mr run, lambda2 = 0 (not N-representable: loosened check as for the gate)
+    g1 = work / "g1only.jref"
+    if not g1.exists():
+        zero_lambda2(last, g1)
+    loose = ["mr_validation_tolerance=0.3"]
+    run_imsrg(args.imsrg, bare, work / "g1only", mr_extra(g1) + loose, env)
+    record("g1only", work / "g1only", g1)
+    run_imsrg(args.imsrg, bare, work / "s0_lambda2", mr_extra(last) + ["smax=0"], env)
+    run_imsrg(args.imsrg, bare, work / "s0_g1only", mr_extra(g1) + ["smax=0"] + loose, env)
+    spe_l, spe_g = snt_spe(work / "s0_lambda2/run.snt"), snt_spe(work / "s0_g1only/run.snt")
+    zero_l, _ = snt_values(work / "s0_lambda2/run.snt")
+    zero_g, _ = snt_values(work / "s0_g1only/run.snt")
+    results["s=0 lambda2 - g1only"] = {"zero body": zero_l - zero_g,
+                                       **{f"spe {k}": spe_l[k] - spe_g[k] for k in spe_l}}
+    print("s=0 .snt, with minus without lambda2: zero body " f"{zero_l - zero_g:+.5f}, SPE "
+          + ", ".join(f"{k[0]}{'spdf'[k[1]]}{k[2]}/2{'p' if k[3] < 0 else 'n'} {spe_l[k] - spe_g[k]:+.5f}"
+                      for k in sorted(spe_l)))
+    (work / "results.json").write_text(json.dumps({"exact": exact, "three_body": args.three_body, **results},
+                                                  indent=1))
 
 
 if __name__ == "__main__":
