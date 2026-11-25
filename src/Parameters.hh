@@ -103,6 +103,8 @@ std::map<std::string,std::string> Parameters::string_par = {
   {"write_HO_ops",              "false"},       // Write the HO operator before doing the HF transormation ;  Added by Antoine Belley
   {"write_HF_ops",              "false"},       // Write the HF operators before doing IMSRG transformation ; Added by Antoine Belley
   {"denominator_partitioning",  "Epstein_Nesbet"}, // Denominators used in IMSRG generators. Can be Moller_Plesset or Epstein_Nesbet.
+  {"cm2step",                   "false"},       // Two-step c.m. treatment: after the valence-space flow, add cm2step_beta*hw*N_cm built from the transformed c.m. ladder operators and flow again
+  {"cm2step_check",             "false"},       // Only check that sum_mu (a_mu)^dagger a_mu reproduces H_cm/hw - 3/2 with no transformation, then exit
 };
 
 
@@ -117,6 +119,8 @@ std::map<std::string,double> Parameters::double_par = {
   {"denominator_delta",	   0},	// offset added to the denominator in the generator
   {"BetaCM",               0},  // Prefactor for Lawson-Glockner term
   {"hwBetaCM",            -1},  // Oscillator frequency used in the Lawson-Glockner term. Negative value means use the frequency of the basis
+  {"cm2step_beta",         0},  // Lawson prefactor of the second step of the two-step c.m. treatment (cm2step=true)
+  {"cm2step_hw",          -1},  // Frequency of the c.m. ladder operators in the second step. Negative value means use the frequency of the basis
   {"eta_criterion",     1e-6},  // Threshold on ||eta|| for convergence in the flow
   {"hw_trap",             -1},  // Frequency for harmonic lab-frame trap V = 1/2 M omega**2 * r**2
   {"dE3max",		  99},  // cut on energies which limits the 3-body states considered in IMSRG(3) commutators

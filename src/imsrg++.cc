@@ -53,6 +53,7 @@
 #include <stdio.h>
 #include <string>
 #include <omp.h>
+#include <memory>
 #include "IMSRG.hh"
 #include "Parameters.hh"
 #include "PhysicalConstants.hh"
@@ -157,6 +158,10 @@ int main(int argc, char** argv)
   double denominator_delta = parameters.d("denominator_delta");
   double BetaCM = parameters.d("BetaCM");
   double hwBetaCM = parameters.d("hwBetaCM");
+  bool cm2step = parameters.s("cm2step") == "true";
+  bool cm2step_check = parameters.s("cm2step_check") == "true";
+  double cm2step_beta = parameters.d("cm2step_beta");
+  double cm2step_hw = parameters.d("cm2step_hw");
   double eta_criterion = parameters.d("eta_criterion");
   double hw_trap = parameters.d("hw_trap");
   double dE3max = parameters.d("dE3max");
@@ -442,6 +447,12 @@ int main(int argc, char** argv)
     std::cout << std::endl;
   }
 
+
+  if (cm2step_check) // two-step c.m. treatment: check the ladder-operator form of H_cm in the HO basis, then stop
+  {
+    imsrg_util::CheckCMNumberIdentity(modelspace, cm2step_hw);
+    return 0;
+  }
 
 //  std::cout << "Making the Hamiltonian..." << std::endl;
   int particle_rank = input3bme=="none" ? 2 : 3;
@@ -1161,6 +1172,78 @@ int main(int argc, char** argv)
   }
 
 
+  // Two-step c.m. treatment (feature/two-step-cm).
+  // Step 1 (above) decoupled H without (or with a small BetaCM) Lawson term: U1, Hbar1.
+  // Step 2: transform the c.m. lowering operator a_cm with U1, keep its one-body part, build N1 = sum_mu (a_mu)^dag a_mu
+  // (exactly positive), flow H2 = Hbar1 + beta*hw_cm*N1 again with the valence generator (U2), and rebuild the Lawson
+  // term from a_cm transformed by U2 as well, so H_cm itself is never evolved:
+  //   H_final = U2 Hbar1 U2^dag + beta*hw_cm * sum_mu (a2_mu)^dag a2_mu,  a2 = 1b part of U2 (U1 a_cm U1^dag) U2^dag
+  //   (the full U1 a_cm U1^dag, with its induced 2b part, is transformed by U2; only the product uses the 1b part).
+  // Operators are transformed with U1 and then U2. N2 is written as <intfile>NCM2step.snt (c.m. quantum number).
+  std::unique_ptr<IMSRGSolver> cm2solver;
+  Operator cm2_N2;
+  if (cm2step)
+  {
+    if (method != "magnus" or modelspace_imsrg.valence.size()==0)
+    {
+      std::cout << "cm2step needs method=magnus and a valence space. Stopping." << std::endl;
+      return 1;
+    }
+    double hw_cm = cm2step_hw > 0 ? cm2step_hw : modelspace.GetHbarOmega();
+    std::cout << "=== Two-step c.m. treatment: beta = " << cm2step_beta << ", hw_cm = " << hw_cm << std::endl;
+
+    // a_cm in the same basis and model space as the operators below (HF or NAT, normal ordered, truncated if emax_imsrg)
+    std::array<Operator,2> a_parts = imsrg_util::CMLowering_HermAntiHerm(modelspace, hw_cm);
+    for (auto& op : a_parts)
+    {
+      if ( basis == "HF")       op = hf.TransformToHFBasis(op);
+      else if ( basis == "NAT") op = hf.TransformHOToNATBasis(op);
+      op = op.DoNormalOrdering();
+      if ( (eMax_imsrg != -1) or (e2Max_imsrg != -1) or (e3Max_imsrg != -1) ) op = op.Truncate(modelspace_imsrg);
+    }
+    Operator aH1 = imsrgsolver.Transform(a_parts[0]);
+    Operator aK1 = imsrgsolver.Transform(a_parts[1]);
+    std::cout << "  a_cm after step 1: one-body norms (herm, antiherm) " << aH1.OneBodyNorm() << " " << aK1.OneBodyNorm()
+              << "   two-body norms (dropped) " << aH1.TwoBodyNorm() << " " << aK1.TwoBodyNorm() << std::endl;
+
+    Operator Hbar1 = imsrgsolver.GetH_s();
+    ModelSpace& ms_h = *(Hbar1.GetModelSpace());
+    Operator N1 = imsrg_util::CMNumberFromLowering(ms_h, aH1.OneBody + aK1.OneBody).DoNormalOrdering();
+    std::cout << "  N1: <ref|N1|ref> = " << N1.ZeroBody << "   one-body norm " << N1.OneBodyNorm()
+              << "   two-body norm " << N1.TwoBodyNorm() << std::endl;
+    Operator H2 = Hbar1 + (cm2step_beta*hw_cm) * N1;
+
+    cm2solver = std::make_unique<IMSRGSolver>(H2);
+    cm2solver->SetScratchDir(""); // Omega files are named by pid; keep the second-step Omegas in memory
+    cm2solver->SetMethod(method);
+    cm2solver->SetDenominatorPartitioning(denominator_partitioning);
+    cm2solver->SetEtaCriterion(eta_criterion);
+    cm2solver->GetGenerator().SetOnly2bEta(only_2b_eta);
+    cm2solver->SetHunterGatherer( hunter_gatherer );
+    cm2solver->SetSmax(smax);
+    if (flowfile != "") cm2solver->SetFlowFile(flowfile + "_cm2");
+    cm2solver->SetDs(ds_0);
+    cm2solver->SetDsmax(dsmax);
+    cm2solver->SetDenominatorDelta(denominator_delta);
+    cm2solver->SetdOmega(domega);
+    cm2solver->SetOmegaNormMax(omega_norm_max);
+    cm2solver->SetODETolerance(ode_tolerance);
+    if (denominator_delta_orbit != "none") cm2solver->SetDenominatorDeltaOrbit(denominator_delta_orbit);
+    cm2solver->SetGenerator(valence_generator);
+    std::cout << "  second flow with generator " << valence_generator << std::endl;
+    modelspace_imsrg.ResetFirstPass();
+    cm2solver->Solve();
+
+    Operator aH2 = cm2solver->Transform(aH1);
+    Operator aK2 = cm2solver->Transform(aK1);
+    cm2_N2 = imsrg_util::CMNumberFromLowering(ms_h, aH2.OneBody + aK2.OneBody).DoNormalOrdering();
+    Operator Hfinal = cm2solver->Transform(Hbar1) + (cm2step_beta*hw_cm) * cm2_N2;
+    std::cout << "  N2: <ref|N2|ref> = " << cm2_N2.ZeroBody << "   E0: Hbar1 " << Hbar1.ZeroBody
+              << "   flowed H2 " << cm2solver->GetH_s().ZeroBody << "   rebuilt " << Hfinal.ZeroBody << std::endl;
+    imsrgsolver.FlowingOps[0] = Hfinal;
+  }
+
+
   if ( imsrg3_at_end )
   {
     if ( method.find("magnus") != std::string::npos )
@@ -1529,6 +1612,7 @@ int main(int argc, char** argv)
 
   
       op = imsrgsolver.Transform(op);
+      if (cm2solver) op = cm2solver->Transform(op); // two-step c.m. treatment: second transformation U2
       
       //      std::cout << "Before renormal ordering Op(5,4) is " << std::setprecision(10) << op.OneBody(5,4) << std::endl;
       if (renormal_order) 
@@ -1584,6 +1668,19 @@ int main(int argc, char** argv)
     }
 
     }// for opnames
+
+    if (cm2step) // two-step c.m. treatment: write the rebuilt c.m. quantum number N2 (E_cm = hw_cm <N2>)
+    {
+      Operator op = cm2_N2;
+      if (renormal_order)
+      {
+        op = op.UndoNormalOrdering();
+        op = op.DoNormalOrderingCore();
+      }
+      std::cout << "writing NCM2step: zero body " << op.ZeroBody << std::endl;
+      if (valence_file_format == "tokyo") rw.WriteTokyo(op, intfile+"NCM2step.snt", "op");
+      else rw.WriteNuShellX_op(op, intfile+"NCM2step.int");
+    }
 
   }// if method == "magnus"
 

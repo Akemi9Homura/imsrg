@@ -5367,6 +5367,191 @@ Operator FourierBesselCoeff(ModelSpace& modelspace, int nu, double R, std::set<i
 
 
 
- 
+
+ ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Two-step c.m. treatment (branch feature/two-step-cm).
+ // H_cm(w) = hbar w (a_cm^dagger . a_cm + 3/2) with the c.m. ladder operator a_cm = (1/sqrt(A)) sum_i a_i.
+ // The IMSRG transforms a_cm (a one-body operator); the Lawson term is rebuilt as beta hbar w sum_mu (a_mu)^dagger a_mu,
+ // which is positive semidefinite by construction.
+ ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ /// Reduced matrix elements of the tensor adjoint B_mu = (-1)^mu (A_{-mu})^dagger of a one-body rank-k tensor A,
+ /// Edmonds convention: <p||B||q> = (-1)^(j_q - j_p) <q||A||p> (real matrix elements).
+ arma::mat TensorAdjointReduced(ModelSpace& modelspace, const arma::mat& Ared)
+ {
+   int norb = modelspace.GetNumberOrbits();
+   arma::mat B(norb, norb, arma::fill::zeros);
+   for (int p=0; p<norb; ++p)
+   {
+     Orbit& op = modelspace.GetOrbit(p);
+     for (int q=0; q<norb; ++q)
+     {
+       if (Ared(q,p) == 0) continue;
+       Orbit& oq = modelspace.GetOrbit(q);
+       B(p,q) = modelspace.phase( (oq.j2 - op.j2)/2 ) * Ared(q,p);
+     }
+   }
+   return B;
+ }
+
+
+ /// c.m. lowering operator for a c.m. oscillator of frequency hw_cm (hw_cm <= 0: the basis frequency):
+ ///   a_cm = (R/b_cm + i b_cm P/hbar)/sqrt(2) = (1/sqrt(A)) sum_i a_i(hw_cm),   b_cm = sqrt(hbar/(m A w_cm)).
+ /// In the HO basis of frequency hw, a(hw_cm) = c1 a(hw) + c2 a^dagger(hw), lambda = sqrt(hw_cm/hw),
+ /// c1 = (lambda + 1/lambda)/2, c2 = (lambda - 1/lambda)/2. The single-particle lowering operator a(hw) = (r/b + b grad)/sqrt(2)
+ /// has the orbital reduced matrix elements (Edmonds; HO radial functions positive at the origin, as in RSquaredOp)
+ ///   <n-1, l+1 || a || n l> = -sqrt(2 n (l+1)),    <n, l-1 || a || n l> = -sqrt(2 l (n + l + 1/2)),
+ /// coupled to j with Edmonds (7.1.7): <(l' s) j'||T^1(l)||(l s) j> = (-1)^(l'+s+j+1) sqrt((2j+1)(2j'+1)) {l' j' s; j l 1} <l'||T^1||l>.
+ /// The tensor commutators handle only hermitian or antihermitian operators, so a_cm is returned as its hermitian part
+ /// (a+a^dagger)/2 [0] and antihermitian part (a-a^dagger)/2 [1]: reduced, rank 1, odd parity, Tz = 0, in the HO basis.
+ std::array<Operator,2> CMLowering_HermAntiHerm(ModelSpace& modelspace, double hw_cm)
+ {
+   double hw = modelspace.GetHbarOmega();
+   if (hw_cm <= 0) hw_cm = hw;
+   int A = modelspace.GetTargetMass();
+   double lambda = std::sqrt(hw_cm / hw);
+   double c1 = 0.5 * (lambda + 1.0/lambda);
+   double c2 = 0.5 * (lambda - 1.0/lambda);
+   int norb = modelspace.GetNumberOrbits();
+   arma::mat Ared(norb, norb, arma::fill::zeros); // <p || a(hw) || q> of a_cm, including 1/sqrt(A)
+   for (int p=0; p<norb; ++p)
+   {
+     Orbit& op = modelspace.GetOrbit(p);
+     for (int q=0; q<norb; ++q)
+     {
+       Orbit& oq = modelspace.GetOrbit(q);
+       if (op.tz2 != oq.tz2) continue;
+       if (std::abs(op.j2 - oq.j2) > 2) continue;
+       double orb = 0;
+       if (op.l == oq.l+1 and op.n == oq.n-1)   orb = -std::sqrt(2.0 * oq.n * (oq.l+1));
+       else if (op.l == oq.l-1 and op.n == oq.n) orb = -std::sqrt(2.0 * oq.l * (oq.n + oq.l + 0.5));
+       if (orb == 0) continue;
+       int ph = modelspace.phase( op.l + (oq.j2 + 3)/2 ); // (-1)^(l_p + 1/2 + j_q + 1)
+       double sixj = AngMom::SixJ( op.l, 0.5*op.j2, 0.5, 0.5*oq.j2, oq.l, 1 );
+       Ared(p,q) = ph * std::sqrt( (op.j2+1.0)*(oq.j2+1.0) ) * sixj * orb / std::sqrt(A);
+     }
+   }
+   arma::mat Atot = c1 * Ared + c2 * TensorAdjointReduced(modelspace, Ared);
+   arma::mat Atot_dag = TensorAdjointReduced(modelspace, Atot);
+
+   std::array<Operator,2> parts = { Operator(modelspace,1,0,1,2), Operator(modelspace,1,0,1,2) };
+   for (auto& op : parts)
+   {
+     if (not op.IsReduced()) op.MakeReduced();
+   }
+   parts[0].SetHermitian();
+   parts[1].SetAntiHermitian();
+   parts[0].OneBody = 0.5 * (Atot + Atot_dag);
+   parts[1].OneBody = 0.5 * (Atot - Atot_dag);
+   return parts;
+ }
+
+
+ /// N = sum_mu (A_mu)^dagger A_mu = B . A (B = tensor adjoint of A) for a one-body rank-1 tensor A given by its reduced
+ /// matrix elements <p||A||q>, in vacuum (particle-number) form: the one-body part (B . A) acts on one particle, the
+ /// two-body part is sum_{i != j} B(i) . A(j) = sum_{i<j} [B(i).A(j) + A(i).B(j)]. No truncation, so N >= 0 exactly.
+ ///   one body:  <p| B.A |q> = 1/(2j_p+1) sum_s (-1)^(j_p - j_s) <p||B||s> <s||A||q>
+ ///   two body (Edmonds 7.1.6): <ab J| T(1).U(2) |cd J> = (-1)^(j_c + j_b + J) {J j_b j_a; 1 j_c j_d} <a||T||c> <b||U||d>,
+ ///   antisymmetrized and normalized as <ab J|V|cd J> = [D(abcd) - (-1)^(j_c+j_d-J) D(abdc)] / sqrt((1+d_ab)(1+d_cd)).
+ Operator CMNumberFromLowering(ModelSpace& modelspace, const arma::mat& Ared)
+ {
+   arma::mat B = TensorAdjointReduced(modelspace, Ared);
+   Operator N(modelspace);
+   N.SetHermitian();
+   int norb = modelspace.GetNumberOrbits();
+   for (int p=0; p<norb; ++p)
+   {
+     Orbit& op = modelspace.GetOrbit(p);
+     for (int q : N.OneBodyChannels.at({op.l, op.j2, op.tz2}) )
+     {
+       double sum = 0;
+       for (int s=0; s<norb; ++s)
+       {
+         if (B(p,s) == 0 or Ared(s,q) == 0) continue;
+         Orbit& os = modelspace.GetOrbit(s);
+         sum += modelspace.phase( (op.j2 - os.j2)/2 ) * B(p,s) * Ared(s,q);
+       }
+       N.OneBody(p,q) = sum / (op.j2 + 1.0);
+     }
+   }
+
+   auto D = [&](int a, int b, int c, int d, int J)
+   {
+     double prod = B(a,c)*Ared(b,d) + Ared(a,c)*B(b,d);
+     if (prod == 0) return 0.0;
+     Orbit& oa = modelspace.GetOrbit(a);
+     Orbit& ob = modelspace.GetOrbit(b);
+     Orbit& oc = modelspace.GetOrbit(c);
+     Orbit& od = modelspace.GetOrbit(d);
+     double sixj = AngMom::SixJ( J, 0.5*ob.j2, 0.5*oa.j2, 1, 0.5*oc.j2, 0.5*od.j2 );
+     return modelspace.phase( (oc.j2 + ob.j2)/2 + J ) * sixj * prod;
+   };
+
+   int nchan = modelspace.GetNumberTwoBodyChannels();
+   for (int ch=0; ch<nchan; ++ch) // SixJ uses a cache that is filled on the fly, so stay serial
+   {
+     TwoBodyChannel& tbc = modelspace.GetTwoBodyChannel(ch);
+     int J = tbc.J;
+     int nkets = tbc.GetNumberKets();
+     for (int ibra=0; ibra<nkets; ++ibra)
+     {
+       Ket& bra = tbc.GetKet(ibra);
+       for (int iket=ibra; iket<nkets; ++iket)
+       {
+         Ket& ket = tbc.GetKet(iket);
+         Orbit& oc = modelspace.GetOrbit(ket.p);
+         Orbit& od = modelspace.GetOrbit(ket.q);
+         double val = D(bra.p, bra.q, ket.p, ket.q, J)
+                    - modelspace.phase( (oc.j2 + od.j2)/2 - J ) * D(bra.p, bra.q, ket.q, ket.p, J);
+         if (bra.p == bra.q) val *= INVSQRT2;
+         if (ket.p == ket.q) val *= INVSQRT2;
+         if (val != 0) N.TwoBody.SetTBME(ch, ibra, iket, val);
+       }
+     }
+   }
+   return N;
+ }
+
+
+ /// Check, with no IMSRG transformation, that sum_mu (a_mu)^dagger a_mu built by CMNumberFromLowering reproduces
+ /// H_cm(hw_cm)/(hbar w_cm) - 3/2 in vacuum form: one body H_cm/hw_cm - 3/(2A) on the diagonal, two body H_cm/hw_cm.
+ /// For hw_cm = hw this should hold to machine precision (up to the E2max cut in TCM_Op); for hw_cm != hw it fails in
+ /// the top shells, where a^dagger(hw) leaves the space. Prints the largest deviations.
+ void CheckCMNumberIdentity(ModelSpace& modelspace, double hw_cm)
+ {
+   double hw = modelspace.GetHbarOmega();
+   if (hw_cm <= 0) hw_cm = hw;
+   int A = modelspace.GetTargetMass();
+   std::array<Operator,2> parts = CMLowering_HermAntiHerm(modelspace, hw_cm);
+   Operator N = CMNumberFromLowering(modelspace, parts[0].OneBody + parts[1].OneBody);
+   Operator Href = TCM_Op(modelspace) + 0.5*A*M_NUCLEON*hw_cm*hw_cm/HBARC/HBARC * R2CM_Op(modelspace);
+   Href /= hw_cm;
+   for (auto p : modelspace.all_orbits) Href.OneBody(p,p) -= 1.5/A;
+
+   double d1 = arma::abs(N.OneBody - Href.OneBody).max();
+   double n1 = arma::abs(Href.OneBody).max();
+   double d2 = 0, n2 = 0;
+   int ch_worst = -1;
+   for (int ch=0; ch<modelspace.GetNumberTwoBodyChannels(); ++ch)
+   {
+     arma::mat diff = arma::abs( N.TwoBody.GetMatrix(ch,ch) - Href.TwoBody.GetMatrix(ch,ch) );
+     if (diff.n_elem == 0) continue; // channel without kets
+     double dmax = diff.max();
+     if (dmax > d2) { d2 = dmax; ch_worst = ch; }
+     n2 = std::max(n2, arma::abs(Href.TwoBody.GetMatrix(ch,ch)).max());
+   }
+   std::cout << std::setprecision(10);
+   std::cout << "CM identity check (hw_cm = " << hw_cm << ", basis hw = " << hw << ", A = " << A << "):" << std::endl;
+   std::cout << "  one body: max |N - (Hcm/hw - 3/2A)| = " << d1 << "   (max |ref| = " << n1 << ")" << std::endl;
+   std::cout << "  two body: max |N - Hcm/hw|          = " << d2 << "   (max |ref| = " << n2 << ")";
+   if (ch_worst >= 0)
+   {
+     TwoBodyChannel& tbc = modelspace.GetTwoBodyChannel(ch_worst);
+     std::cout << "   worst channel J,p,Tz = " << tbc.J << "," << tbc.parity << "," << tbc.Tz;
+   }
+   std::cout << std::endl;
+   std::cout << "  one-body norms N, ref: " << N.OneBodyNorm() << " " << Href.OneBodyNorm()
+             << "   two-body norms N, ref: " << N.TwoBodyNorm() << " " << Href.TwoBodyNorm() << std::endl;
+ }
 
 }// namespace imsrg_util

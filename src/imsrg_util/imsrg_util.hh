@@ -38,6 +38,12 @@ namespace imsrg_util
 
  Operator OperatorFromString(ModelSpace& modelspace, std::string str);
 // DaggerOperator DaggerOperatorFromString(ModelSpace& modelspace, std::string str);
+
+ // Two-step c.m. treatment (feature/two-step-cm): c.m. ladder operators and the c.m. quantum number built from them.
+ arma::mat TensorAdjointReduced(ModelSpace& modelspace, const arma::mat& Ared);
+ std::array<Operator,2> CMLowering_HermAntiHerm(ModelSpace& modelspace, double hw_cm);
+ Operator CMNumberFromLowering(ModelSpace& modelspace, const arma::mat& Ared);
+ void CheckCMNumberIdentity(ModelSpace& modelspace, double hw_cm);
  std::map<index_t,double> GetSecondOrderOccupations(Operator& H, int emax);
 
  Operator NumberOp(ModelSpace& modelspace, int n, int l, int j2, int tz2);
